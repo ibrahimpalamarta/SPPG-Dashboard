@@ -1,0 +1,11 @@
+# Copy to backend-production.hcl (gitignored) for local runs, or pass the
+# same key=value pairs as -backend-config flags directly (this is what CI
+# does, building each value from GitHub Environment variables).
+#
+# terraform init -backend-config=backend-production.hcl
+
+bucket         = "dashboard-sppg-terraform-state-production"
+key            = "production/terraform.tfstate"
+region         = "ap-southeast-3"
+dynamodb_table = "dashboard-sppg-terraform-lock-production"
+encrypt        = true
