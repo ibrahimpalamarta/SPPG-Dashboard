@@ -1,0 +1,14 @@
+# Real per-environment values — never committed, only *.example files are.
+terraform.tfvars
+backend-*.hcl
+!backend-*.hcl.example
+
+# Terraform working files
+# Note: .terraform.lock.hcl is intentionally NOT ignored — commit it per
+# root module (backend-bootstrap, environments/*) for reproducible provider versions.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
