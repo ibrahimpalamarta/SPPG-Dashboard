@@ -9,7 +9,7 @@ locals {
   # Application-infra resources are provisioned by a separate Terraform state
   # (infra/environments/<env>) and don't exist yet when this role is created
   # in backend-bootstrap. ARNs are therefore built from the shared naming
-  # convention (dashboard-sppg-<env>-<resource>) rather than resource
+  # convention (sppg-dashboard-<env>-<resource>) rather than resource
   # references, so bootstrap has no dependency on the environment stacks.
   ecr_repo_arn_pattern     = "arn:aws:ecr:${var.aws_region}:${var.account_id}:repository/${local.prefix}-*"
   ecs_cluster_arn          = "arn:aws:ecs:${var.aws_region}:${var.account_id}:cluster/${local.prefix}-cluster"

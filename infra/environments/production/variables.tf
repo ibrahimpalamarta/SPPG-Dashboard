@@ -5,7 +5,7 @@ variable "env" {
 
 variable "project_name" {
   type    = string
-  default = "dashboard-sppg"
+  default = "sppg-dashboard"
 }
 
 variable "aws_region" {
@@ -106,7 +106,7 @@ variable "acm_certificate_arn" {
 
 variable "db_name" {
   type    = string
-  default = "dashboard_sppg"
+  default = "sppg_dashboard"
 }
 
 variable "db_master_username" {
@@ -138,4 +138,19 @@ variable "db_multi_az" {
 variable "db_backup_retention_period" {
   type    = number
   default = 7
+}
+
+variable "auth0_domain" {
+  description = "Auth0 tenant domain for this environment (staging and prod use separate Auth0 APIs)."
+  type        = string
+}
+
+variable "auth0_audience" {
+  description = "Auth0 API identifier the backend validates access tokens against."
+  type        = string
+}
+
+variable "auth0_roles_claim" {
+  description = "Namespaced custom claim on the access token carrying the user's roles."
+  type        = string
 }

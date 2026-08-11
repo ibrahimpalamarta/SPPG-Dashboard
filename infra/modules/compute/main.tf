@@ -260,9 +260,18 @@ resource "aws_ecs_task_definition" "backend" {
         protocol      = "tcp"
       }]
       environment = [
+        { name = "NODE_ENV", value = "production" },
+        { name = "PORT", value = tostring(var.backend_container_port) },
         { name = "DB_HOST", value = var.db_endpoint },
         { name = "DB_PORT", value = tostring(var.db_port) },
         { name = "DB_NAME", value = var.db_name },
+        # Auth0 config is deliberately plain environment, not secrets: the API
+        # only verifies tokens against the public JWKS, so it holds no Auth0
+        # credentials. The Management API M2M secret used for seeding is never
+        # given to the running service.
+        { name = "AUTH0_DOMAIN", value = var.auth0_domain },
+        { name = "AUTH0_AUDIENCE", value = var.auth0_audience },
+        { name = "AUTH0_ROLES_CLAIM", value = var.auth0_roles_claim },
       ]
       secrets = [
         { name = "DB_USERNAME", valueFrom = "${var.db_secret_arn}:username::" },

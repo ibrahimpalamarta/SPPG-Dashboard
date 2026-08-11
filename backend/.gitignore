@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Postman env template is committed with blank values; a filled-in copy is not.
+postman/*.local.json
+

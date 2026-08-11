@@ -12,7 +12,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Project name used as resource naming prefix"
   type        = string
-  default     = "dashboard-sppg"
+  default     = "sppg-dashboard"
 }
 
 variable "github_org" {

@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Authorization roles. Auth0 is the source of truth (Roles & Permissions);
+/// this column is the synced copy the backend actually enforces against.
+enum Role {
+  SUPER_ADMIN
+  DATA_ADMIN
+  INTERNAL
+  PUBLIC
+}
+
+/// Application-side user record. Holds NO credentials — Auth0 owns identity,
+/// `auth0Sub` is the only link between the two.
+model User {
+  id       String  @id @default(uuid()) @db.Uuid
+  auth0Sub String  @unique @map("auth0_sub")
+  email    String? @unique
+  name     String?
+  role     Role    @default(PUBLIC)
+
+  /// Scopes a DATA_ADMIN to a single SPPG Dapur. Nullable and unconstrained for
+  /// now; a FK to the sppg_dapur table lands with that table in the next phase.
+  scopeId String? @map("scope_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  auditLogs AuditLog[]
+
+  @@index([role])
+  @@index([scopeId])
+  @@map("users")
+}
+
+/// Who did what, to which entity, when. Written sparsely in this phase;
+/// the shape is here so feature endpoints can just call writeAuditLog().
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}

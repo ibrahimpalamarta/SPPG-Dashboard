@@ -4,8 +4,8 @@
 #
 # terraform init -backend-config=backend-staging.hcl
 
-bucket         = "dashboard-sppg-terraform-state-staging"
+bucket         = "sppg-dashboard-terraform-state-staging"
 key            = "staging/terraform.tfstate"
 region         = "ap-southeast-3"
-dynamodb_table = "dashboard-sppg-terraform-lock-staging"
+dynamodb_table = "sppg-dashboard-terraform-lock-staging"
 encrypt        = true

@@ -1,4 +1,4 @@
-# Infrastruktur AWS — dashboard_sppg
+# Infrastruktur AWS — SPPG Dashboard
 
 Terraform + GitHub Actions untuk 2 environment (`staging`, `production`), didesain **migration-ready**: saat ini jalan di AWS account personal, dan pindah ke account kantor nanti hanya butuh ganti *value* (Account ID, region, role ARN) tanpa mengubah kode/struktur apa pun.
 
