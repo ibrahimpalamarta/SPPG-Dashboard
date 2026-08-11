@@ -30,12 +30,11 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push frontend image
-        working-directory: frontend
-        run: |
-          docker build -t "${{ vars.ECR_FRONTEND_URL }}:${{ github.sha }}" .
-          docker push "${{ vars.ECR_FRONTEND_URL }}:${{ github.sha }}"
-
+      # Frontend build is skipped for now — frontend/ has no app yet. The
+      # frontend ECS service will sit unhealthy on whatever image tag it last
+      # had (or fail to pull if none was ever pushed); that's expected and
+      # doesn't block the backend service/target group. Re-add this step once
+      # frontend/ has a Dockerfile.
       - name: Build and push backend image
         working-directory: backend
         run: |
