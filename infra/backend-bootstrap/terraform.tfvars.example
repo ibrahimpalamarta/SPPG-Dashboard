@@ -4,7 +4,7 @@
 
 account_id  = "111111111111"
 aws_region  = "ap-southeast-3"
-project_name = "dashboard-sppg"
+project_name = "sppg-dashboard"
 
 github_org  = "your-github-org-or-username"
-github_repo = "dashboard_sppg"
+github_repo = "SPPG-Dashboard"

@@ -4,8 +4,8 @@
 #
 # terraform init -backend-config=backend-production.hcl
 
-bucket         = "dashboard-sppg-terraform-state-production"
+bucket         = "sppg-dashboard-terraform-state-production"
 key            = "production/terraform.tfstate"
 region         = "ap-southeast-3"
-dynamodb_table = "dashboard-sppg-terraform-lock-production"
+dynamodb_table = "sppg-dashboard-terraform-lock-production"
 encrypt        = true

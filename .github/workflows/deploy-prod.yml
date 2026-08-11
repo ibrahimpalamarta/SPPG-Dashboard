@@ -67,7 +67,10 @@ jobs:
             -var="github_org=${{ vars.GITHUB_ORG }}" \
             -var="github_repo=${{ vars.GITHUB_REPO_NAME }}" \
             -var="frontend_image_tag=${{ github.sha }}" \
-            -var="backend_image_tag=${{ github.sha }}"
+            -var="backend_image_tag=${{ github.sha }}" \
+            -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
+            -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
+            -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
 
       - name: Show ALB URL
         working-directory: ${{ env.TF_DIR }}

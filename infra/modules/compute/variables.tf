@@ -117,3 +117,18 @@ variable "acm_certificate_arn" {
   type        = string
   default     = ""
 }
+
+variable "auth0_domain" {
+  description = "Auth0 tenant domain, e.g. your-tenant.us.auth0.com. Not a secret."
+  type        = string
+}
+
+variable "auth0_audience" {
+  description = "Auth0 API identifier the backend validates tokens against. Not a secret."
+  type        = string
+}
+
+variable "auth0_roles_claim" {
+  description = "Namespaced custom claim carrying the user's Auth0 roles."
+  type        = string
+}
