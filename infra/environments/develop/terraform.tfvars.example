@@ -5,3 +5,9 @@
 account_id  = "111111111111"
 github_org  = "your-github-org-or-username"
 github_repo = "SPPG-Dashboard"
+
+# Wajib: tidak punya default di variables.tf. Di CI nilainya datang dari
+# GitHub Environment variables AUTH0_DOMAIN / AUTH0_AUDIENCE / AUTH0_ROLES_CLAIM.
+auth0_domain      = "your-tenant-develop.au.auth0.com"
+auth0_audience    = "https://api.sppg-dashboard.local"
+auth0_roles_claim = "https://sppg-dashboard/roles"
