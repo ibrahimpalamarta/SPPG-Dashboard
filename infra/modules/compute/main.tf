@@ -374,7 +374,7 @@ resource "aws_ecs_service" "frontend" {
   name            = "${local.prefix}-frontend"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.frontend.arn
-  desired_count   = var.desired_count
+  desired_count   = var.frontend_desired_count
   launch_type     = "FARGATE"
 
   network_configuration {

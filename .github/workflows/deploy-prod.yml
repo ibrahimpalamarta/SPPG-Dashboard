@@ -51,18 +51,6 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
-      # Frontend is deliberately absent from this workflow — frontend/ has no
-      # app yet. Add a step here once frontend/ has a Dockerfile.
-      - name: Build and push backend image
-        working-directory: backend
-        run: |
-          docker build -t "${{ vars.ECR_BACKEND_URL }}:${{ github.sha }}" .
-          docker push "${{ vars.ECR_BACKEND_URL }}:${{ github.sha }}"
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -75,22 +63,48 @@ jobs:
             -backend-config="region=${{ vars.AWS_REGION }}" \
             -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE }}"
 
-      # Targeted on purpose: registers the migration task definition against
-      # the new image tag WITHOUT rolling the service, so migrations land
-      # before the new code serves traffic.
-      - name: Register migration task definition
+      # Runs before the image is built, and does two jobs at once.
+      #
+      # It creates the ECR repository the next step pushes to: the repository
+      # is part of this stack, so on a fresh environment `docker push` would
+      # otherwise fail with "repository does not exist".
+      #
+      # And it registers the migration task definition against the new image
+      # tag WITHOUT rolling the service, so migrations land before the new code
+      # serves traffic. RegisterTaskDefinition doesn't check that the image
+      # exists, so registering it ahead of the push is safe — run-task below
+      # still happens after.
+      #
+      # The cluster is targeted explicitly because it is NOT a dependency of the
+      # migrate task definition: without it, a fresh environment reaches the
+      # migration step with no cluster and no ecs_cluster_name output to read.
+      # Everything else those two pull in as dependencies — VPC, subnets,
+      # security group, RDS, the secret, the log group, the task roles.
+      - name: Provision ECR and register migration task definition
         working-directory: ${{ env.TF_DIR }}
         run: |
+          set -euo pipefail
           terraform apply -auto-approve \
+            -target=module.compute.aws_ecs_cluster.this \
             -target=module.compute.aws_ecs_task_definition.migrate \
-            -var="account_id=${{ vars.AWS_ACCOUNT_ID }}" \
             -var="aws_region=${{ vars.AWS_REGION }}" \
-            -var="github_org=${{ vars.GITHUB_ORG }}" \
-            -var="github_repo=${{ vars.GITHUB_REPO_NAME }}" \
             -var="backend_image_tag=${{ github.sha }}" \
             -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
             -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
             -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+          echo "ECR_BACKEND_URL=$(terraform output -raw ecr_backend_repository_url)" >> "$GITHUB_ENV"
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Frontend is deliberately absent from this workflow — frontend/ has no
+      # app yet, and its ECS service is pinned to desired_count 0 in Terraform
+      # for the same reason. Add a step here once frontend/ has a Dockerfile.
+      - name: Build and push backend image
+        working-directory: backend
+        run: |
+          docker build -t "$ECR_BACKEND_URL:${{ github.sha }}" .
+          docker push "$ECR_BACKEND_URL:${{ github.sha }}"
 
       - name: Run database migrations
         working-directory: ${{ env.TF_DIR }}
@@ -129,14 +143,22 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: |
           terraform apply -auto-approve \
-            -var="account_id=${{ vars.AWS_ACCOUNT_ID }}" \
             -var="aws_region=${{ vars.AWS_REGION }}" \
-            -var="github_org=${{ vars.GITHUB_ORG }}" \
-            -var="github_repo=${{ vars.GITHUB_REPO_NAME }}" \
             -var="backend_image_tag=${{ github.sha }}" \
             -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
             -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
             -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+
+      # terraform apply returns as soon as UpdateService is accepted, so
+      # without this the job goes green while the new tasks are still
+      # crash-looping. This is what turns "deployed" into "actually running".
+      - name: Wait for backend service to stabilise
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          set -euo pipefail
+          aws ecs wait services-stable \
+            --cluster "$(terraform output -raw ecs_cluster_name)" \
+            --services "$(terraform output -raw backend_service_name)"
 
       - name: Show ALB URL
         working-directory: ${{ env.TF_DIR }}
