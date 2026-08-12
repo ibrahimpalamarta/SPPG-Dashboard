@@ -2,8 +2,8 @@ locals {
   prefix = "${var.project_name}-${var.env}"
 
   sub_conditions = [
-    for pattern in var.trusted_ref_patterns :
-    "repo:${var.github_org}/${var.github_repo}:ref:${pattern}"
+    for pattern in var.trusted_sub_patterns :
+    "repo:${var.github_org}/${var.github_repo}:${pattern}"
   ]
 
   # Application-infra resources are provisioned by a separate Terraform state
@@ -86,7 +86,10 @@ resource "aws_iam_policy" "deploy_app" {
           "ecs:DescribeServices",
           "ecs:DescribeTaskDefinition",
           "ecs:DescribeTasks",
-          "ecs:ListTasks"
+          "ecs:ListTasks",
+          # One-off `prisma migrate deploy` task, run by the deploy workflow
+          # before the service rolls out. RDS is unreachable from the runner.
+          "ecs:RunTask"
         ]
         Resource = [
           local.ecs_cluster_arn,
@@ -114,6 +117,17 @@ resource "aws_iam_policy" "deploy_app" {
             "iam:PassedToService" = "ecs-tasks.amazonaws.com"
           }
         }
+      },
+      {
+        # So a failed migration task prints its reason in the workflow log
+        # instead of only in CloudWatch.
+        Sid    = "EcsTaskLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:GetLogEvents",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "${local.logs_arn_pattern}:*"
       }
     ]
   })

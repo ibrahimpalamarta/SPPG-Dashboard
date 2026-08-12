@@ -10,7 +10,7 @@ variable "project_name" {
 
 variable "aws_region" {
   type    = string
-  default = "ap-southeast-3"
+  default = "ap-southeast-2"
 }
 
 variable "account_id" {
@@ -34,9 +34,12 @@ variable "vpc_cidr" {
   default = "10.20.0.0/16"
 }
 
+# CI passes no tfvars file — terraform.tfvars is gitignored — so these defaults
+# are what the deploy workflow actually builds with. They must match the region
+# the state bucket lives in (ap-southeast-2).
 variable "azs" {
   type    = list(string)
-  default = ["ap-southeast-3a", "ap-southeast-3b"]
+  default = ["ap-southeast-2a", "ap-southeast-2b"]
 }
 
 variable "public_subnet_cidrs" {
@@ -127,7 +130,7 @@ variable "db_allocated_storage" {
 
 variable "db_engine_version" {
   type    = string
-  default = "16.4"
+  default = "16.14"
 }
 
 variable "db_multi_az" {

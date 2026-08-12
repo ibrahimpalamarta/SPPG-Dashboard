@@ -21,6 +21,19 @@ resource "aws_secretsmanager_secret_version" "db_password" {
   secret_string = jsonencode({
     username = var.master_username
     password = random_password.master.result
+
+    # The app composes its own URL from the discrete DB_* pieces (see
+    # backend/src/config/env.ts), but the Prisma CLI only reads DATABASE_URL,
+    # and ECS can't interpolate one secret into another. urlencode matters:
+    # override_special above puts /, ?, #, %, @ and : into the password.
+    url = format(
+      "postgresql://%s:%s@%s:%d/%s?sslmode=require",
+      urlencode(var.master_username),
+      urlencode(random_password.master.result),
+      aws_db_instance.this.address,
+      aws_db_instance.this.port,
+      var.db_name,
+    )
   })
 }
 

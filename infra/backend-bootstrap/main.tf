@@ -116,6 +116,11 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = [var.github_oidc_thumbprint]
 }
 
+# The sub claim is `environment:<name>`, not `ref:refs/heads/<branch>`: every
+# deploy job declares `environment:`, and GitHub swaps the ref form out for the
+# environment form when it does. Which branches may reach an environment is
+# therefore enforced by GitHub (Settings -> Environments -> Deployment branches),
+# not here: staging <- develop, production <- main and v* tags.
 module "iam_oidc_staging" {
   source = "../modules/iam-oidc"
 
@@ -126,7 +131,7 @@ module "iam_oidc_staging" {
   github_org           = var.github_org
   github_repo          = var.github_repo
   oidc_provider_arn    = aws_iam_openid_connect_provider.github.arn
-  trusted_ref_patterns = ["refs/heads/staging"]
+  trusted_sub_patterns = ["environment:staging"]
   state_bucket_arn     = aws_s3_bucket.state["staging"].arn
   lock_table_arn       = aws_dynamodb_table.lock["staging"].arn
 }
@@ -134,17 +139,14 @@ module "iam_oidc_staging" {
 module "iam_oidc_production" {
   source = "../modules/iam-oidc"
 
-  env               = "production"
-  project_name      = var.project_name
-  account_id        = var.account_id
-  aws_region        = var.aws_region
-  github_org        = var.github_org
-  github_repo       = var.github_repo
-  oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
-  trusted_ref_patterns = [
-    "refs/heads/main",
-    "refs/tags/v*",
-  ]
-  state_bucket_arn = aws_s3_bucket.state["production"].arn
-  lock_table_arn   = aws_dynamodb_table.lock["production"].arn
+  env                  = "production"
+  project_name         = var.project_name
+  account_id           = var.account_id
+  aws_region           = var.aws_region
+  github_org           = var.github_org
+  github_repo          = var.github_repo
+  oidc_provider_arn    = aws_iam_openid_connect_provider.github.arn
+  trusted_sub_patterns = ["environment:production"]
+  state_bucket_arn     = aws_s3_bucket.state["production"].arn
+  lock_table_arn       = aws_dynamodb_table.lock["production"].arn
 }

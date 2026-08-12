@@ -293,6 +293,45 @@ resource "aws_ecs_task_definition" "backend" {
   }
 }
 
+# Same image as the backend, different command: the deploy workflow runs this
+# as a one-off task before rolling the service, because RDS is only reachable
+# from inside the VPC. No service owns it; it exists purely to be run-task'd.
+resource "aws_ecs_task_definition" "migrate" {
+  family                   = "${local.prefix}-migrate"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.backend_cpu
+  memory                   = var.backend_memory
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "migrate"
+      image     = "${var.ecr_backend_repository_url}:${var.backend_image_tag}"
+      essential = true
+      command   = ["npx", "prisma", "migrate", "deploy"]
+      secrets = [
+        { name = "DATABASE_URL", valueFrom = "${var.db_secret_arn}:url::" },
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          # Shares the backend log group so this needs no extra log group and
+          # no extra IAM grant; the stream prefix keeps it separable.
+          "awslogs-group"         = aws_cloudwatch_log_group.backend.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "migrate"
+        }
+      }
+    }
+  ])
+
+  tags = {
+    Name = "${local.prefix}-migrate"
+  }
+}
+
 resource "aws_ecs_service" "frontend" {
   name            = "${local.prefix}-frontend"
   cluster         = aws_ecs_cluster.this.id
