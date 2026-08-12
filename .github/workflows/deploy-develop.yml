@@ -1,8 +1,8 @@
-name: Deploy Staging
+name: Deploy Develop
 
 on:
   push:
-    branches: [staging]
+    branches: [develop]
 
 permissions:
   id-token: write
@@ -11,20 +11,20 @@ permissions:
 # Two overlapping runs would fight over the Terraform state lock. Queue instead
 # of cancelling: a half-finished apply is worse than a slow one.
 concurrency:
-  group: deploy-staging
+  group: deploy-develop
   cancel-in-progress: false
 
 env:
-  TF_DIR: infra/environments/staging
+  TF_DIR: infra/environments/develop
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     # `environment:` is load-bearing twice over: every `vars.*` below is a
     # GitHub Environment variable, and the OIDC sub claim the deploy role
-    # trusts is `repo:<org>/<repo>:environment:staging`. Which branches may
+    # trusts is `repo:<org>/<repo>:environment:develop`. Which branches may
     # deploy here is set in Settings -> Environments -> Deployment branches.
-    environment: staging
+    environment: develop
 
     steps:
       - name: Checkout
@@ -75,7 +75,7 @@ jobs:
         run: |
           terraform init \
             -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
-            -backend-config="key=staging/terraform.tfstate" \
+            -backend-config="key=develop/terraform.tfstate" \
             -backend-config="region=${{ vars.AWS_REGION }}" \
             -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE }}"
 

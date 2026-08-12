@@ -27,7 +27,7 @@ provider "aws" {
 }
 
 locals {
-  environments = ["staging", "production"]
+  environments = ["develop", "staging", "production"]
 }
 
 resource "aws_s3_bucket" "state" {
@@ -120,7 +120,22 @@ resource "aws_iam_openid_connect_provider" "github" {
 # deploy job declares `environment:`, and GitHub swaps the ref form out for the
 # environment form when it does. Which branches may reach an environment is
 # therefore enforced by GitHub (Settings -> Environments -> Deployment branches),
-# not here: staging <- develop, production <- main and v* tags.
+# not here: develop <- develop, staging <- staging, production <- main and v* tags.
+module "iam_oidc_develop" {
+  source = "../modules/iam-oidc"
+
+  env                  = "develop"
+  project_name         = var.project_name
+  account_id           = var.account_id
+  aws_region           = var.aws_region
+  github_org           = var.github_org
+  github_repo          = var.github_repo
+  oidc_provider_arn    = aws_iam_openid_connect_provider.github.arn
+  trusted_sub_patterns = ["environment:develop"]
+  state_bucket_arn     = aws_s3_bucket.state["develop"].arn
+  lock_table_arn       = aws_dynamodb_table.lock["develop"].arn
+}
+
 module "iam_oidc_staging" {
   source = "../modules/iam-oidc"
 
