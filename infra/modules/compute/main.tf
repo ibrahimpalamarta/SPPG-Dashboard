@@ -80,6 +80,27 @@ resource "aws_lb_listener" "http" {
   }
 }
 
+# Without this the backend is only reachable at /api/*, which is behind auth,
+# so there is no unauthenticated way to tell a deployed backend from a dead
+# one: every other path falls through to the frontend target group and returns
+# 503 while frontend/ has no app. Same path the backend target group already
+# health-checks, so it stays correct once a frontend does exist.
+resource "aws_lb_listener_rule" "health_http" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 5
+
+  condition {
+    path_pattern {
+      values = [var.backend_health_check_path]
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+}
+
 resource "aws_lb_listener_rule" "api_http" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 10
@@ -110,6 +131,23 @@ resource "aws_lb_listener" "https" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.frontend.arn
+  }
+}
+
+resource "aws_lb_listener_rule" "health_https" {
+  count        = var.acm_certificate_arn != "" ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 5
+
+  condition {
+    path_pattern {
+      values = [var.backend_health_check_path]
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
   }
 }
 
