@@ -14,6 +14,14 @@ output "backend_service_name" {
   value = aws_ecs_service.backend.name
 }
 
+output "migrate_task_definition_family" {
+  value = aws_ecs_task_definition.migrate.family
+}
+
+output "backend_log_group_name" {
+  value = aws_cloudwatch_log_group.backend.name
+}
+
 output "ecs_task_execution_role_arn" {
   value = aws_iam_role.ecs_task_execution.arn
 }

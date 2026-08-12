@@ -31,8 +31,8 @@ variable "github_repo" {
   type        = string
 }
 
-variable "trusted_ref_patterns" {
-  description = "Git ref patterns (e.g. refs/heads/staging, refs/tags/v*) allowed to assume this role via OIDC"
+variable "trusted_sub_patterns" {
+  description = "OIDC sub claim suffixes allowed to assume this role, appended to repo:<org>/<repo>: — e.g. environment:staging, or ref:refs/tags/v* for jobs without an environment"
   type        = list(string)
 }
 
