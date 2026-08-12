@@ -6,6 +6,11 @@ output "ecs_cluster_name" {
   value = module.compute.ecs_cluster_name
 }
 
+# Consumed by the deploy workflow to wait out the ECS rollout.
+output "backend_service_name" {
+  value = module.compute.backend_service_name
+}
+
 # Consumed by the deploy workflow to run the one-off migration task.
 output "migrate_task_definition_family" {
   value = module.compute.migrate_task_definition_family
