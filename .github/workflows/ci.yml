@@ -1,0 +1,67 @@
+name: CI
+
+# The `develop` tier: every PR and every push to develop is gated here, but
+# nothing is deployed and no AWS credential is ever issued — this workflow
+# declares no `environment:` and no `id-token: write` on purpose. Deploys
+# start one tier up, when develop is merged into `staging`.
+on:
+  pull_request:
+    branches: [develop, staging, main]
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+# Opposite of the deploy workflows: superseding a stale PR check costs
+# nothing, so cancel it rather than queue it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # Same three commands the deploy workflows gate on, so a red CI here
+      # means a red deploy there — no surprises after merge. `npm test` needs
+      # no database: it is node's own test runner over .env.test.
+      - name: Install, build and test
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive infra
+
+      # -backend=false: validate needs provider schemas, not the S3 state —
+      # this job holds no AWS credentials. Catches broken HCL here instead of
+      # halfway through a deploy, after the image is already pushed to ECR.
+      - name: Terraform validate
+        run: |
+          set -euo pipefail
+          for dir in infra/backend-bootstrap infra/environments/staging infra/environments/production; do
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+          done

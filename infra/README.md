@@ -1,6 +1,6 @@
 # Infrastruktur AWS — SPPG Dashboard
 
-Terraform + GitHub Actions untuk 2 environment (`staging`, `production`), didesain **migration-ready**: saat ini jalan di AWS account personal, dan pindah ke account kantor nanti hanya butuh ganti *value* (Account ID, region, role ARN) tanpa mengubah kode/struktur apa pun.
+Tiga tingkat promosi — `develop` (gate CI saja, tanpa resource AWS), `staging`, dan `production` — dengan Terraform + GitHub Actions untuk 2 environment AWS (`staging`, `production`), didesain **migration-ready**: saat ini jalan di AWS account personal, dan pindah ke account kantor nanti hanya butuh ganti *value* (Account ID, region, role ARN) tanpa mengubah kode/struktur apa pun.
 
 ## Struktur
 
@@ -46,12 +46,14 @@ Prasyarat: AWS CLI ter-konfigurasi dengan **credential admin dari akun AWS perso
 
 4. **GitHub Environments** — di repo Settings → Environments, buat environment `staging` dan `production`. Isi Variables di masing-masing environment (lihat tabel di bawah) dengan value dari `terraform output` environment yang sesuai + output bootstrap. Dua konfigurasi manual satu kali lewat GitHub UI, **bukan** dikelola Terraform:
 
-   - **Deployment branches** (wajib, ini yang menegakkan pembatasan branch): `staging` → *Selected branches* → `develop`; `production` → `main` + tag `v*`. IAM tidak lagi mengunci branch, karena setiap job deploy memakai `environment:` sehingga GitHub mengirim sub claim `repo:<org>/<repo>:environment:<nama>` — bentuk `ref:refs/heads/<branch>` tidak pernah muncul.
+   - **Deployment branches** (wajib, ini yang menegakkan pembatasan branch): `staging` → *Selected branches* → `staging`; `production` → `main` + tag `v*`. IAM tidak lagi mengunci branch, karena setiap job deploy memakai `environment:` sehingga GitHub mengirim sub claim `repo:<org>/<repo>:environment:<nama>` — bentuk `ref:refs/heads/<branch>` tidak pernah muncul.
    - **Required reviewers** pada `production` (protection rule) — inilah gate approval manual sebelum deploy prod.
 
-5. Push/merge ke branch `develop` → trigger `deploy-staging.yml`, verifikasi OIDC auth, gate test/build, build+push image, migrasi DB, `terraform apply` dari CI, dan ECS service jadi healthy.
+5. PR ke `develop` (dan push ke `develop`) → trigger `ci.yml`: build + test backend, `terraform fmt`/`validate`. Tidak ada environment GitHub, tidak ada credential AWS, tidak ada resource yang dibuat — tingkat ini murni gate kualitas.
 
-6. Push tag `v*` atau merge ke `main` → trigger `deploy-prod.yml`, approve manual gate di GitHub UI, verifikasi hal yang sama di production.
+6. Merge `develop` → branch `staging` → trigger `deploy-staging.yml`, verifikasi OIDC auth, gate test/build, build+push image, migrasi DB, `terraform apply` dari CI, dan ECS service jadi healthy.
+
+7. Push tag `v*` atau merge `staging` ke `main` → trigger `deploy-prod.yml`, approve manual gate di GitHub UI, verifikasi hal yang sama di production.
 
 ### GitHub Environment Variables
 
@@ -79,7 +81,7 @@ Tidak ada AWS secret jangka panjang yang perlu disimpan — OIDC menghilangkan k
 4. **Re-run `terraform init -reconfigure` + `apply`** di tiap `environments/<env>` mengarah ke state bucket akun baru (dari output langkah 2), dengan `-var="account_id=<baru>"`. Ini provision VPC/ECS/RDS/ECR/S3 baru di akun kantor.
 5. **Update GitHub Environment variables** (staging & production): `AWS_ACCOUNT_ID`, `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE`, `ECR_BACKEND_URL` (region biasanya tetap `ap-southeast-2`). **Tidak ada perubahan kode/workflow** — inilah inti dari desain ini.
 6. **Cutover DNS** (jika sudah ada domain kustom) mengarah ke ALB DNS name akun baru.
-7. **Verifikasi full deploy cycle** di akun kantor (push ke `develop`, lalu tag rilis prod) sebelum mematikan apa pun di akun personal.
+7. **Verifikasi full deploy cycle** di akun kantor (push ke `staging`, lalu tag rilis prod) sebelum mematikan apa pun di akun personal.
 8. **Decommission akun personal**: `terraform destroy` tiap environment (staging dulu, baru production), lalu hapus resource `backend-bootstrap` (OIDC provider, IAM role, state bucket — setelah yakin tidak ada yang masih butuh histori state-nya; sebaiknya arsipkan dulu file `.tfstate` terakhir sebelum bucket dihapus).
 9. **Cabut/rotate** credential admin lokal akun personal yang dipakai untuk bootstrap.
 
