@@ -13,20 +13,6 @@ variable "aws_region" {
   default = "ap-southeast-2"
 }
 
-variable "account_id" {
-  description = "AWS Account ID currently in use (personal account today, office account after migration)"
-  type        = string
-}
-
-variable "github_org" {
-  description = "GitHub organization or username that owns the repository"
-  type        = string
-}
-
-variable "github_repo" {
-  type = string
-}
-
 # --- Network ---
 
 variable "vpc_cidr" {

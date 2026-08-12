@@ -21,6 +21,13 @@ locals {
   logs_arn_pattern         = "arn:aws:logs:${var.aws_region}:${var.account_id}:log-group:/ecs/${local.prefix}-*"
   rds_instance_arn         = "arn:aws:rds:${var.aws_region}:${var.account_id}:db:${local.prefix}-db"
   rds_subnet_group_arn     = "arn:aws:rds:${var.aws_region}:${var.account_id}:subgrp:${local.prefix}-db-subnet-group"
+
+  # CreateDBInstance is authorized against the parameter and option groups the
+  # instance ends up attached to as well as the instance itself. We never name
+  # one, so RDS attaches the account defaults (default.postgres<major>) — whose
+  # names track the engine version and so can't be pinned here.
+  rds_param_group_arn  = "arn:aws:rds:${var.aws_region}:${var.account_id}:pg:*"
+  rds_option_group_arn = "arn:aws:rds:${var.aws_region}:${var.account_id}:og:*"
 }
 
 resource "aws_iam_role" "deploy" {
@@ -178,11 +185,28 @@ resource "aws_iam_policy" "deploy_infra" {
         Sid    = "EcsInfra"
         Effect = "Allow"
         Action = [
-          "ecs:CreateCluster", "ecs:DeleteCluster", "ecs:DescribeClusters",
+          "ecs:CreateCluster", "ecs:DeleteCluster", "ecs:DescribeClusters", "ecs:UpdateCluster",
+          "ecs:PutClusterCapacityProviders",
           "ecs:CreateService", "ecs:DeleteService",
-          "ecs:DeregisterTaskDefinition", "ecs:TagResource", "ecs:ListTagsForResource"
+          "ecs:DeregisterTaskDefinition", "ecs:TagResource", "ecs:UntagResource",
+          "ecs:ListTagsForResource"
         ]
         Resource = "*"
+      },
+      {
+        # The ECR repositories are created by the environment stack, so the
+        # role that runs terraform needs to manage them — not just push to
+        # them (that part lives in deploy-app-policy).
+        Sid    = "EcrInfra"
+        Effect = "Allow"
+        Action = [
+          "ecr:CreateRepository", "ecr:DeleteRepository",
+          "ecr:PutLifecyclePolicy", "ecr:GetLifecyclePolicy", "ecr:DeleteLifecyclePolicy",
+          "ecr:PutImageScanningConfiguration", "ecr:PutImageTagMutability",
+          "ecr:GetRepositoryPolicy", "ecr:SetRepositoryPolicy", "ecr:DeleteRepositoryPolicy",
+          "ecr:TagResource", "ecr:UntagResource", "ecr:ListTagsForResource"
+        ]
+        Resource = local.ecr_repo_arn_pattern
       },
       {
         Sid    = "RdsInfra"
@@ -196,17 +220,22 @@ resource "aws_iam_policy" "deploy_infra" {
         Resource = [
           local.rds_instance_arn,
           local.rds_subnet_group_arn,
+          local.rds_param_group_arn,
+          local.rds_option_group_arn,
         ]
       },
       {
+        # s3:Get* rather than an enumerated read list: refreshing a single
+        # aws_s3_bucket makes the provider read a dozen sub-resources (cors,
+        # logging, lifecycle, replication, object-lock, ...), and missing any
+        # one of them fails the whole apply. Still scoped to this one bucket.
         Sid    = "S3AssetsBucket"
         Effect = "Allow"
         Action = [
-          "s3:CreateBucket", "s3:DeleteBucket", "s3:GetBucketPolicy", "s3:PutBucketPolicy",
-          "s3:PutBucketVersioning", "s3:GetBucketVersioning",
-          "s3:PutEncryptionConfiguration", "s3:GetEncryptionConfiguration",
-          "s3:PutBucketPublicAccessBlock", "s3:GetBucketPublicAccessBlock",
-          "s3:GetObject", "s3:PutObject", "s3:ListBucket", "s3:PutBucketTagging", "s3:GetBucketTagging"
+          "s3:CreateBucket", "s3:DeleteBucket", "s3:Get*", "s3:ListBucket",
+          "s3:PutBucketPolicy", "s3:PutBucketVersioning",
+          "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock",
+          "s3:PutObject", "s3:PutBucketTagging"
         ]
         Resource = [
           local.s3_assets_bucket_arn,
@@ -219,7 +248,9 @@ resource "aws_iam_policy" "deploy_infra" {
         Action = [
           "secretsmanager:CreateSecret", "secretsmanager:DeleteSecret",
           "secretsmanager:DescribeSecret", "secretsmanager:GetSecretValue",
-          "secretsmanager:PutSecretValue", "secretsmanager:TagResource"
+          "secretsmanager:PutSecretValue", "secretsmanager:UpdateSecret",
+          "secretsmanager:ListSecretVersionIds", "secretsmanager:GetResourcePolicy",
+          "secretsmanager:TagResource", "secretsmanager:UntagResource"
         ]
         Resource = local.secrets_arn_pattern
       },
@@ -228,9 +259,19 @@ resource "aws_iam_policy" "deploy_infra" {
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup", "logs:DeleteLogGroup",
-          "logs:PutRetentionPolicy", "logs:DescribeLogGroups", "logs:TagResource", "logs:TagLogGroup"
+          "logs:PutRetentionPolicy", "logs:TagResource", "logs:TagLogGroup",
+          "logs:ListTagsForResource", "logs:ListTagsLogGroup"
         ]
-        Resource = local.logs_arn_pattern
+        Resource = "${local.logs_arn_pattern}:*"
+      },
+      {
+        # DescribeLogGroups is a list call — it takes a name *prefix* as a
+        # parameter and does not support resource-level authorization, so it
+        # can only be granted on "*".
+        Sid      = "LogsDescribe"
+        Effect   = "Allow"
+        Action   = ["logs:DescribeLogGroups"]
+        Resource = "*"
       },
       {
         Sid    = "IamEcsRoles"
@@ -239,7 +280,8 @@ resource "aws_iam_policy" "deploy_infra" {
           "iam:CreateRole", "iam:DeleteRole", "iam:GetRole",
           "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
           "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListAttachedRolePolicies",
-          "iam:TagRole"
+          "iam:ListRolePolicies", "iam:ListRoleTags", "iam:ListInstanceProfilesForRole",
+          "iam:TagRole", "iam:UntagRole"
         ]
         Resource = local.ecs_role_arn_pattern
       }

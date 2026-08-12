@@ -91,8 +91,10 @@ resource "aws_db_instance" "this" {
   multi_az                = var.multi_az
   backup_retention_period = var.backup_retention_period
 
-  skip_final_snapshot       = var.env == "staging"
-  final_snapshot_identifier = var.env == "staging" ? null : "${local.prefix}-db-final-snapshot"
+  # Only production is worth a final snapshot; staging is disposable, and
+  # demanding one there just makes `terraform destroy` fail.
+  skip_final_snapshot       = var.env != "production"
+  final_snapshot_identifier = var.env != "production" ? null : "${local.prefix}-db-final-snapshot"
 
   tags = {
     Name = "${local.prefix}-db"
