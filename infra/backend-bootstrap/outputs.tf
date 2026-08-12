@@ -10,10 +10,6 @@ output "oidc_provider_arn" {
   value = aws_iam_openid_connect_provider.github.arn
 }
 
-output "develop_role_arn" {
-  value = module.iam_oidc_develop.role_arn
-}
-
 output "staging_role_arn" {
   value = module.iam_oidc_staging.role_arn
 }
