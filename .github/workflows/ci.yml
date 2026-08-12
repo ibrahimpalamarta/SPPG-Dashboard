@@ -1,13 +1,16 @@
 name: CI
 
-# Pre-merge gate for all three tiers. Deliberately pull_request-only: a push
-# to develop/staging/main already runs the matching deploy workflow, which
-# gates on the same build/test before it touches AWS — running this on push
-# too would just duplicate it. Nothing here is deployed and no AWS credential
-# is ever issued: no `environment:`, no `id-token: write`.
+# Pre-merge gate for all three tiers, plus the only gate `develop` has: it is a
+# transit branch with no deploy workflow, so a push straight to it would
+# otherwise go unchecked. staging/main stay pull_request-only — a push there
+# already runs the matching deploy workflow, which gates on the same build/test
+# before it touches AWS. Nothing here is deployed and no AWS credential is ever
+# issued: no `environment:`, no `id-token: write`.
 on:
   pull_request:
     branches: [develop, staging, main]
+  push:
+    branches: [develop]
 
 permissions:
   contents: read
@@ -60,7 +63,7 @@ jobs:
       - name: Terraform validate
         run: |
           set -euo pipefail
-          for dir in infra/backend-bootstrap infra/environments/develop infra/environments/staging infra/environments/production; do
+          for dir in infra/backend-bootstrap infra/environments/staging infra/environments/production; do
             terraform -chdir="$dir" init -backend=false -input=false
             terraform -chdir="$dir" validate
           done
