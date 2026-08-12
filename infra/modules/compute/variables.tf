@@ -76,6 +76,15 @@ variable "desired_count" {
   type = number
 }
 
+# Separate from desired_count, and 0, because frontend/ has no app yet: no
+# frontend image has ever been pushed, so any task ECS starts here just
+# crash-loops on ImagePullFailure. Raise this once frontend/ has a Dockerfile
+# and the deploy workflows push a frontend image.
+variable "frontend_desired_count" {
+  type    = number
+  default = 0
+}
+
 variable "frontend_health_check_path" {
   type    = string
   default = "/"
