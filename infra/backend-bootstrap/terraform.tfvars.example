@@ -3,7 +3,7 @@
 # this whole design exists to keep out of version control.
 
 account_id  = "111111111111"
-aws_region  = "ap-southeast-3"
+aws_region  = "ap-southeast-2"
 project_name = "sppg-dashboard"
 
 github_org  = "your-github-org-or-username"
