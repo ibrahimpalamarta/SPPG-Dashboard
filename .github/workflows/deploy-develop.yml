@@ -1,0 +1,147 @@
+name: Deploy Develop
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  id-token: write
+  contents: read
+
+# Two overlapping runs would fight over the Terraform state lock. Queue instead
+# of cancelling: a half-finished apply is worse than a slow one.
+concurrency:
+  group: deploy-develop
+  cancel-in-progress: false
+
+env:
+  TF_DIR: infra/environments/develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # `environment:` is load-bearing twice over: every `vars.*` below is a
+    # GitHub Environment variable, and the OIDC sub claim the deploy role
+    # trusts is `repo:<org>/<repo>:environment:develop`. Which branches may
+    # deploy here is set in Settings -> Environments -> Deployment branches.
+    environment: develop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # Gate: nothing below runs if this fails, so a broken commit never
+      # reaches ECR or Terraform. `npm test` needs no database — it is node's
+      # own test runner over .env.test, which is committed with dummy values.
+      - name: Install, build and test
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Frontend is deliberately absent from this workflow — frontend/ has no
+      # app yet. The frontend ECS service will sit unhealthy on whatever image
+      # tag it last had; that doesn't block the backend service or its target
+      # group. Add a step here once frontend/ has a Dockerfile.
+      - name: Build and push backend image
+        working-directory: backend
+        run: |
+          docker build -t "${{ vars.ECR_BACKEND_URL }}:${{ github.sha }}" .
+          docker push "${{ vars.ECR_BACKEND_URL }}:${{ github.sha }}"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=develop/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE }}"
+
+      # Targeted on purpose: registers the migration task definition against
+      # the new image tag WITHOUT rolling the service, so migrations land
+      # before the new code serves traffic.
+      - name: Register migration task definition
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform apply -auto-approve \
+            -target=module.compute.aws_ecs_task_definition.migrate \
+            -var="account_id=${{ vars.AWS_ACCOUNT_ID }}" \
+            -var="aws_region=${{ vars.AWS_REGION }}" \
+            -var="github_org=${{ vars.GITHUB_ORG }}" \
+            -var="github_repo=${{ vars.GITHUB_REPO_NAME }}" \
+            -var="backend_image_tag=${{ github.sha }}" \
+            -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
+            -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
+            -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+
+      - name: Run database migrations
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          set -euo pipefail
+          CLUSTER=$(terraform output -raw ecs_cluster_name)
+          FAMILY=$(terraform output -raw migrate_task_definition_family)
+          SUBNETS=$(terraform output -json private_subnet_ids | jq -r 'join(",")')
+          SG=$(terraform output -raw ecs_tasks_security_group_id)
+          LOG_GROUP=$(terraform output -raw backend_log_group_name)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$CLUSTER" \
+            --launch-type FARGATE \
+            --task-definition "$FAMILY" \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=DISABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "Migration task: $TASK_ARN"
+
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN"
+
+          # Surface prisma's own output in this log, not just CloudWatch.
+          aws logs get-log-events \
+            --log-group-name "$LOG_GROUP" \
+            --log-stream-name "migrate/migrate/${TASK_ARN##*/}" \
+            --query 'events[].message' --output text || true
+
+          EXIT_CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::prisma migrate deploy exited with $EXIT_CODE"
+            exit 1
+          fi
+
+      - name: Terraform Apply
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform apply -auto-approve \
+            -var="account_id=${{ vars.AWS_ACCOUNT_ID }}" \
+            -var="aws_region=${{ vars.AWS_REGION }}" \
+            -var="github_org=${{ vars.GITHUB_ORG }}" \
+            -var="github_repo=${{ vars.GITHUB_REPO_NAME }}" \
+            -var="backend_image_tag=${{ github.sha }}" \
+            -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
+            -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
+            -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+
+      - name: Show ALB URL
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform output -raw alb_dns_name

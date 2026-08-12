@@ -1,14 +1,13 @@
 name: CI
 
-# The `develop` tier: every PR and every push to develop is gated here, but
-# nothing is deployed and no AWS credential is ever issued — this workflow
-# declares no `environment:` and no `id-token: write` on purpose. Deploys
-# start one tier up, when develop is merged into `staging`.
+# Pre-merge gate for all three tiers. Deliberately pull_request-only: a push
+# to develop/staging/main already runs the matching deploy workflow, which
+# gates on the same build/test before it touches AWS — running this on push
+# too would just duplicate it. Nothing here is deployed and no AWS credential
+# is ever issued: no `environment:`, no `id-token: write`.
 on:
   pull_request:
     branches: [develop, staging, main]
-  push:
-    branches: [develop]
 
 permissions:
   contents: read
@@ -61,7 +60,7 @@ jobs:
       - name: Terraform validate
         run: |
           set -euo pipefail
-          for dir in infra/backend-bootstrap infra/environments/staging infra/environments/production; do
+          for dir in infra/backend-bootstrap infra/environments/develop infra/environments/staging infra/environments/production; do
             terraform -chdir="$dir" init -backend=false -input=false
             terraform -chdir="$dir" validate
           done
