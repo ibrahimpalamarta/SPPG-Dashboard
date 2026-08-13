@@ -32,7 +32,9 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  auditLogs AuditLog[]
+  auditLogs     AuditLog[]
+  galleryImages GalleryImage[]
+  documents     Document[]
 
   @@index([role])
   @@index([scopeId])
@@ -54,4 +56,220 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+/// Slot penyajian dalam satu hari operasional.
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+/// Status penyelesaian satu catatan operasional harian dapur.
+enum OperationalStatus {
+  COMPLETED
+  PENDING
+  CANCELLED
+}
+
+/// Status keaktifan dapur sebagai master data.
+enum KitchenStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Format berkas yang boleh diunggah ke modul dokumen.
+enum FileType {
+  PDF
+  DOCX
+  XLSX
+  PPTX
+  CSV
+  OTHER
+}
+
+/// Master wilayah administratif Indonesia. Satu baris dipakai bersama oleh
+/// banyak dapur di wilayah yang sama, sehingga nama wilayah tidak terduplikasi
+/// dan dashboard publik bisa mengelompokkan tanpa normalisasi string.
+model GeographicInfo {
+  id          String @id @default(uuid()) @db.Uuid
+  province    String
+  cityRegency String @map("city_regency")
+  district    String
+  village     String
+
+  /// Titik representasi wilayah (centroid), bukan lokasi dapur — dipakai untuk
+  /// agregasi peta di level wilayah administratif. Koordinat fisik tiap dapur
+  /// ada di Kitchen.latitude/longitude. Nullable: wilayah bisa didaftarkan
+  /// lebih dulu sebelum centroid-nya ditentukan.
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  kitchens Kitchen[]
+
+  @@unique([province, cityRegency, district, village])
+  @@map("geographic_infos")
+}
+
+/// Master data SPPG Dapur — unit produksi yang memasak dan mendistribusikan makanan.
+/// TODO: confirm real kitchen master data fields with stakeholder.
+/// Section 10.4 di PRD salah copy-paste (isinya duplikat field Transaction),
+/// jadi field di bawah adalah rekonstruksi yang masuk akal, bukan spesifikasi final.
+model Kitchen {
+  id          String        @id @default(uuid()) @db.Uuid
+  kitchenName String        @map("kitchen_name")
+  address     String
+  status      KitchenStatus @default(ACTIVE)
+
+  /// Kapasitas produksi maksimum dalam porsi makan per hari.
+  capacity Int
+
+  /// Titik lokasi dapur. Nullable karena master data bisa didaftarkan
+  /// lebih dulu sebelum koordinatnya diverifikasi di lapangan.
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+
+  geographicInfoId String         @map("geographic_info_id") @db.Uuid
+  geographicInfo   GeographicInfo @relation(fields: [geographicInfoId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  menus        Menu[]
+  transactions Transaction[]
+
+  @@index([geographicInfoId])
+  @@index([status])
+  @@map("kitchens")
+}
+
+/// Menu yang direncanakan/disajikan satu dapur pada satu tanggal dan satu slot makan.
+model Menu {
+  id       String   @id @default(uuid()) @db.Uuid
+  menuDate DateTime @map("menu_date") @db.Date
+  mealType MealType @map("meal_type")
+
+  /// Daftar nama item makanan, mis. ["Nasi putih", "Ayam goreng", "Tumis buncis"].
+  foodItems String[] @map("food_items")
+
+  /// TODO: confirm unit with stakeholder — diasumsikan gram per porsi.
+  portionSize Int @map("portion_size")
+
+  kitchenId String  @map("kitchen_id") @db.Uuid
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  nutrition Nutrition?
+
+  @@index([kitchenId, menuDate])
+  @@map("menus")
+}
+
+/// Catatan operasional harian satu dapur: berapa porsi yang benar-benar
+/// disalurkan dan bagaimana status penyelesaiannya.
+model Transaction {
+  id              String   @id @default(uuid()) @db.Uuid
+  transactionDate DateTime @map("transaction_date") @db.Date
+
+  kitchenId String  @map("kitchen_id") @db.Uuid
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  numberOfMeals     Int               @map("number_of_meals")
+  operationalStatus OperationalStatus @default(PENDING) @map("operational_status")
+  remarks           String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([kitchenId, transactionDate])
+  @@index([operationalStatus])
+  @@map("transactions")
+}
+
+/// Kandungan gizi satu porsi menu. One-to-one dengan Menu (`menu_id` unique).
+/// Decimal dipakai, bukan Float, supaya agregasi SUM/AVG di dashboard publik
+/// tidak terkena akumulasi galat floating point.
+model Nutrition {
+  id String @id @default(uuid()) @db.Uuid
+
+  menuId String @unique @map("menu_id") @db.Uuid
+  menu   Menu   @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  /// Energi dalam kkal per porsi.
+  calories Decimal @db.Decimal(8, 2)
+
+  /// Makronutrien dalam gram per porsi.
+  protein       Decimal @db.Decimal(7, 2)
+  carbohydrates Decimal @db.Decimal(7, 2)
+  fat           Decimal @db.Decimal(7, 2)
+
+  /// Vitamin & mineral sebagai key-value, mis. { "vitaminA_mcg": 350, "iron_mg": 4.2 }.
+  /// Sengaja JSON, bukan tabel terpisah: jenis mikronutrien yang dilacak masih berubah.
+  micronutrients Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("nutritions")
+}
+
+/// Foto dokumentasi program untuk galeri publik.
+model GalleryImage {
+  id          String  @id @default(uuid()) @db.Uuid
+  imageTitle  String  @map("image_title")
+  description String?
+
+  /// Object key di S3 assets bucket. Tidak ada di daftar field PRD, tapi tanpa
+  /// penunjuk berkas record ini tidak bisa dipakai.
+  storageKey String @map("storage_key")
+
+  /// Tanggal unggah versi bisnis — bisa di-backfill/diedit, berbeda dari `createdAt`
+  /// yang merupakan timestamp sistem.
+  uploadDate DateTime @default(now()) @map("upload_date")
+
+  uploadedById String? @map("uploaded_by_id") @db.Uuid
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  /// TODO: confirm fixed category list with stakeholder; promote to enum once frozen.
+  category String
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([uploadedById])
+  @@index([category])
+  @@map("gallery_images")
+}
+
+/// Berkas administratif program (laporan, SOP, rekap) yang diunggah pengguna internal.
+model Document {
+  id            String @id @default(uuid()) @db.Uuid
+  documentTitle String @map("document_title")
+
+  /// TODO: confirm fixed category list with stakeholder; promote to enum once frozen.
+  category String
+
+  /// Object key di S3 assets bucket. Lihat catatan yang sama di GalleryImage.
+  storageKey String @map("storage_key")
+
+  /// Tanggal unggah versi bisnis — lihat catatan yang sama di GalleryImage.
+  uploadDate DateTime @default(now()) @map("upload_date")
+
+  uploadedById String? @map("uploaded_by_id") @db.Uuid
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  fileType FileType @map("file_type")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([uploadedById])
+  @@index([category])
+  @@map("documents")
 }
