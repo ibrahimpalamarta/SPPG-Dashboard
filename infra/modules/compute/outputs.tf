@@ -14,6 +14,12 @@ output "backend_service_name" {
   value = aws_ecs_service.backend.name
 }
 
+# aws_ecs_service exposes its ARN as `id`. Consumed by the scheduler module so
+# its IAM policy can scope ecs:UpdateService to this one service.
+output "backend_service_arn" {
+  value = aws_ecs_service.backend.id
+}
+
 output "migrate_task_definition_family" {
   value = aws_ecs_task_definition.migrate.family
 }

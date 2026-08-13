@@ -14,6 +14,14 @@ output "security_group_id" {
   value = aws_security_group.rds.id
 }
 
+output "db_instance_identifier" {
+  value = aws_db_instance.this.identifier
+}
+
+output "db_instance_arn" {
+  value = aws_db_instance.this.arn
+}
+
 # Deliberately the version's ARN, not the secret's — identical string, but it
 # makes every task definition that reads a key out of this secret depend on the
 # version that actually contains that key. Without it, a targeted apply of the

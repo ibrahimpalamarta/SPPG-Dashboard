@@ -20,8 +20,21 @@ variable "public_subnet_ids" {
   type = list(string)
 }
 
-variable "private_subnet_ids" {
-  type = list(string)
+# Which subnets the ECS services place tasks in. Separate from the ALB's
+# public_subnet_ids because the two are not always the same: production puts
+# tasks in private subnets behind a NAT gateway, while staging has no NAT and
+# runs them in the public subnets so they can still reach ECR, Secrets Manager
+# and CloudWatch. Neither is an exposure — the tasks security group only ever
+# accepts ingress from the ALB security group, in either placement.
+variable "task_subnet_ids" {
+  description = "Subnets for ECS service tasks. Private subnets normally; public subnets in environments where enable_nat_gateway is false."
+  type        = list(string)
+}
+
+variable "task_assign_public_ip" {
+  description = "Give ECS tasks a public IP. Required when task_subnet_ids are public subnets and there is no NAT gateway."
+  type        = bool
+  default     = false
 }
 
 variable "alb_security_group_id" {
@@ -98,6 +111,12 @@ variable "backend_health_check_path" {
 variable "enable_container_insights" {
   type    = bool
   default = false
+}
+
+variable "log_retention_in_days" {
+  description = "CloudWatch Logs retention for the ECS log groups. Staging lowers this; nobody reads week-old staging logs."
+  type        = number
+  default     = 30
 }
 
 variable "db_endpoint" {

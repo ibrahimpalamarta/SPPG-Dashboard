@@ -170,12 +170,12 @@ resource "aws_lb_listener_rule" "api_https" {
 
 resource "aws_cloudwatch_log_group" "frontend" {
   name              = "/ecs/${local.prefix}-frontend"
-  retention_in_days = 30
+  retention_in_days = var.log_retention_in_days
 }
 
 resource "aws_cloudwatch_log_group" "backend" {
   name              = "/ecs/${local.prefix}-backend"
-  retention_in_days = 30
+  retention_in_days = var.log_retention_in_days
 }
 
 resource "aws_iam_role" "ecs_task_execution" {
@@ -378,9 +378,9 @@ resource "aws_ecs_service" "frontend" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.task_subnet_ids
     security_groups  = [var.ecs_tasks_security_group_id]
-    assign_public_ip = false
+    assign_public_ip = var.task_assign_public_ip
   }
 
   load_balancer {
@@ -406,9 +406,9 @@ resource "aws_ecs_service" "backend" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.task_subnet_ids
     security_groups  = [var.ecs_tasks_security_group_id]
-    assign_public_ip = false
+    assign_public_ip = var.task_assign_public_ip
   }
 
   load_balancer {
@@ -420,6 +420,19 @@ resource "aws_ecs_service" "backend" {
   health_check_grace_period_seconds = 60
 
   depends_on = [aws_lb_listener.http]
+
+  # desired_count is deliberately not tracked after creation. In staging the
+  # EventBridge scheduler scales this to 0 overnight and back to 1 each
+  # morning; without this, every apply would fight the scheduler and leave a
+  # permanent phantom diff in the plan. Terraform still applies var.desired_count
+  # when the service is first created.
+  #
+  # Note this makes var.desired_count a create-time value in ALL environments:
+  # to change it later, scale with `aws ecs update-service --desired-count`
+  # (or add autoscaling, which requires this same lifecycle rule anyway).
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
 
   tags = {
     Name = "${local.prefix}-backend"
