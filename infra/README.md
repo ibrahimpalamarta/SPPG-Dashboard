@@ -65,7 +65,7 @@ Buat dengan key yang sama di environment `staging` dan `production`, isi value b
 
 | Variable | Isi |
 |---|---|
-| `AWS_REGION` | `ap-southeast-2` — harus region tempat state bucket & VPC berada |
+| `AWS_REGION` | `ap-southeast-3` — harus region tempat state bucket & VPC berada |
 | `AWS_ROLE_ARN` | ARN role OIDC (dari `backend-bootstrap` output) |
 | `TF_STATE_BUCKET`, `TF_LOCK_TABLE` | Dari `backend-bootstrap` output |
 | `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_ROLES_CLAIM` | Tenant Auth0 environment tsb — bukan rahasia, API hanya memverifikasi token |
@@ -80,11 +80,11 @@ Tidak ada AWS secret jangka panjang yang perlu disimpan — OIDC menghilangkan k
 
 ## Checklist Migrasi: Akun Personal → Akun Kantor
 
-1. **Akses akun kantor**: siapkan credential admin/SSO untuk akun AWS kantor, pastikan region `ap-southeast-2` sudah aktif di akun tsb.
+1. **Akses akun kantor**: siapkan credential admin/SSO untuk akun AWS kantor, pastikan region `ap-southeast-3` sudah aktif di akun tsb — Jakarta adalah region *opt-in*, jadi harus di-enable manual lewat Console → Account → AWS Regions sebelum API call apa pun ke sana bisa jalan.
 2. **Re-run `backend-bootstrap`** dengan `account_id` baru di `terraform.tfvars`, jalankan `terraform init && apply` **memakai credential admin akun kantor**. Ini membuat state bucket/lock table/OIDC provider/IAM role baru yang sepenuhnya independen dari akun personal — tidak menyentuh resource lama.
 3. **Putuskan strategi data**: (a) fresh start — provision environment dari nol di akun baru (paling simpel, cocok jika belum ada data produksi nyata), atau (b) migrasi data — RDS snapshot export/import, sync S3, re-push image ke ECR akun baru. Pilih sesuai kondisi saat migrasi.
 4. **Re-run `terraform init -reconfigure` + `apply`** di tiap `environments/<env>` mengarah ke state bucket akun baru (dari output langkah 2). Ini provision VPC/ECS/RDS/ECR/S3 baru di akun kantor.
-5. **Update GitHub Environment variables** (staging & production): `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` (region biasanya tetap `ap-southeast-2`). **Tidak ada perubahan kode/workflow** — inilah inti dari desain ini.
+5. **Update GitHub Environment variables** (staging & production): `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` (region biasanya tetap `ap-southeast-3`). **Tidak ada perubahan kode/workflow** — inilah inti dari desain ini.
 6. **Cutover DNS** (jika sudah ada domain kustom) mengarah ke ALB DNS name akun baru.
 7. **Verifikasi full deploy cycle** di akun kantor (PR `develop` → `staging`, lalu tag rilis prod) sebelum mematikan apa pun di akun personal.
 8. **Decommission akun personal**: `terraform destroy` tiap environment (staging dulu, baru production), lalu hapus resource `backend-bootstrap` (OIDC provider, IAM role, state bucket — setelah yakin tidak ada yang masih butuh histori state-nya; sebaiknya arsipkan dulu file `.tfstate` terakhir sebelum bucket dihapus).
