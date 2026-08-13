@@ -35,6 +35,12 @@ locals {
   # names track the engine version and so can't be pinned here.
   rds_param_group_arn  = "arn:aws:rds:${var.aws_region}:${var.account_id}:pg:*"
   rds_option_group_arn = "arn:aws:rds:${var.aws_region}:${var.account_id}:og:*"
+
+  # Off-hours start/stop schedules (staging only, but the policy is shared).
+  # Schedules live in the "default" schedule group, which we don't manage.
+  scheduler_arn_pattern   = "arn:aws:scheduler:${var.aws_region}:${var.account_id}:schedule/default/${local.prefix}-*"
+  scheduler_role_arn      = "arn:aws:iam::${var.account_id}:role/${local.prefix}-scheduler-role"
+  managed_role_arn_prefix = "arn:aws:iam::${var.account_id}:role/${local.prefix}"
 }
 
 resource "aws_iam_role" "deploy" {
@@ -239,7 +245,11 @@ resource "aws_iam_policy" "deploy_infra" {
         Action = [
           "rds:CreateDBInstance", "rds:DeleteDBInstance", "rds:ModifyDBInstance",
           "rds:CreateDBSubnetGroup", "rds:DeleteDBSubnetGroup", "rds:ModifyDBSubnetGroup",
-          "rds:AddTagsToResource", "rds:RemoveTagsFromResource", "rds:ListTagsForResource"
+          "rds:AddTagsToResource", "rds:RemoveTagsFromResource", "rds:ListTagsForResource",
+          # The deploy workflow wakes a scheduled-down staging database before
+          # running migrations. Stop is deliberately not granted here — only the
+          # scheduler role may stop the instance.
+          "rds:StartDBInstance"
         ]
         Resource = [
           local.rds_instance_arn,
@@ -259,7 +269,8 @@ resource "aws_iam_policy" "deploy_infra" {
           "s3:CreateBucket", "s3:DeleteBucket", "s3:Get*", "s3:ListBucket",
           "s3:PutBucketPolicy", "s3:PutBucketVersioning",
           "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock",
-          "s3:PutObject", "s3:PutBucketTagging"
+          "s3:PutObject", "s3:PutBucketTagging",
+          "s3:PutLifecycleConfiguration"
         ]
         Resource = [
           local.s3_assets_bucket_arn,
@@ -301,7 +312,9 @@ resource "aws_iam_policy" "deploy_infra" {
         Resource = "*"
       },
       {
-        Sid    = "IamEcsRoles"
+        # Covers both the ECS task roles and the EventBridge Scheduler role;
+        # every role this stack creates is named "<project>-<env>-*".
+        Sid    = "IamStackRoles"
         Effect = "Allow"
         Action = [
           "iam:CreateRole", "iam:DeleteRole", "iam:GetRole",
@@ -310,7 +323,31 @@ resource "aws_iam_policy" "deploy_infra" {
           "iam:ListRolePolicies", "iam:ListRoleTags", "iam:ListInstanceProfilesForRole",
           "iam:TagRole", "iam:UntagRole"
         ]
-        Resource = local.ecs_role_arn_pattern
+        Resource = "${local.managed_role_arn_prefix}-*"
+      },
+      {
+        # Attaching the scheduler role to a schedule is a PassRole, exactly as
+        # it is for ECS task roles above — but to a different service principal,
+        # so it needs its own statement and condition.
+        Sid      = "PassSchedulerRole"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
+        Resource = local.scheduler_role_arn
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "scheduler.amazonaws.com"
+          }
+        }
+      },
+      {
+        Sid    = "Scheduler"
+        Effect = "Allow"
+        Action = [
+          "scheduler:CreateSchedule", "scheduler:DeleteSchedule",
+          "scheduler:GetSchedule", "scheduler:UpdateSchedule",
+          "scheduler:ListTagsForResource", "scheduler:TagResource", "scheduler:UntagResource"
+        ]
+        Resource = local.scheduler_arn_pattern
       }
     ]
   })

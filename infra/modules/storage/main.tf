@@ -18,6 +18,30 @@ resource "aws_s3_bucket_versioning" "assets" {
   }
 }
 
+# Versioning above keeps every overwritten object forever unless something
+# expires them. The bucket is empty today, so this costs nothing now — it exists
+# so the bill cannot quietly grow once the app starts writing assets.
+resource "aws_s3_bucket_lifecycle_configuration" "assets" {
+  bucket = aws_s3_bucket.assets.id
+
+  rule {
+    id     = "expire-noncurrent-versions"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.assets]
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "assets" {
   bucket = aws_s3_bucket.assets.id
 

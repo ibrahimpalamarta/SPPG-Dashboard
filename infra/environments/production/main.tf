@@ -77,9 +77,12 @@ module "compute" {
   aws_region                  = var.aws_region
   vpc_id                      = module.network.vpc_id
   public_subnet_ids           = module.network.public_subnet_ids
-  private_subnet_ids          = module.network.private_subnet_ids
   alb_security_group_id       = module.network.alb_security_group_id
   ecs_tasks_security_group_id = module.network.ecs_tasks_security_group_id
+  # Production keeps its NAT gateway, so tasks stay in the private subnets with
+  # no public IP. Staging differs — see the comment in its main.tf.
+  task_subnet_ids             = module.network.private_subnet_ids
+  task_assign_public_ip       = false
   ecr_frontend_repository_url = module.ecr.frontend_repository_url
   ecr_backend_repository_url  = module.ecr.backend_repository_url
   frontend_image_tag          = var.frontend_image_tag

@@ -49,6 +49,32 @@ resource "aws_s3_bucket_versioning" "state" {
   }
 }
 
+# State history is worth keeping longer than ordinary object history — 90 days
+# is enough to recover from a bad apply — but not forever. Every terraform apply
+# writes a new version of the state file, so without this the bucket grows
+# monotonically for the life of the project.
+resource "aws_s3_bucket_lifecycle_configuration" "state" {
+  for_each = aws_s3_bucket.state
+  bucket   = each.value.id
+
+  rule {
+    id     = "expire-noncurrent-state-versions"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.state]
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
   for_each = aws_s3_bucket.state
   bucket   = each.value.id
