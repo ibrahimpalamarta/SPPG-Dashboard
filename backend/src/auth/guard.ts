@@ -3,6 +3,7 @@ import type { User } from '@prisma/client';
 import { prisma, type Db } from '../db.js';
 import { findOrCreateUser } from './user-sync.js';
 import type { Role } from './roles.js';
+import { sendError } from '../middleware/error-handler.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -20,7 +21,7 @@ declare global {
 export function attachUser(db: Db = prisma): RequestHandler {
   return async (req, res, next) => {
     if (!req.auth) {
-      res.status(401).json({ error: 'unauthorized', message: 'Invalid or expired token' });
+      sendError(res, 'INVALID_TOKEN');
       return;
     }
     try {
@@ -47,11 +48,11 @@ export function attachUser(db: Db = prisma): RequestHandler {
 export function requireRole(...allowed: Role[]): RequestHandler {
   return (req, res, next) => {
     if (!req.user) {
-      res.status(401).json({ error: 'unauthorized', message: 'Invalid or expired token' });
+      sendError(res, 'INVALID_TOKEN');
       return;
     }
     if (!allowed.includes(req.user.role)) {
-      res.status(403).json({ error: 'forbidden', message: 'Insufficient role' });
+      sendError(res, 'FORBIDDEN');
       return;
     }
     next();

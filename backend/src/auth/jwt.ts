@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from 'jose';
 import type { RequestHandler } from 'express';
 import { env, AUTH0_ISSUER } from '../config/env.js';
+import { sendError } from '../middleware/error-handler.js';
 
 /** What the token asserts. Display-only until reconciled against Postgres. */
 export interface AuthContext {
@@ -42,8 +43,6 @@ function toAuthContext(payload: JWTPayload): AuthContext {
   };
 }
 
-const unauthorized = { error: 'unauthorized', message: 'Invalid or expired token' } as const;
-
 /**
  * Authentication only: proves the caller holds a live Auth0 access token for
  * this API. Says nothing about what they may do — that is guard.ts.
@@ -57,7 +56,7 @@ export function requireAuth(jwks: JWTVerifyGetKey = remoteJwks): RequestHandler 
   return async (req, res, next) => {
     const header = req.headers.authorization;
     if (typeof header !== 'string' || !header.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'unauthorized', message: 'Missing bearer token' });
+      sendError(res, 'MISSING_TOKEN');
       return;
     }
 
@@ -71,7 +70,7 @@ export function requireAuth(jwks: JWTVerifyGetKey = remoteJwks): RequestHandler 
     } catch {
       // Deliberately opaque: expired vs bad-signature vs wrong-audience all
       // look the same to the client. The reason stays server-side.
-      res.status(401).json(unauthorized);
+      sendError(res, 'INVALID_TOKEN');
     }
   };
 }
