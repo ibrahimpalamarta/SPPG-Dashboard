@@ -92,6 +92,13 @@ variable "acm_certificate_arn" {
   default     = ""
 }
 
+# 7 rather than the module default of 30: staging logs older than a week are
+# never read, and CloudWatch bills for stored volume.
+variable "log_retention_in_days" {
+  type    = number
+  default = 7
+}
+
 # --- Database ---
 
 variable "db_name" {

@@ -46,7 +46,14 @@ resource "aws_subnet" "private" {
 # Single NAT gateway for both AZs — cost-conscious default for a first pass.
 # Trade-off: it is a single point of failure for private-subnet egress.
 # Add one NAT gateway per AZ later if that becomes a concern (mainly for production).
+#
+# Disabled entirely in staging (enable_nat_gateway = false): at ~$45/month it was
+# the single largest line item there, and it existed only so ECS tasks could reach
+# ECR/Secrets Manager/CloudWatch. Staging runs its tasks in the public subnets
+# instead — see task_assign_public_ip in the compute module. Nothing else needs
+# egress from the private subnets: RDS lives there and never calls out.
 resource "aws_eip" "nat" {
+  count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
 
   tags = {
@@ -55,7 +62,8 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_nat_gateway" "this" {
-  allocation_id = aws_eip.nat.id
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public[0].id
 
   tags = {
@@ -87,9 +95,15 @@ resource "aws_route_table_association" "public" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this.id
+  # Without a NAT gateway the private subnets have no default route at all,
+  # which is the correct end state: their only occupant is RDS.
+  dynamic "route" {
+    for_each = var.enable_nat_gateway ? [1] : []
+
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.this[0].id
+    }
   }
 
   tags = {
