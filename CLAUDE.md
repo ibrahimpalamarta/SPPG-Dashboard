@@ -8,7 +8,7 @@ Instruksi ini berlaku untuk semua sesi Claude Code di repo ini. Ikuti secara ket
 - Database: PostgreSQL (data aplikasi tetap di Postgres, auth didelegasikan ke Auth0)
 - Frontend: folder masih kosong, belum digarap — fokus backend dulu
 - RBAC 4 role: Super Admin, Data Admin/entry (per-SPPG Dapur), Internal (view-only), Public (insight visualisasi)
-- Deployment: AWS ECS + ECR di belakang ALB, RDS, S3 assets bucket, region ap-southeast-2, environment staging & prod, CI/CD via GitHub Actions
+- Deployment: AWS ECS + ECR di belakang ALB, RDS, S3 assets bucket, region ap-southeast-3, environment staging & prod, CI/CD via GitHub Actions
 
 ## Prinsip Coding — Presisi & Ramping
 1. **Jangan berasumsi.** Kalau requirement ambigu atau ada beberapa cara implementasi yang masuk akal, tanyakan dulu sebelum menulis kode, jangan menebak.

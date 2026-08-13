@@ -6,7 +6,7 @@ variable "account_id" {
 variable "aws_region" {
   description = "AWS region for state resources and the OIDC-authenticated deploy roles"
   type        = string
-  default     = "ap-southeast-2"
+  default     = "ap-southeast-3"
 }
 
 variable "project_name" {
