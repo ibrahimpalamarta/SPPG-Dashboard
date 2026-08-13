@@ -10,7 +10,7 @@ variable "project_name" {
 
 variable "aws_region" {
   type    = string
-  default = "ap-southeast-2"
+  default = "ap-southeast-3"
 }
 
 # --- Network ---
@@ -22,11 +22,11 @@ variable "vpc_cidr" {
 
 # CI passes no tfvars file — terraform.tfvars is gitignored — so these defaults
 # are what the deploy workflow actually builds with. They must match the region
-# the state bucket and the live VPC are in (ap-southeast-2), or Terraform will
+# the state bucket and the live VPC are in (ap-southeast-3), or Terraform will
 # try to move every subnet into an AZ that doesn't exist there.
 variable "azs" {
   type    = list(string)
-  default = ["ap-southeast-2a", "ap-southeast-2b"]
+  default = ["ap-southeast-3a", "ap-southeast-3b"]
 }
 
 variable "public_subnet_cidrs" {
@@ -90,6 +90,13 @@ variable "acm_certificate_arn" {
   description = "Leave empty until a domain/ACM certificate is available"
   type        = string
   default     = ""
+}
+
+# 7 rather than the module default of 30: staging logs older than a week are
+# never read, and CloudWatch bills for stored volume.
+variable "log_retention_in_days" {
+  type    = number
+  default = 7
 }
 
 # --- Database ---

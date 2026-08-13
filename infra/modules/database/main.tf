@@ -80,6 +80,11 @@ resource "aws_db_instance" "this" {
   allocated_storage = var.allocated_storage
   storage_encrypted = true
 
+  # gp3 rather than the gp2 default: cheaper per GB, and it decouples IOPS from
+  # volume size. gp2 at 20 GB caps out at 60 baseline IOPS, which the analytics
+  # queries in the next phase would hit immediately.
+  storage_type = "gp3"
+
   db_name  = var.db_name
   username = var.master_username
   password = random_password.master.result
@@ -90,6 +95,12 @@ resource "aws_db_instance" "this" {
 
   multi_az                = var.multi_az
   backup_retention_period = var.backup_retention_period
+
+  # RDS otherwise defers modifications to the next maintenance window, which
+  # leaves Terraform reporting the same pending change on every plan until it
+  # lands. Staging applies immediately; production keeps the default so changes
+  # there are deliberate and windowed.
+  apply_immediately = var.apply_immediately
 
   # Only production is worth a final snapshot; staging is disposable, and
   # demanding one there just makes `terraform destroy` fail.

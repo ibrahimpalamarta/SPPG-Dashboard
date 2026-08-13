@@ -65,7 +65,7 @@ Buat dengan key yang sama di environment `staging` dan `production`, isi value b
 
 | Variable | Isi |
 |---|---|
-| `AWS_REGION` | `ap-southeast-2` — harus region tempat state bucket & VPC berada |
+| `AWS_REGION` | `ap-southeast-3` — harus region tempat state bucket & VPC berada |
 | `AWS_ROLE_ARN` | ARN role OIDC (dari `backend-bootstrap` output) |
 | `TF_STATE_BUCKET`, `TF_LOCK_TABLE` | Dari `backend-bootstrap` output |
 | `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_ROLES_CLAIM` | Tenant Auth0 environment tsb — bukan rahasia, API hanya memverifikasi token |
@@ -80,11 +80,11 @@ Tidak ada AWS secret jangka panjang yang perlu disimpan — OIDC menghilangkan k
 
 ## Checklist Migrasi: Akun Personal → Akun Kantor
 
-1. **Akses akun kantor**: siapkan credential admin/SSO untuk akun AWS kantor, pastikan region `ap-southeast-2` sudah aktif di akun tsb.
+1. **Akses akun kantor**: siapkan credential admin/SSO untuk akun AWS kantor, pastikan region `ap-southeast-3` sudah aktif di akun tsb — Jakarta adalah region *opt-in*, jadi harus di-enable manual lewat Console → Account → AWS Regions sebelum API call apa pun ke sana bisa jalan.
 2. **Re-run `backend-bootstrap`** dengan `account_id` baru di `terraform.tfvars`, jalankan `terraform init && apply` **memakai credential admin akun kantor**. Ini membuat state bucket/lock table/OIDC provider/IAM role baru yang sepenuhnya independen dari akun personal — tidak menyentuh resource lama.
 3. **Putuskan strategi data**: (a) fresh start — provision environment dari nol di akun baru (paling simpel, cocok jika belum ada data produksi nyata), atau (b) migrasi data — RDS snapshot export/import, sync S3, re-push image ke ECR akun baru. Pilih sesuai kondisi saat migrasi.
 4. **Re-run `terraform init -reconfigure` + `apply`** di tiap `environments/<env>` mengarah ke state bucket akun baru (dari output langkah 2). Ini provision VPC/ECS/RDS/ECR/S3 baru di akun kantor.
-5. **Update GitHub Environment variables** (staging & production): `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` (region biasanya tetap `ap-southeast-2`). **Tidak ada perubahan kode/workflow** — inilah inti dari desain ini.
+5. **Update GitHub Environment variables** (staging & production): `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` (region biasanya tetap `ap-southeast-3`). **Tidak ada perubahan kode/workflow** — inilah inti dari desain ini.
 6. **Cutover DNS** (jika sudah ada domain kustom) mengarah ke ALB DNS name akun baru.
 7. **Verifikasi full deploy cycle** di akun kantor (PR `develop` → `staging`, lalu tag rilis prod) sebelum mematikan apa pun di akun personal.
 8. **Decommission akun personal**: `terraform destroy` tiap environment (staging dulu, baru production), lalu hapus resource `backend-bootstrap` (OIDC provider, IAM role, state bucket — setelah yakin tidak ada yang masih butuh histori state-nya; sebaiknya arsipkan dulu file `.tfstate` terakhir sebelum bucket dihapus).
@@ -92,7 +92,8 @@ Tidak ada AWS secret jangka panjang yang perlu disimpan — OIDC menghilangkan k
 
 ## Catatan Desain / Trade-off yang Disengaja
 
-- **1 NAT gateway** per environment (bukan per-AZ) — hemat biaya untuk first pass, tapi jadi single point of failure untuk egress private subnet. Tingkatkan ke NAT per-AZ nanti kalau availability jadi prioritas, terutama untuk production.
+- **NAT gateway hanya di production**, 1 buah (bukan per-AZ) — single point of failure untuk egress private subnet; tingkatkan ke NAT per-AZ nanti kalau availability jadi prioritas. **Staging tidak punya NAT sama sekali** (`enable_nat_gateway = false`): dengan ~$45/bulan hanya untuk memberi egress ke satu task 0.25 vCPU, biayanya tidak sepadan. Staging menjalankan ECS task-nya di public subnet dengan public IP (`task_subnet_ids` + `task_assign_public_ip` di module `compute`). Ini bukan pelonggaran keamanan: security group `ecs-tasks` tetap hanya menerima ingress dari SG ALB, dan RDS tetap di private subnet yang — tanpa NAT — kini benar-benar tidak punya rute keluar sama sekali. Konsekuensinya, task migrasi di workflow staging harus jalan di subnet yang sama dengan `assignPublicIp=ENABLED`, kalau tidak ia tak bisa menarik image dari ECR.
+- **Staging dimatikan di luar jam kerja** (module `scheduler`, staging saja). EventBridge Scheduler memanggil `ecs:UpdateService` dan `rds:Stop/StartDBInstance` langsung lewat universal target — tanpa Lambda, tanpa kode. Default: nyala 07:00–21:00 WIB, Senin–Jumat (cron ditulis dalam `Asia/Jakarta`, jadi tidak perlu hitung UTC). Dua konsekuensi yang sudah ditangani: (1) `aws_ecs_service.backend` memakai `ignore_changes = [desired_count]` supaya Terraform tidak berkelahi dengan scheduler — artinya `var.desired_count` jadi nilai create-time di **semua** environment, dan perubahan setelahnya harus lewat `aws ecs update-service`; (2) workflow deploy staging punya step "Wake staging database" dan "Scale backend service up", supaya deploy di luar jam kerja tidak gagal dengan connection timeout. Storage RDS tetap ditagih saat instance berhenti — yang hemat hanya jam compute-nya.
 - **HTTPS opsional**: listener 443/ACM di ALB dikontrol lewat variable `acm_certificate_arn` (default kosong = HTTP saja). Begitu ada domain, isi variable ini — tidak perlu ubah struktur module.
 - **CloudFront tidak dibuat** di first pass ini (ALB sudah cukup untuk awal, S3 assets bucket tetap private). Tambahkan CloudFront di depan ALB dan/atau S3 nanti kalau kebutuhan caching/TLS-edge/WAF/akses publik ke asset sudah jelas.
 - **`terraform apply` jalan di setiap deploy** (bukan pipeline terpisah untuk "infra" vs "update image"), dengan image tag (commit SHA) sebagai variable yang memicu perubahan task definition. Ini menghindari state drift dari dua jalur deploy yang terpisah; ketika hanya image yang berubah, apply hampir no-op karena cuma 2 resource yang berubah (task definition + service).
