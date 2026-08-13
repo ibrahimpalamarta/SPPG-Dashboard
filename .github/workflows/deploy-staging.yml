@@ -108,13 +108,39 @@ jobs:
           docker build -t "$ECR_BACKEND_URL:${{ github.sha }}" .
           docker push "$ECR_BACKEND_URL:${{ github.sha }}"
 
+      # Staging is scheduled down outside working hours (infra/modules/scheduler):
+      # the database is stopped and the service is scaled to zero. A deploy that
+      # lands while it is asleep would otherwise fail in the migration step with
+      # a bare connection timeout, so wake it first and wait for it.
+      - name: Wake staging database
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          set -euo pipefail
+          DB_ID=$(terraform output -raw db_instance_identifier)
+          STATUS=$(aws rds describe-db-instances --db-instance-identifier "$DB_ID" \
+            --query 'DBInstances[0].DBInstanceStatus' --output text)
+          echo "Database $DB_ID is $STATUS"
+
+          if [ "$STATUS" = "stopped" ]; then
+            aws rds start-db-instance --db-instance-identifier "$DB_ID" >/dev/null
+          fi
+
+          # Also covers the case where the scheduler started it moments ago and
+          # it is still in "starting".
+          if [ "$STATUS" != "available" ]; then
+            echo "Waiting for the database to become available..."
+            aws rds wait db-instance-available --db-instance-identifier "$DB_ID"
+          fi
+
       - name: Run database migrations
         working-directory: ${{ env.TF_DIR }}
         run: |
           set -euo pipefail
           CLUSTER=$(terraform output -raw ecs_cluster_name)
           FAMILY=$(terraform output -raw migrate_task_definition_family)
-          SUBNETS=$(terraform output -json private_subnet_ids | jq -r 'join(",")')
+          # Public subnets with a public IP, because staging has no NAT gateway
+          # and this task has to reach ECR to pull its image at all.
+          SUBNETS=$(terraform output -json task_subnet_ids | jq -r 'join(",")')
           SG=$(terraform output -raw ecs_tasks_security_group_id)
           LOG_GROUP=$(terraform output -raw backend_log_group_name)
 
@@ -122,7 +148,7 @@ jobs:
             --cluster "$CLUSTER" \
             --launch-type FARGATE \
             --task-definition "$FAMILY" \
-            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=DISABLED}" \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=ENABLED}" \
             --query 'tasks[0].taskArn' --output text)
           echo "Migration task: $TASK_ARN"
 
@@ -150,6 +176,20 @@ jobs:
             -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
             -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
             -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+
+      # Terraform no longer manages desired_count — the off-hours scheduler owns
+      # it — so an apply alone will not bring the service back up if it is
+      # currently scaled to zero. Deploying is an explicit statement that the
+      # environment should be running, so scale it here.
+      - name: Scale backend service up
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          set -euo pipefail
+          aws ecs update-service \
+            --cluster "$(terraform output -raw ecs_cluster_name)" \
+            --service "$(terraform output -raw backend_service_name)" \
+            --desired-count "$(terraform output -raw backend_desired_count)" \
+            >/dev/null
 
       # terraform apply returns as soon as UpdateService is accepted, so
       # without this the job goes green while the new tasks are still
