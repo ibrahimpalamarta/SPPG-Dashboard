@@ -6,8 +6,12 @@ output "ecs_cluster_name" {
   value = aws_ecs_cluster.this.name
 }
 
-output "frontend_service_name" {
-  value = aws_ecs_service.frontend.name
+output "frontend_admin_service_name" {
+  value = aws_ecs_service.frontend_admin.name
+}
+
+output "frontend_public_service_name" {
+  value = aws_ecs_service.frontend_public.name
 }
 
 output "backend_service_name" {
@@ -15,7 +19,15 @@ output "backend_service_name" {
 }
 
 # aws_ecs_service exposes its ARN as `id`. Consumed by the scheduler module so
-# its IAM policy can scope ecs:UpdateService to this one service.
+# its IAM policy can scope ecs:UpdateService to exactly these services.
+output "frontend_admin_service_arn" {
+  value = aws_ecs_service.frontend_admin.id
+}
+
+output "frontend_public_service_arn" {
+  value = aws_ecs_service.frontend_public.id
+}
+
 output "backend_service_arn" {
   value = aws_ecs_service.backend.id
 }
