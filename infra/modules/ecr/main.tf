@@ -2,8 +2,8 @@ locals {
   prefix = "${var.project_name}-${var.env}"
 }
 
-resource "aws_ecr_repository" "frontend" {
-  name                 = "${local.prefix}-frontend"
+resource "aws_ecr_repository" "frontend_admin" {
+  name                 = "${local.prefix}-frontend-admin"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
@@ -11,7 +11,20 @@ resource "aws_ecr_repository" "frontend" {
   }
 
   tags = {
-    Name = "${local.prefix}-frontend"
+    Name = "${local.prefix}-frontend-admin"
+  }
+}
+
+resource "aws_ecr_repository" "frontend_public" {
+  name                 = "${local.prefix}-frontend-public"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name = "${local.prefix}-frontend-public"
   }
 }
 
@@ -56,8 +69,13 @@ locals {
   })
 }
 
-resource "aws_ecr_lifecycle_policy" "frontend" {
-  repository = aws_ecr_repository.frontend.name
+resource "aws_ecr_lifecycle_policy" "frontend_admin" {
+  repository = aws_ecr_repository.frontend_admin.name
+  policy     = local.lifecycle_policy
+}
+
+resource "aws_ecr_lifecycle_policy" "frontend_public" {
+  repository = aws_ecr_repository.frontend_public.name
   policy     = local.lifecycle_policy
 }
 
