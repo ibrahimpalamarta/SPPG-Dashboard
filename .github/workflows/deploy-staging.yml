@@ -80,13 +80,17 @@ jobs:
       # The cluster is targeted explicitly because it is NOT a dependency of the
       # migrate task definition: without it, a fresh environment reaches the
       # migration step with no cluster and no ecs_cluster_name output to read.
-      # Everything else those two pull in as dependencies — VPC, subnets,
-      # security group, RDS, the secret, the log group, the task roles.
+      # module.ecr is targeted for the same reason — only the backend repository
+      # is pulled in as a dependency of the migrate task definition, so on a
+      # fresh environment the two frontend repositories would not exist yet.
+      # Everything else those pull in as dependencies — VPC, subnets, security
+      # group, RDS, the secret, the log group, the task roles.
       - name: Provision ECR and register migration task definition
         working-directory: ${{ env.TF_DIR }}
         run: |
           set -euo pipefail
           terraform apply -auto-approve \
+            -target=module.ecr \
             -target=module.compute.aws_ecs_cluster.this \
             -target=module.compute.aws_ecs_task_definition.migrate \
             -var="aws_region=${{ vars.AWS_REGION }}" \
@@ -95,18 +99,33 @@ jobs:
             -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
             -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
           echo "ECR_BACKEND_URL=$(terraform output -raw ecr_backend_repository_url)" >> "$GITHUB_ENV"
+          echo "ECR_FRONTEND_ADMIN_URL=$(terraform output -raw ecr_frontend_admin_repository_url)" >> "$GITHUB_ENV"
+          echo "ECR_FRONTEND_PUBLIC_URL=$(terraform output -raw ecr_frontend_public_repository_url)" >> "$GITHUB_ENV"
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Frontend is deliberately absent from this workflow — frontend/ has no
-      # app yet, and its ECS service is pinned to desired_count 0 in Terraform
-      # for the same reason. Add a step here once frontend/ has a Dockerfile.
       - name: Build and push backend image
         working-directory: backend
         run: |
           docker build -t "$ECR_BACKEND_URL:${{ github.sha }}" .
           docker push "$ECR_BACKEND_URL:${{ github.sha }}"
+
+      # These run before the migration step on purpose: a frontend that fails to
+      # compile then fails the job while the database is still untouched, which
+      # is why neither app is also built on the runner as a separate gate. Both
+      # carry the same tag — one commit, one deploy, no way for them to drift.
+      - name: Build and push frontend-admin image
+        working-directory: frontend-admin
+        run: |
+          docker build -t "$ECR_FRONTEND_ADMIN_URL:${{ github.sha }}" .
+          docker push "$ECR_FRONTEND_ADMIN_URL:${{ github.sha }}"
+
+      - name: Build and push frontend-public image
+        working-directory: frontend-public
+        run: |
+          docker build -t "$ECR_FRONTEND_PUBLIC_URL:${{ github.sha }}" .
+          docker push "$ECR_FRONTEND_PUBLIC_URL:${{ github.sha }}"
 
       # Staging is scheduled down outside working hours (infra/modules/scheduler):
       # the database is stopped and the service is scaled to zero. A deploy that
@@ -173,35 +192,52 @@ jobs:
           terraform apply -auto-approve \
             -var="aws_region=${{ vars.AWS_REGION }}" \
             -var="backend_image_tag=${{ github.sha }}" \
+            -var="frontend_image_tag=${{ github.sha }}" \
             -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
             -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
             -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
 
       # Terraform no longer manages desired_count — the off-hours scheduler owns
-      # it — so an apply alone will not bring the service back up if it is
-      # currently scaled to zero. Deploying is an explicit statement that the
-      # environment should be running, so scale it here.
-      - name: Scale backend service up
+      # it for all three services — so an apply alone will not bring them back
+      # up if they are currently scaled to zero. Deploying is an explicit
+      # statement that the environment should be running, so scale them here.
+      - name: Scale services up
         working-directory: ${{ env.TF_DIR }}
         run: |
           set -euo pipefail
-          aws ecs update-service \
-            --cluster "$(terraform output -raw ecs_cluster_name)" \
+          CLUSTER=$(terraform output -raw ecs_cluster_name)
+          FRONTEND_COUNT=$(terraform output -raw frontend_desired_count)
+
+          aws ecs update-service --cluster "$CLUSTER" \
             --service "$(terraform output -raw backend_service_name)" \
-            --desired-count "$(terraform output -raw backend_desired_count)" \
-            >/dev/null
+            --desired-count "$(terraform output -raw backend_desired_count)" >/dev/null
+
+          for output in frontend_admin_service_name frontend_public_service_name; do
+            aws ecs update-service --cluster "$CLUSTER" \
+              --service "$(terraform output -raw "$output")" \
+              --desired-count "$FRONTEND_COUNT" >/dev/null
+          done
 
       # terraform apply returns as soon as UpdateService is accepted, so
       # without this the job goes green while the new tasks are still
       # crash-looping. This is what turns "deployed" into "actually running".
-      - name: Wait for backend service to stabilise
+      - name: Wait for services to stabilise
         working-directory: ${{ env.TF_DIR }}
         run: |
           set -euo pipefail
           aws ecs wait services-stable \
             --cluster "$(terraform output -raw ecs_cluster_name)" \
-            --services "$(terraform output -raw backend_service_name)"
+            --services \
+              "$(terraform output -raw backend_service_name)" \
+              "$(terraform output -raw frontend_admin_service_name)" \
+              "$(terraform output -raw frontend_public_service_name)"
 
-      - name: Show ALB URL
+      - name: Show staging URLs
         working-directory: ${{ env.TF_DIR }}
-        run: terraform output -raw alb_dns_name
+        run: |
+          set -euo pipefail
+          ALB=$(terraform output -raw alb_dns_name)
+          echo "Public: http://$ALB/"
+          echo "Admin:  http://$ALB/admin"
+          echo "API:    http://$ALB/api/"
+          echo "Health: http://$ALB/health"

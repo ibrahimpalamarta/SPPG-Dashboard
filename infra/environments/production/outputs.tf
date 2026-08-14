@@ -28,8 +28,20 @@ output "ecs_tasks_security_group_id" {
   value = module.network.ecs_tasks_security_group_id
 }
 
-output "ecr_frontend_repository_url" {
-  value = module.ecr.frontend_repository_url
+output "frontend_admin_service_name" {
+  value = module.compute.frontend_admin_service_name
+}
+
+output "frontend_public_service_name" {
+  value = module.compute.frontend_public_service_name
+}
+
+output "ecr_frontend_admin_repository_url" {
+  value = module.ecr.frontend_admin_repository_url
+}
+
+output "ecr_frontend_public_repository_url" {
+  value = module.ecr.frontend_public_repository_url
 }
 
 output "ecr_backend_repository_url" {

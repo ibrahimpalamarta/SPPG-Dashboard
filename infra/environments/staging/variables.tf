@@ -76,6 +76,13 @@ variable "desired_count" {
   default = 1
 }
 
+# Applies to both frontend services. Overrides the module default of 0, which
+# exists for environments that do not yet push frontend images.
+variable "frontend_desired_count" {
+  type    = number
+  default = 1
+}
+
 variable "frontend_image_tag" {
   type    = string
   default = "latest"
