@@ -85,6 +85,14 @@ jobs:
       # fresh environment the two frontend repositories would not exist yet.
       # Everything else those pull in as dependencies — VPC, subnets, security
       # group, RDS, the secret, the log group, the task roles.
+      #
+      # The HTTP listener is targeted so its default action (and the target
+      # groups it forwards to) settle before the full apply below. Terraform
+      # does not reliably order "update the listener" ahead of "destroy a target
+      # group the listener still points at", and ELB rejects DeleteTargetGroup
+      # while any listener or rule still references it — which is exactly how
+      # the first frontend-admin/frontend-public rollout failed. Doing it here
+      # also means the listener a new service attaches to always exists first.
       - name: Provision ECR and register migration task definition
         working-directory: ${{ env.TF_DIR }}
         run: |
@@ -92,6 +100,7 @@ jobs:
           terraform apply -auto-approve \
             -target=module.ecr \
             -target=module.compute.aws_ecs_cluster.this \
+            -target=module.compute.aws_lb_listener.http \
             -target=module.compute.aws_ecs_task_definition.migrate \
             -var="aws_region=${{ vars.AWS_REGION }}" \
             -var="backend_image_tag=${{ github.sha }}" \
