@@ -45,6 +45,34 @@ jobs:
           npm run build
           npm test
 
+  # Both apps are the same shape, so they share one job definition. This is the
+  # only place the frontends are built on a runner: the deploy workflow lets the
+  # Docker build be its gate instead, and that build already happens before any
+  # migration runs.
+  frontend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [frontend-admin, frontend-public]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      # `next build` type-checks as part of building, so this is the type gate
+      # too — same arrangement as the backend job. Neither app has tests yet.
+      - name: Install and build
+        working-directory: ${{ matrix.app }}
+        run: |
+          npm ci
+          npm run build
+
   terraform:
     runs-on: ubuntu-latest
     steps:

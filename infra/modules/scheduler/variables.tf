@@ -12,19 +12,16 @@ variable "ecs_cluster_name" {
   type = string
 }
 
-variable "ecs_service_name" {
-  description = "Name of the ECS service to scale up and down"
-  type        = string
-}
-
-variable "ecs_service_arn" {
-  description = "ARN of that service, so ecs:UpdateService can be scoped to it alone"
-  type        = string
-}
-
-variable "ecs_running_desired_count" {
-  description = "Task count to restore during working hours"
-  type        = number
+# A map rather than a single service: every Fargate service in the environment
+# has to be scaled down, or the ones left out quietly bill around the clock and
+# undo the saving. The key is only used to name the schedules.
+variable "ecs_services" {
+  description = "ECS services to scale out of hours: key => { name, arn, desired_count }"
+  type = map(object({
+    name          = string
+    arn           = string
+    desired_count = number
+  }))
 }
 
 variable "db_instance_identifier" {

@@ -40,7 +40,7 @@ resource "aws_iam_role_policy" "scheduler" {
         Sid      = "ScaleEcsService"
         Effect   = "Allow"
         Action   = ["ecs:UpdateService"]
-        Resource = var.ecs_service_arn
+        Resource = [for s in var.ecs_services : s.arn]
       },
       {
         Sid      = "StartStopDatabase"
@@ -53,7 +53,9 @@ resource "aws_iam_role_policy" "scheduler" {
 }
 
 resource "aws_scheduler_schedule" "ecs_start" {
-  name       = "${local.prefix}-ecs-start"
+  for_each = var.ecs_services
+
+  name       = "${local.prefix}-ecs-start-${each.key}"
   group_name = "default"
 
   # OFF, not a flexible window: these fire in a fixed order relative to each
@@ -71,14 +73,16 @@ resource "aws_scheduler_schedule" "ecs_start" {
 
     input = jsonencode({
       Cluster      = var.ecs_cluster_name
-      Service      = var.ecs_service_name
-      DesiredCount = var.ecs_running_desired_count
+      Service      = each.value.name
+      DesiredCount = each.value.desired_count
     })
   }
 }
 
 resource "aws_scheduler_schedule" "ecs_stop" {
-  name       = "${local.prefix}-ecs-stop"
+  for_each = var.ecs_services
+
+  name       = "${local.prefix}-ecs-stop-${each.key}"
   group_name = "default"
 
   flexible_time_window {
@@ -94,7 +98,7 @@ resource "aws_scheduler_schedule" "ecs_stop" {
 
     input = jsonencode({
       Cluster      = var.ecs_cluster_name
-      Service      = var.ecs_service_name
+      Service      = each.value.name
       DesiredCount = 0
     })
   }
