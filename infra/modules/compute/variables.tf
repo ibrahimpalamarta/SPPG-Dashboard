@@ -45,7 +45,11 @@ variable "ecs_tasks_security_group_id" {
   type = string
 }
 
-variable "ecr_frontend_repository_url" {
+variable "ecr_frontend_admin_repository_url" {
+  type = string
+}
+
+variable "ecr_frontend_public_repository_url" {
   type = string
 }
 
@@ -53,6 +57,9 @@ variable "ecr_backend_repository_url" {
   type = string
 }
 
+# One tag for both frontends: they are built in the same workflow run, from the
+# same commit, and always roll out together. Splitting this into two variables
+# would only create a way for them to drift.
 variable "frontend_image_tag" {
   type = string
 }
@@ -89,16 +96,24 @@ variable "desired_count" {
   type = number
 }
 
-# Separate from desired_count, and 0, because frontend/ has no app yet: no
-# frontend image has ever been pushed, so any task ECS starts here just
-# crash-loops on ImagePullFailure. Raise this once frontend/ has a Dockerfile
-# and the deploy workflows push a frontend image.
+# Applies to both frontend services, which are sized and scaled identically.
+# Defaults to 0 so an environment whose deploy workflow does not push frontend
+# images (production, today) does not crash-loop on ImagePullFailure. Staging
+# overrides it.
 variable "frontend_desired_count" {
   type    = number
   default = 0
 }
 
-variable "frontend_health_check_path" {
+# The admin app sets basePath "/admin", so it 404s on "/" — its health check has
+# to hit the prefix or the target group never turns healthy. ALB health checks
+# go straight to the container, bypassing the listener rules.
+variable "frontend_admin_health_check_path" {
+  type    = string
+  default = "/admin"
+}
+
+variable "frontend_public_health_check_path" {
   type    = string
   default = "/"
 }

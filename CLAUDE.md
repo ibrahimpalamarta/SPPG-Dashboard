@@ -6,7 +6,8 @@ Instruksi ini berlaku untuk semua sesi Claude Code di repo ini. Ikuti secara ket
 - Repo: monorepo `dashboard_sppg` (GitHub: `ibrahimpalamarta/SPPG-Dashboard`)
 - Backend: Node.js + TypeScript, Express, Prisma, Auth0 untuk autentikasi
 - Database: PostgreSQL (data aplikasi tetap di Postgres, auth didelegasikan ke Auth0)
-- Frontend: folder masih kosong, belum digarap — fokus backend dulu
+- Frontend: dua app Next.js (App Router) terpisah — `frontend-admin/` (Backoffice + Dashboard Internal, di belakang Auth0) dan `frontend-public/` (dashboard transparansi publik). Keduanya baru berisi halaman statis "Segera Hadir": fondasi deployment sudah jalan ke staging, tapi desain UI/UX masih berjalan jadi belum ada halaman produk
+- Monorepo tanpa workspace tool: tiap service punya `package.json` + lockfile sendiri, tidak ada root `package.json`
 - RBAC 4 role: Super Admin, Data Admin/entry (per-SPPG Dapur), Internal (view-only), Public (insight visualisasi)
 - Deployment: AWS ECS + ECR di belakang ALB, RDS, S3 assets bucket, region ap-southeast-3, environment staging & prod, CI/CD via GitHub Actions
 
