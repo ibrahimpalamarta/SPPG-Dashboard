@@ -7,63 +7,77 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------------------------------------------------------------------
+// Schema ini adalah terjemahan langsung dari `sppg_erd.drawio` (15 entitas).
+//
+// Dua konvensi menyimpang dari ERD, disengaja dan dicatat di prisma/README.md:
+//   1. Nama tabel plural (`kitchens`, bukan `KITCHEN`) - mengikuti tabel
+//      `users`/`audit_logs`/`gallery_images` yang sudah ada di repo.
+//   2. Nilai enum SCREAMING_SNAKE - mengikuti enum `Role` yang sudah ada.
+//      Nilai aslinya di ERD ditulis huruf kecil (`diterima`, `basah`, ...).
+//
+// PK memakai BigInt auto-increment untuk ID internal, sesuai ERD (`PK, INT`).
+// Entitas yang ID-nya keluar ke permukaan publik juga punya `public_id UUID`
+// supaya ID internal yang berurutan tidak bocor / tidak bisa dienumerasi.
+// ---------------------------------------------------------------------------
+
 /// Authorization roles. Auth0 is the source of truth (Roles & Permissions);
 /// this column is the synced copy the backend actually enforces against.
+/// CMS_ADMIN berasal dari ERD (USER.role) dan SCRUM-14.
 enum Role {
   SUPER_ADMIN
   DATA_ADMIN
+  CMS_ADMIN
   INTERNAL
   PUBLIC
 }
 
-/// Application-side user record. Holds NO credentials — Auth0 owns identity,
-/// `auth0Sub` is the only link between the two.
-model User {
-  id       String  @id @default(uuid()) @db.Uuid
-  auth0Sub String  @unique @map("auth0_sub")
-  email    String? @unique
-  name     String?
-  role     Role    @default(PUBLIC)
-
-  /// Scopes a DATA_ADMIN to a single SPPG Dapur. Nullable and unconstrained for
-  /// now; a FK to the sppg_dapur table lands with that table in the next phase.
-  scopeId String? @map("scope_id") @db.Uuid
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  auditLogs     AuditLog[]
-  galleryImages GalleryImage[]
-  documents     Document[]
-
-  @@index([role])
-  @@index([scopeId])
-  @@map("users")
+/// Status keaktifan akun maupun dapur - ERD memakai ENUM(active,inactive)
+/// untuk keduanya.
+enum ActiveStatus {
+  ACTIVE
+  INACTIVE
 }
 
-/// Who did what, to which entity, when. Written sparsely in this phase;
-/// the shape is here so feature endpoints can just call writeAuditLog().
-model AuditLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  actorId    String?  @map("actor_id") @db.Uuid
-  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  action     String
-  entityType String   @map("entity_type")
-  entityId   String?  @map("entity_id")
-  metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  @@index([actorId, createdAt])
-  @@index([entityType, entityId])
-  @@map("audit_logs")
+/// Jenis dapur: basah (masak di tempat) atau kering (distribusi kemasan).
+enum KitchenType {
+  BASAH
+  KERING
 }
 
-/// Slot penyajian dalam satu hari operasional.
-enum MealType {
-  BREAKFAST
-  LUNCH
-  DINNER
-  SNACK
+/// Slot pendistribusian MBG pada tabel rujukan AKG.
+enum PendistribusianMbg {
+  PAGI
+  SIANG
+}
+
+/// Hasil pemeriksaan format berkas saat diunggah (SCRUM-5).
+enum UploadStatus {
+  DITERIMA
+  DITOLAK
+  PROCESSING
+}
+
+/// Jenis menu pada form perencanaan menu SOP-OPR-001.
+enum MenuType {
+  KERING
+  BASAH
+}
+
+/// Kelompok porsi pada form menu. BUSUI_BUMIL = "Busui & Bumil"; nilai enum
+/// tidak boleh memuat spasi/ampersand sehingga ditulis snake.
+enum PortionClass {
+  KECIL
+  BESAR
+  BALITA
+  BUSUI_BUMIL
+}
+
+/// Posisi nilai gizi satu porsi terhadap rentang target AKG-nya (SCRUM-8).
+enum ComplianceStatus {
+  WITHIN
+  BELOW
+  ABOVE
 }
 
 /// Status penyelesaian satu catatan operasional harian dapur.
@@ -73,167 +87,542 @@ enum OperationalStatus {
   CANCELLED
 }
 
-/// Status keaktifan dapur sebagai master data.
-enum KitchenStatus {
-  ACTIVE
-  INACTIVE
+/// Status publikasi konten CMS (SCRUM-14).
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
 }
 
-/// Format berkas yang boleh diunggah ke modul dokumen.
-enum FileType {
+/// Format berkas dokumen CMS yang boleh diunggah.
+enum DocumentFileType {
   PDF
   DOCX
   XLSX
-  PPTX
-  CSV
-  OTHER
 }
 
-/// Master wilayah administratif Indonesia. Satu baris dipakai bersama oleh
-/// banyak dapur di wilayah yang sama, sehingga nama wilayah tidak terduplikasi
-/// dan dashboard publik bisa mengelompokkan tanpa normalisasi string.
-model GeographicInfo {
-  id          String @id @default(uuid()) @db.Uuid
-  province    String
-  cityRegency String @map("city_regency")
-  district    String
-  village     String
+// ---------------------------------------------------------------------------
+// Identitas & audit
+// ---------------------------------------------------------------------------
 
-  /// Titik representasi wilayah (centroid), bukan lokasi dapur — dipakai untuk
-  /// agregasi peta di level wilayah administratif. Koordinat fisik tiap dapur
-  /// ada di Kitchen.latitude/longitude. Nullable: wilayah bisa didaftarkan
-  /// lebih dulu sebelum centroid-nya ditentukan.
-  latitude  Decimal? @db.Decimal(9, 6)
-  longitude Decimal? @db.Decimal(9, 6)
+/// Application-side user record. Holds NO credentials - Auth0 owns identity,
+/// `auth0Sub` is the only link between the two.
+///
+/// TODO(catatan): ERD mencantumkan kolom `password_hash`. Kolom itu sengaja
+/// TIDAK dibuat - menyimpan kredensial bertentangan dengan arsitektur Auth0
+/// yang sudah berjalan dan tidak ada satu pun jalur kode yang menulisnya.
+/// Konfirmasi ke tim agar ERD diperbarui.
+model User {
+  id       BigInt  @id @default(autoincrement()) @map("user_id")
+  auth0Sub String  @unique @map("auth0_sub")
+  email    String? @unique
+  fullName String? @map("full_name")
+  role     Role    @default(PUBLIC)
+
+  status      ActiveStatus @default(ACTIVE)
+  lastLoginAt DateTime?    @map("last_login")
+
+  /// Scopes a DATA_ADMIN to a single SPPG Dapur. Nullable: hanya role
+  /// DATA_ADMIN yang di-scope, role lain melihat seluruh dapur.
+  scopeId BigInt?  @map("scope_id")
+  scope   Kitchen? @relation(fields: [scopeId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  kitchens Kitchen[]
+  auditLogs        AuditLog[]
+  galleryImages    GalleryImage[]
+  uploadBatches    UploadBatch[]
+  cmsAnnouncements CmsAnnouncement[]
+  cmsDocuments     CmsDocument[]
 
-  @@unique([province, cityRegency, district, village])
-  @@map("geographic_infos")
+  @@index([role])
+  @@index([scopeId])
+  @@map("users")
 }
 
-/// Master data SPPG Dapur — unit produksi yang memasak dan mendistribusikan makanan.
-/// TODO: confirm real kitchen master data fields with stakeholder.
-/// Section 10.4 di PRD salah copy-paste (isinya duplikat field Transaction),
-/// jadi field di bawah adalah rekonstruksi yang masuk akal, bukan spesifikasi final.
+/// Who did what, to which entity, when (SCRUM-1, SCRUM-14 "all actions logged").
+model AuditLog {
+  id     BigInt  @id @default(autoincrement()) @map("log_id")
+  userId BigInt? @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action   String
+  entity   String
+  entityId BigInt? @map("entity_id")
+
+  /// Tidak ada di ERD, tapi dipertahankan: kolom ini sudah dipakai
+  /// `writeAuditLog()` untuk menyimpan konteks perubahan (mis. role lama ke
+  /// role baru). Jangan pernah diisi token, password, atau raw request body.
+  metadata Json?
+
+  timestamp DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Master data
+// ---------------------------------------------------------------------------
+
+/// Master SPPG Dapur - unit produksi yang memasak dan mendistribusikan makanan
+/// (SCRUM-15: 6 dapur saat peluncuran).
 model Kitchen {
-  id          String        @id @default(uuid()) @db.Uuid
-  kitchenName String        @map("kitchen_name")
-  address     String
-  status      KitchenStatus @default(ACTIVE)
+  id       BigInt @id @default(autoincrement()) @map("kitchen_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
 
-  /// Kapasitas produksi maksimum dalam porsi makan per hari.
-  capacity Int
+  name String @unique
 
-  /// Titik lokasi dapur. Nullable karena master data bisa didaftarkan
-  /// lebih dulu sebelum koordinatnya diverifikasi di lapangan.
+  /// Wilayah administratif. Nullable - TODO(catatan): master dapur belum ada
+  /// sebagai berkas. "SPPG Data points" 9.1 menandai tabel ini "build new"
+  /// dan menyebut nama dapur "today only implied by sheet name", jadi wilayah,
+  /// jenis, dan koordinat belum tersedia untuk keenam dapur.
+  province    String?
+  cityRegency String? @map("city_regency")
+  district    String?
+  village     String?
+
+  type   KitchenType?
+  status ActiveStatus @default(ACTIVE)
+
   latitude  Decimal? @db.Decimal(9, 6)
   longitude Decimal? @db.Decimal(9, 6)
-
-  geographicInfoId String         @map("geographic_info_id") @db.Uuid
-  geographicInfo   GeographicInfo @relation(fields: [geographicInfoId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  menus        Menu[]
-  transactions Transaction[]
+  menuPlans      MenuPlan[]
+  uploadBatches  UploadBatch[]
+  menuNutritions MenuNutrition[]
+  dailyKitchens  DailyKitchen[]
+  menuCosts      MenuCost[]
+  scopedUsers    User[]
 
-  @@index([geographicInfoId])
   @@index([status])
   @@map("kitchens")
 }
 
-/// Menu yang direncanakan/disajikan satu dapur pada satu tanggal dan satu slot makan.
-model Menu {
-  id       String   @id @default(uuid()) @db.Uuid
-  menuDate DateTime @map("menu_date") @db.Date
-  mealType MealType @map("meal_type")
+/// Master bahan kanonik. Menyatukan ~443 ejaan menjadi ~370 bahan nyata
+/// ("SPPG Data points" 9.2).
+model Ingredient {
+  id   BigInt @id @default(autoincrement()) @map("ingredient_id")
+  name String @unique
 
-  /// Daftar nama item makanan, mis. ["Nasi putih", "Ayam goreng", "Tumis buncis"].
-  foodItems String[] @map("food_items")
+  /// Ejaan-ejaan lain yang menunjuk bahan yang sama.
+  /// TODO(catatan): proses matching `menu_plans.bahan` (teks bebas) ke
+  /// `ingredient_id` belum didefinisikan aturannya - tunggu keputusan tim data.
+  /// Peringatan dari 9.2: "Ubi Ungu" dan "Kubis ungu" adalah bahan BERBEDA
+  /// dan tidak boleh digabung otomatis berdasarkan kemiripan string.
+  aliases String[] @default([])
 
-  /// TODO: confirm unit with stakeholder — diasumsikan gram per porsi.
-  portionSize Int @map("portion_size")
+  /// Bagian Dapat Dimakan, dalam persen.
+  bddPct Decimal? @map("bdd_pct") @db.Decimal(5, 2)
 
-  kitchenId String  @map("kitchen_id") @db.Uuid
-  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+  /// Kandungan gizi per 100 g bahan mentah.
+  energiPer100g      Decimal? @map("energi_per100g") @db.Decimal(10, 2)
+  proteinPer100g     Decimal? @map("protein_per100g") @db.Decimal(10, 2)
+  lemakPer100g       Decimal? @map("lemak_per100g") @db.Decimal(10, 2)
+  karbohidratPer100g Decimal? @map("karbohidrat_per100g") @db.Decimal(10, 2)
+  seratPer100g       Decimal? @map("serat_per100g") @db.Decimal(10, 2)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  nutrition Nutrition?
+  menuPlans MenuPlan[]
 
-  @@index([kitchenId, menuDate])
-  @@map("menus")
+  @@map("ingredients")
 }
 
-/// Catatan operasional harian satu dapur: berapa porsi yang benar-benar
-/// disalurkan dan bagaimana status penyelesaiannya.
-model Transaction {
-  id              String   @id @default(uuid()) @db.Uuid
-  transactionDate DateTime @map("transaction_date") @db.Date
+/// Tabel rujukan AKG - 12 kelompok sasaran, Tabel 2 SOP-OPR-001
+/// (Juknis 401.1/2025). Lookup tetap, bukan data yang diunggah (SCRUM-8).
+model AkgTarget {
+  id                 BigInt             @id @default(autoincrement()) @map("akg_id")
+  kelompokSasaran    String             @map("kelompok_sasaran")
+  pendistribusianMbg PendistribusianMbg @map("pendistribusian_mbg")
 
-  kitchenId String  @map("kitchen_id") @db.Uuid
+  /// Rentang %AKG sebagai teks apa adanya dari tabel rujukan, mis. "20-25%".
+  rujukanPctAkg String? @map("rujukan_pct_akg")
+
+  energiMin Decimal? @map("energi_min") @db.Decimal(10, 2)
+  energiMax Decimal? @map("energi_max") @db.Decimal(10, 2)
+
+  proteinMin Decimal? @map("protein_min") @db.Decimal(10, 2)
+  proteinMax Decimal? @map("protein_max") @db.Decimal(10, 2)
+
+  lemakMin Decimal? @map("lemak_min") @db.Decimal(10, 2)
+  lemakMax Decimal? @map("lemak_max") @db.Decimal(10, 2)
+
+  karbohidratMin Decimal? @map("karbohidrat_min") @db.Decimal(10, 2)
+  karbohidratMax Decimal? @map("karbohidrat_max") @db.Decimal(10, 2)
+
+  /// TODO(catatan): SCRUM-8 meminta kolom Serat di tabel AKG compliance, tapi
+  /// tabel rujukan resmi (Tabel 2 SOP-OPR-001 / Juknis 401.1 Tahun 2025) TIDAK
+  /// mencantumkan rentang Serat - hanya Energi/Protein/Lemak/Karbohidrat.
+  /// Kedua kolom ini dibiarkan NULL dan nilainya PERLU DIKONFIRMASI ke Program
+  /// Team sebelum dipakai untuk validasi compliance.
+  seratMin Decimal? @map("serat_min") @db.Decimal(10, 2)
+  seratMax Decimal? @map("serat_max") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  akgCompliances AkgCompliance[]
+
+  @@unique([kelompokSasaran, pendistribusianMbg])
+  @@map("akg_targets")
+}
+
+// ---------------------------------------------------------------------------
+// Unggah & data operasional
+// ---------------------------------------------------------------------------
+
+/// Satu berkas Excel yang diunggah Data Admin (SCRUM-5, 6, 7).
+model UploadBatch {
+  id BigInt @id @default(autoincrement()) @map("batch_id")
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+
+  uploaderId BigInt? @map("uploader_id")
+  uploader   User?   @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  uploadDate DateTime @default(now()) @map("upload_date")
+  fileName   String   @map("file_name")
+
+  /// Sidik jari berkas. UNIQUE - inilah yang membuat SCRUM-6 ("re-import berkas
+  /// yang sama diperlakukan sebagai berkas yang sama bila tidak ada perubahan")
+  /// bisa ditegakkan di level database, bukan hanya di aplikasi.
+  fileHash String @unique @map("file_hash")
+
+  rowCount Int          @map("row_count")
+  status   UploadStatus @default(PROCESSING)
+
+  /// Alasan penolakan / catatan verifikasi.
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  menuPlans MenuPlan[]
+
+  @@index([kitchenId, uploadDate])
+  @@map("upload_batches")
+}
+
+/// Form perencanaan menu SOP-OPR-001, sudah diratakan menjadi satu baris per
+/// bahan (SCRUM-2). Nama kolom sengaja dipertahankan dalam Bahasa Indonesia
+/// agar konsisten dengan istilah SOP dan header Excel sumbernya.
+model MenuPlan {
+  id BigInt @id @default(autoincrement()) @map("menu_plan_id")
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+
+  uploadBatchId BigInt      @map("upload_batch_id")
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [id], onDelete: Cascade)
+
+  /// TODO(catatan): proses matching bahan-ke-ingredient_id belum didefinisikan,
+  /// tunggu keputusan tim data. Sampai aturan itu ada, kolom ini tetap nullable
+  /// dan `bahan` di bawah adalah satu-satunya sumber nama bahan yang pasti.
+  ingredientId BigInt?     @map("ingredient_id")
+  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+
+  /// Tanggal menu disajikan.
+  tanggal DateTime @db.Date
+
+  /// Nama hari yang menyertai tanggal (Senin sampai Minggu).
+  /// TODO(catatan): nilai ini bisa diturunkan dari `tanggal`. Dipertahankan
+  /// karena ada di ERD dan di form SOP; konfirmasi apakah perlu disimpan.
+  hari String?
+
+  menuType     MenuType     @map("menu_type")
+  portionClass PortionClass @map("portion_class")
+
+  /// Nama masakan (kolom "menu" di form SOP).
+  menuName String @map("menu_name")
+
+  /// Nama bahan apa adanya seperti ditulis ahli gizi (kolom "bahan").
+  bahan String
+
+  /// Berat bersih (dapat dimakan) per porsi, gram.
+  beratBersih Decimal @map("berat_bersih") @db.Decimal(10, 2)
+
+  /// Berat kotor per porsi, gram.
+  /// TODO(catatan): "SPPG Data points" 11 mencatat sebagian baris punya
+  /// berat_kotor = berat_bersih dan sebagian lagi = bersih / BDD. Konvensi
+  /// mana yang benar belum diputuskan.
+  beratKotor Decimal @map("berat_kotor") @db.Decimal(10, 2)
+
+  /// Bagian Dapat Dimakan, persen.
+  bdd Decimal @db.Decimal(5, 2)
+
+  /// Ukuran Rumah Tangga: jumlah + satuan, mis. 1 "potong".
+  jumlahUrt Decimal? @map("jumlah_urt") @db.Decimal(10, 2)
+  satuanUrt String?  @map("satuan_urt")
+
+  /// Kandungan gizi per porsi.
+  energi      Decimal @db.Decimal(10, 2)
+  protein     Decimal @db.Decimal(10, 2)
+  lemak       Decimal @db.Decimal(10, 2)
+  karbohidrat Decimal @db.Decimal(10, 2)
+
+  /// TODO(catatan): kolom Serat ada di ERD dan diminta SCRUM-12, tapi tidak ada
+  /// di 14 kolom form menu maupun di tabel rujukan AKG. Dibuat nullable sampai
+  /// sumber datanya jelas.
+  serat Decimal? @db.Decimal(10, 2)
+
+  /// Jumlah penerima manfaat yang disuapi blok menu ini.
+  jumlahPm Int @map("jumlah_pm")
+
+  /// Total kebutuhan bahan untuk satu blok, kilogram.
+  kebutuhanBahanKg Decimal? @map("kebutuhan_bahan_kg") @db.Decimal(12, 3)
+
+  /// Total kebutuhan makanan kemasan, satuan pax.
+  kebutuhanKemasanPax Decimal? @map("kebutuhan_kemasan_pax") @db.Decimal(12, 2)
+
+  /// INTERNAL-ONLY (SCRUM-13). Harga satuan bahan dan total biaya baris, rupiah.
+  /// Dua kolom ini tidak boleh muncul di view publik manapun.
+  hargaBahan Decimal? @map("harga_bahan") @db.Decimal(14, 2)
+  totalHarga Decimal? @map("total_harga") @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  recipeCostings RecipeCosting[]
+  akgCompliances AkgCompliance[]
+  menuCosts      MenuCost[]
+
+  @@index([kitchenId, tanggal])
+  @@index([uploadBatchId])
+  @@index([ingredientId])
+  @@map("menu_plans")
+}
+
+/// Standar resep berbiaya (SOP-OPR-001 langkah 5). `yieldTestPct` adalah
+/// penyusutan material - berbeda dari BDD dan tidak boleh digabung dengannya.
+model RecipeCosting {
+  id BigInt @id @default(autoincrement()) @map("costing_id")
+
+  menuPlanId BigInt   @map("menu_plan_id")
+  menuPlan   MenuPlan @relation(fields: [menuPlanId], references: [id], onDelete: Cascade)
+
+  /// Nama bahan pada tabel standar resep.
+  item String
+
+  /// INTERNAL-ONLY (SCRUM-13): seluruh kolom biaya di bawah.
+  hargaPerKg Decimal? @map("harga_per_kg") @db.Decimal(14, 2)
+
+  /// Gramasi bahan per porsi.
+  gramasi Decimal? @db.Decimal(10, 2)
+
+  /// Bagian yang masih terpakai setelah persiapan, persen. Kosong berarti 100%.
+  yieldTestPct Decimal? @map("yield_test_pct") @db.Decimal(5, 2)
+
+  /// Biaya per porsi setelah disesuaikan yield test.
+  costPerPorsi Decimal? @map("cost_per_porsi") @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([menuPlanId])
+  @@map("recipe_costings")
+}
+
+// ---------------------------------------------------------------------------
+// Mart pre-computed
+//
+// Kelima tabel di bawah ditandai [mart] di ERD: isinya diturunkan dari tabel
+// operasional, bukan diisi manusia.
+// TODO(catatan): mekanisme refresh (job terjadwal / trigger / recompute saat
+// import di-commit) belum ditentukan. Migration ini hanya membuat strukturnya.
+// ---------------------------------------------------------------------------
+
+/// Hasil perbandingan gizi satu baris menu terhadap target AKG-nya (SCRUM-8).
+///
+/// TODO(catatan): "SPPG Data points" 11 mencatat pemetaan 4 portion_class di
+/// form menu ke 12 kelompok sasaran AKG BELUM ADA. Compliance tidak bisa
+/// dihitung sampai pemetaan itu diputuskan.
+model AkgCompliance {
+  id       BigInt @id @default(autoincrement()) @map("compliance_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  menuPlanId BigInt   @map("menu_plan_id")
+  menuPlan   MenuPlan @relation(fields: [menuPlanId], references: [id], onDelete: Cascade)
+
+  akgId     BigInt    @map("akg_id")
+  akgTarget AkgTarget @relation(fields: [akgId], references: [id], onDelete: Restrict)
+
+  status     ComplianceStatus
+  computedAt DateTime         @default(now()) @map("computed_at")
+
+  @@unique([menuPlanId, akgId])
+  @@map("akg_compliances")
+}
+
+/// Rekap gizi per dapur per tanggal per kelompok porsi (SCRUM-12).
+model MenuNutrition {
+  id       BigInt @id @default(autoincrement()) @map("mart_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  kitchenId BigInt  @map("kitchen_id")
   kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
 
-  numberOfMeals     Int               @map("number_of_meals")
+  tanggal      DateTime     @db.Date
+  portionClass PortionClass @map("portion_class")
+
+  totalEnergi      Decimal? @map("total_energi") @db.Decimal(10, 2)
+  totalProtein     Decimal? @map("total_protein") @db.Decimal(10, 2)
+  totalLemak       Decimal? @map("total_lemak") @db.Decimal(10, 2)
+  totalKarbohidrat Decimal? @map("total_karbohidrat") @db.Decimal(10, 2)
+  totalSerat       Decimal? @map("total_serat") @db.Decimal(10, 2)
+
+  lastRefreshedAt DateTime @default(now()) @map("last_refreshed_at")
+
+  @@unique([kitchenId, tanggal, portionClass])
+  @@map("menu_nutritions")
+}
+
+/// Rekap operasional harian per dapur (SCRUM-11).
+model DailyKitchen {
+  id BigInt @id @default(autoincrement()) @map("mart_id")
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  tanggal DateTime @db.Date
+
+  mealsPrepared    Int @map("meals_prepared")
+  mealsDistributed Int @map("meals_distributed")
+
+  /// INTERNAL-ONLY (SCRUM-13): hitungan penerima manfaat yang eksak.
+  jumlahPm Int @map("jumlah_pm")
+
   operationalStatus OperationalStatus @default(PENDING) @map("operational_status")
-  remarks           String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  lastRefreshedAt DateTime @default(now()) @map("last_refreshed_at")
 
-  @@index([kitchenId, transactionDate])
-  @@index([operationalStatus])
-  @@map("transactions")
+  @@unique([kitchenId, tanggal])
+  @@map("daily_kitchens")
 }
 
-/// Kandungan gizi satu porsi menu. One-to-one dengan Menu (`menu_id` unique).
-/// Decimal dipakai, bukan Float, supaya agregasi SUM/AVG di dashboard publik
-/// tidak terkena akumulasi galat floating point.
-model Nutrition {
-  id String @id @default(uuid()) @db.Uuid
+/// Rekap biaya per dapur per tanggal.
+/// ERD menandai tabel ini [mart, internal-only] - SELURUH isinya sensitif dan
+/// tidak boleh muncul di view publik manapun (SCRUM-13).
+model MenuCost {
+  id BigInt @id @default(autoincrement()) @map("mart_id")
 
-  menuId String @unique @map("menu_id") @db.Uuid
-  menu   Menu   @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
 
-  /// Energi dalam kkal per porsi.
-  calories Decimal @db.Decimal(8, 2)
+  menuPlanId BigInt?   @map("menu_plan_id")
+  menuPlan   MenuPlan? @relation(fields: [menuPlanId], references: [id], onDelete: SetNull)
 
-  /// Makronutrien dalam gram per porsi.
-  protein       Decimal @db.Decimal(7, 2)
-  carbohydrates Decimal @db.Decimal(7, 2)
-  fat           Decimal @db.Decimal(7, 2)
+  tanggal DateTime @db.Date
 
-  /// Vitamin & mineral sebagai key-value, mis. { "vitaminA_mcg": 350, "iron_mg": 4.2 }.
-  /// Sengaja JSON, bukan tabel terpisah: jenis mikronutrien yang dilacak masih berubah.
-  micronutrients Json?
+  costPerPortion Decimal? @map("cost_per_portion") @db.Decimal(14, 2)
+  plannedCost    Decimal? @map("planned_cost") @db.Decimal(14, 2)
+  actualCost     Decimal? @map("actual_cost") @db.Decimal(14, 2)
+
+  lastRefreshedAt DateTime @default(now()) @map("last_refreshed_at")
+
+  @@index([kitchenId, tanggal])
+  @@index([menuPlanId])
+  @@map("menu_costs")
+}
+
+/// Angka ringkas untuk dashboard transparansi publik.
+model PublicSummary {
+  id       BigInt @id @default(autoincrement()) @map("summary_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  periodStart DateTime @map("period_start") @db.Date
+  periodEnd   DateTime @map("period_end") @db.Date
+
+  mealsServed    Int @map("meals_served")
+  kitchensActive Int @map("kitchens_active")
+  coverageCount  Int @map("coverage_count")
+
+  lastRefreshedAt DateTime @default(now()) @map("last_refreshed_at")
+
+  @@unique([periodStart, periodEnd])
+  @@map("public_summaries")
+}
+
+// ---------------------------------------------------------------------------
+// CMS (SCRUM-14)
+// ---------------------------------------------------------------------------
+
+/// Pengumuman untuk situs publik.
+model CmsAnnouncement {
+  id       BigInt @id @default(autoincrement()) @map("announcement_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  title String
+  body  String
+
+  status      ContentStatus @default(DRAFT)
+  publishDate DateTime?     @map("publish_date")
+
+  createdById BigInt? @map("created_by")
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("nutritions")
+  @@index([status, publishDate])
+  @@index([createdById])
+  @@map("cms_announcements")
+}
+
+/// Berkas yang bisa diunduh publik (SOP, laporan).
+model CmsDocument {
+  id       BigInt @id @default(autoincrement()) @map("document_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  title    String
+  category String
+  fileType DocumentFileType @map("file_type")
+
+  /// Object key di S3 assets bucket. Tidak ada di ERD, tapi tanpa penunjuk
+  /// berkas record ini tidak bisa dipakai - pola yang sama sudah dipakai
+  /// GalleryImage.
+  storageKey String @map("storage_key")
+
+  uploadDate DateTime      @default(now()) @map("upload_date")
+  status     ContentStatus @default(DRAFT)
+
+  uploadedById BigInt? @map("uploaded_by")
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([category])
+  @@index([uploadedById])
+  @@map("cms_documents")
 }
 
 /// Foto dokumentasi program untuk galeri publik.
+///
+/// TODO(catatan): tabel ini TIDAK ADA di sppg_erd.drawio, tapi dipertahankan
+/// karena fitur galeri CMS sudah terpasang. Konfirmasi apakah memang harus
+/// dihapus atau ERD yang perlu ditambah.
 model GalleryImage {
-  id          String  @id @default(uuid()) @db.Uuid
+  id       BigInt @id @default(autoincrement()) @map("gallery_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
   imageTitle  String  @map("image_title")
   description String?
 
-  /// Object key di S3 assets bucket. Tidak ada di daftar field PRD, tapi tanpa
-  /// penunjuk berkas record ini tidak bisa dipakai.
+  /// Object key di S3 assets bucket.
   storageKey String @map("storage_key")
 
-  /// Tanggal unggah versi bisnis — bisa di-backfill/diedit, berbeda dari `createdAt`
-  /// yang merupakan timestamp sistem.
-  uploadDate DateTime @default(now()) @map("upload_date")
+  uploadDate DateTime      @default(now()) @map("upload_date")
+  status     ContentStatus @default(DRAFT)
 
-  uploadedById String? @map("uploaded_by_id") @db.Uuid
+  uploadedById BigInt? @map("uploaded_by")
   uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   /// TODO: confirm fixed category list with stakeholder; promote to enum once frozen.
@@ -245,31 +634,4 @@ model GalleryImage {
   @@index([uploadedById])
   @@index([category])
   @@map("gallery_images")
-}
-
-/// Berkas administratif program (laporan, SOP, rekap) yang diunggah pengguna internal.
-model Document {
-  id            String @id @default(uuid()) @db.Uuid
-  documentTitle String @map("document_title")
-
-  /// TODO: confirm fixed category list with stakeholder; promote to enum once frozen.
-  category String
-
-  /// Object key di S3 assets bucket. Lihat catatan yang sama di GalleryImage.
-  storageKey String @map("storage_key")
-
-  /// Tanggal unggah versi bisnis — lihat catatan yang sama di GalleryImage.
-  uploadDate DateTime @default(now()) @map("upload_date")
-
-  uploadedById String? @map("uploaded_by_id") @db.Uuid
-  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-
-  fileType FileType @map("file_type")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([uploadedById])
-  @@index([category])
-  @@map("documents")
 }

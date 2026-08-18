@@ -6,12 +6,14 @@ import { requireRole, resolveScopeId, attachUser } from './guard.js';
 import type { Role } from './roles.js';
 import type { Db } from '../db.js';
 
-const userWith = (role: Role, scopeId: string | null = null): User => ({
-  id: 'u1',
+const userWith = (role: Role, scopeId: bigint | null = null): User => ({
+  id: 1n,
   auth0Sub: 'auth0|abc123',
   email: 'a@example.com',
-  name: 'A',
+  fullName: 'A',
   role,
+  status: 'ACTIVE',
+  lastLoginAt: null,
   scopeId,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -78,11 +80,11 @@ describe('requireRole', () => {
 
 describe('resolveScopeId', () => {
   test('SUPER_ADMIN is unscoped', () => {
-    assert.equal(resolveScopeId(userWith('SUPER_ADMIN', 'sppg-1')), null);
+    assert.equal(resolveScopeId(userWith('SUPER_ADMIN', 7n)), null);
   });
 
   test('DATA_ADMIN is pinned to its own scope', () => {
-    assert.equal(resolveScopeId(userWith('DATA_ADMIN', 'sppg-1')), 'sppg-1');
+    assert.equal(resolveScopeId(userWith('DATA_ADMIN', 7n)), 7n);
   });
 });
 
