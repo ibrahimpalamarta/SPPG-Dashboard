@@ -1,6 +1,6 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { SignJWT, generateKeyPair, type JWTVerifyGetKey } from 'jose';
+import { SignJWT, generateKeyPair, type JWTVerifyGetKey, type KeyLike } from 'jose';
 import type { Request, Response } from 'express';
 import { requireAuth } from './jwt.js';
 import { AUTH0_ISSUER, env } from '../config/env.js';
@@ -13,7 +13,7 @@ interface Signed {
   issuer?: string;
   audience?: string;
   expiresIn?: string;
-  key?: CryptoKey;
+  key?: KeyLike;
   claims?: Record<string, unknown>;
   sub?: string | null;
 }

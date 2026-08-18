@@ -1,0 +1,12 @@
+// `tsconfig.json` excludes *.test.ts so the build never emits tests into dist/.
+// That also meant test files were never type-checked at all, and their fixtures
+// silently drifted out of sync with the Prisma model. This config checks
+// everything and emits nothing: `npm run typecheck`.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

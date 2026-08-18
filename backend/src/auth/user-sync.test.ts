@@ -6,6 +6,27 @@ import { findOrCreateUser } from './user-sync.js';
 import { roleFromClaims } from './roles.js';
 import type { AuthContext } from './jwt.js';
 
+/**
+ * The subset of Prisma's generated argument types this stub actually receives.
+ * Written out rather than `any` so a rename in the real model breaks the test
+ * instead of silently sailing past it.
+ */
+interface UserUpsertArgs {
+  where: { auth0Sub: string };
+  create: Partial<User>;
+  update: Partial<User>;
+}
+
+interface AuditCreateArgs {
+  data: {
+    action: string;
+    entity: string;
+    userId?: bigint | null;
+    entityId?: bigint | null;
+    metadata?: unknown;
+  };
+}
+
 /** Minimal in-memory stand-in for the two tables the auth module touches. */
 function fakeDb(seed: User[] = []) {
   const users = new Map(seed.map((u) => [u.auth0Sub, u]));
@@ -18,20 +39,24 @@ function fakeDb(seed: User[] = []) {
         calls.findUnique++;
         return users.get(where.auth0Sub) ?? null;
       },
-      async upsert({ where, create, update }: any) {
+      async upsert({ where, create, update }: UserUpsertArgs) {
         calls.upsert++;
         const existing = users.get(where.auth0Sub);
+        // Every required column is spelled out before `create` is spread in, so
+        // the literal is a complete User even though `create` is a Partial.
         const next: User = existing
           ? { ...existing, ...stripUndefined(update), updatedAt: new Date() }
           : {
               id: BigInt(users.size + 1),
+              auth0Sub: where.auth0Sub,
+              email: null,
+              fullName: null,
+              role: 'PUBLIC',
+              status: 'ACTIVE',
+              lastLoginAt: null,
               scopeId: null,
               createdAt: new Date(),
               updatedAt: new Date(),
-              email: null,
-              fullName: null,
-              status: 'ACTIVE',
-              lastLoginAt: null,
               ...stripUndefined(create),
             };
         users.set(where.auth0Sub, next);
@@ -39,8 +64,8 @@ function fakeDb(seed: User[] = []) {
       },
     },
     auditLog: {
-      async create({ data }: any) {
-        audits.push({ action: data.action, entityId: data.entityId });
+      async create({ data }: AuditCreateArgs) {
+        audits.push({ action: data.action, entityId: data.entityId ?? null });
         return data;
       },
     },
@@ -49,8 +74,9 @@ function fakeDb(seed: User[] = []) {
   return { db, users, audits, calls };
 }
 
-const stripUndefined = (o: Record<string, unknown>) =>
-  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+/** Generic so the spread keeps its field types instead of widening to unknown. */
+const stripUndefined = <T extends object>(o: T): Partial<T> =>
+  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
 
 const ctx = (over: Partial<AuthContext> = {}): AuthContext => ({
   sub: 'auth0|abc123',

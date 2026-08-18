@@ -122,30 +122,57 @@ ADD COLUMN     "status" "ContentStatus" NOT NULL DEFAULT 'DRAFT',
 ADD COLUMN     "uploaded_by" BIGINT,
 ADD CONSTRAINT "gallery_images_pkey" PRIMARY KEY ("gallery_id");
 
--- AlterTable
+-- AlterTable: kitchens
+-- Ditulis tangan. Versi generate memakai DROP + ADD untuk dua kolom yang
+-- sebenarnya cuma berganti nama/tipe:
+--   * `kitchen_name` -> `name`: DROP + ADD "name" TEXT NOT NULL akan GAGAL
+--     total kalau tabel sudah berisi baris (kolom NOT NULL tanpa default), dan
+--     kalaupun lolos akan membuang nama tiap dapur.
+--   * `status`: enum lama KitchenStatus dan enum baru ActiveStatus punya nilai
+--     yang persis sama (ACTIVE/INACTIVE), jadi cukup dikonversi lewat teks.
+ALTER TABLE "kitchens" RENAME COLUMN "kitchen_name" TO "name";
+
+ALTER TABLE "kitchens" ALTER COLUMN "status" DROP DEFAULT;
+ALTER TABLE "kitchens" ALTER COLUMN "status" TYPE "ActiveStatus"
+    USING "status"::text::"ActiveStatus";
+ALTER TABLE "kitchens" ALTER COLUMN "status" SET DEFAULT 'ACTIVE';
+
+-- Schema lama juga meng-index kolom status. Versi generate tidak perlu
+-- membuangnya karena kolomnya ikut ter-DROP; karena di sini kolomnya
+-- dikonversi di tempat, index-nya ikut selamat dan akan bentrok dengan
+-- CREATE INDEX bernama sama di bagian bawah berkas ini.
+DROP INDEX IF EXISTS "kitchens_status_idx";
+
+-- TODO(catatan): `address` dan `capacity` dibuang karena tidak ada di ERD, dan
+-- `geographic_info_id` ikut hilang bersama tabel geographic_infos. Wilayah kini
+-- kolom langsung di kitchens tapi TIDAK di-backfill dari geographic_infos -
+-- pemetaannya belum diputuskan dan tabel ini masih kosong di semua environment.
 ALTER TABLE "kitchens" DROP CONSTRAINT "kitchens_pkey",
 DROP COLUMN "address",
 DROP COLUMN "capacity",
 DROP COLUMN "geographic_info_id",
 DROP COLUMN "id",
-DROP COLUMN "kitchen_name",
 ADD COLUMN     "city_regency" TEXT,
 ADD COLUMN     "district" TEXT,
 ADD COLUMN     "kitchen_id" BIGSERIAL NOT NULL,
-ADD COLUMN     "name" TEXT NOT NULL,
 ADD COLUMN     "province" TEXT,
 ADD COLUMN     "public_id" UUID NOT NULL DEFAULT gen_random_uuid(),
 ADD COLUMN     "type" "KitchenType",
 ADD COLUMN     "village" TEXT,
-DROP COLUMN "status",
-ADD COLUMN     "status" "ActiveStatus" NOT NULL DEFAULT 'ACTIVE',
 ADD CONSTRAINT "kitchens_pkey" PRIMARY KEY ("kitchen_id");
 
 -- AlterTable
+-- `name` -> `full_name` ditulis tangan sebagai RENAME, bukan DROP + ADD seperti
+-- hasil generate. DROP + ADD akan membuang nama tampilan setiap pengguna tanpa
+-- suara: kolomnya memang berganti nama, isinya tidak berubah.
+ALTER TABLE "users" RENAME COLUMN "name" TO "full_name";
+
+-- TODO(catatan): `scope_id` lama bertipe UUID dan tidak pernah berisi FK yang
+-- sah (kolomnya sengaja tanpa constraint di schema sebelumnya), jadi tidak ada
+-- yang bisa dipetakan ke BIGINT. Kolom dibuat ulang kosong; scoping DATA_ADMIN
+-- per dapur perlu di-set ulang oleh Super Admin setelah master dapur terisi.
 ALTER TABLE "users" DROP CONSTRAINT "users_pkey",
 DROP COLUMN "id",
-DROP COLUMN "name",
-ADD COLUMN     "full_name" TEXT,
 ADD COLUMN     "last_login" TIMESTAMP(3),
 ADD COLUMN     "status" "ActiveStatus" NOT NULL DEFAULT 'ACTIVE',
 ADD COLUMN     "user_id" BIGSERIAL NOT NULL,
