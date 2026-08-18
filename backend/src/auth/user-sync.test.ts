@@ -9,7 +9,7 @@ import type { AuthContext } from './jwt.js';
 /** Minimal in-memory stand-in for the two tables the auth module touches. */
 function fakeDb(seed: User[] = []) {
   const users = new Map(seed.map((u) => [u.auth0Sub, u]));
-  const audits: { action: string; entityId: string | null }[] = [];
+  const audits: { action: string; entityId: bigint | null }[] = [];
   const calls = { findUnique: 0, upsert: 0 };
 
   const db = {
@@ -24,12 +24,14 @@ function fakeDb(seed: User[] = []) {
         const next: User = existing
           ? { ...existing, ...stripUndefined(update), updatedAt: new Date() }
           : {
-              id: `id-${users.size + 1}`,
+              id: BigInt(users.size + 1),
               scopeId: null,
               createdAt: new Date(),
               updatedAt: new Date(),
               email: null,
-              name: null,
+              fullName: null,
+              status: 'ACTIVE',
+              lastLoginAt: null,
               ...stripUndefined(create),
             };
         users.set(where.auth0Sub, next);
@@ -137,7 +139,11 @@ describe('findOrCreateUser', () => {
   test('does not store anything credential-shaped', async () => {
     const { db, users } = fakeDb();
     await findOrCreateUser(ctx(), db);
-    const stored = JSON.stringify([...users.values()]);
+    // BigInt has no JSON representation, so ids are stringified explicitly —
+    // the point of the assertion is the row's *content*, not its id type.
+    const stored = JSON.stringify([...users.values()], (_k, v) =>
+      typeof v === 'bigint' ? v.toString() : v
+    );
 
     for (const forbidden of ['password', 'token', 'secret']) {
       assert.equal(stored.toLowerCase().includes(forbidden), false, `stored row contains "${forbidden}"`);

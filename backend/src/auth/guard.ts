@@ -60,12 +60,11 @@ export function requireRole(...allowed: Role[]): RequestHandler {
 }
 
 /**
- * A DATA_ADMIN may only touch its own SPPG Dapur. The tables it scopes do not
- * exist yet, so this only resolves the scope; call it from feature routes next
- * phase to get the `scope_id` to filter by.
+ * A DATA_ADMIN may only touch its own SPPG Dapur. `scope_id` is now a real FK
+ * to `kitchens`, so this value can be used directly to filter feature queries.
  *
  * @returns null when the caller is unrestricted (SUPER_ADMIN).
  */
-export function resolveScopeId(user: User): string | null {
+export function resolveScopeId(user: User): bigint | null {
   return user.role === 'SUPER_ADMIN' ? null : user.scopeId;
 }

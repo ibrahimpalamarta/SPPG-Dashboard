@@ -16,7 +16,7 @@ import type { AuthContext } from './jwt.js';
 export async function findOrCreateUser(auth: AuthContext, db: Db = prisma): Promise<User> {
   const role = roleFromClaims(auth.roleClaims);
   const email = auth.email?.toLowerCase();
-  const name = auth.name;
+  const fullName = auth.name;
 
   const existing = await db.user.findUnique({ where: { auth0Sub: auth.sub } });
   if (existing && existing.role === role && existing.email === (email ?? null)) {
@@ -27,23 +27,23 @@ export async function findOrCreateUser(auth: AuthContext, db: Db = prisma): Prom
   // the auth0_sub unique index.
   const user = await db.user.upsert({
     where: { auth0Sub: auth.sub },
-    create: { auth0Sub: auth.sub, email, name, role },
-    update: { email, name, role },
+    create: { auth0Sub: auth.sub, email, fullName, role },
+    update: { email, fullName, role },
   });
 
   if (!existing) {
     await writeAuditLog(db, {
-      actorId: user.id,
+      userId: user.id,
       action: 'user.provisioned',
-      entityType: 'user',
+      entity: 'user',
       entityId: user.id,
       metadata: { role },
     });
   } else if (existing.role !== role) {
     await writeAuditLog(db, {
-      actorId: user.id,
+      userId: user.id,
       action: 'user.role_synced',
-      entityType: 'user',
+      entity: 'user',
       entityId: user.id,
       metadata: { from: existing.role, to: role },
     });
