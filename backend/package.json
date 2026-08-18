@@ -14,6 +14,7 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed:superadmin": "node --env-file=.env --import tsx scripts/seed-superadmin.ts",
+    "seed:reference": "node --env-file=.env --import tsx scripts/seed-reference-data.ts",
     "pretest": "prisma generate",
     "test": "node --env-file=.env.test --import tsx --test src/config/env.test.ts src/auth/jwt.test.ts src/auth/user-sync.test.ts src/auth/guard.test.ts"
   },
