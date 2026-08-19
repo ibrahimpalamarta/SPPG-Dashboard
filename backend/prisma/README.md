@@ -154,10 +154,14 @@ Yang **tidak pernah** masuk view: seluruh isi `menu_costs` (ditandai
 seluruh `recipe_costings`, `daily_kitchens.jumlah_pm` (hitungan penerima manfaat
 eksak), dan `users` (PII + `auth0_sub`).
 
-> **Belum selesai.** View membatasi kolom apa yang tersedia, bukan siapa yang
-> boleh membacanya. `GRANT SELECT` per role database, pencabutan akses langsung
-> ke tabel dasar, dan kemungkinan row-level security adalah pekerjaan layer
-> berikutnya dan sengaja tidak diputuskan di sini.
+Sejak migrasi `20260819000000_public_db_role`, siapa yang boleh membaca juga
+ditegakkan di database: role `sppg_public` hanya punya `GRANT SELECT` ke dua
+view di atas, `public_summaries`, dan tiga tabel CMS. Karena view berjalan
+dengan hak pemiliknya (bukan `security_invoker`), role itu bisa membacanya tanpa
+punya akses apa pun ke `menu_plans`, `daily_kitchens`, atau `menu_costs`.
+
+Row-level security tidak dipakai. Yang masih di aplikasi: filter
+`status = PUBLISHED` untuk konten CMS — role publik bisa melihat draft.
 
 ## Open Questions
 
@@ -170,8 +174,10 @@ Semua poin di bawah juga ditandai `TODO(catatan):` di `schema.prisma` dan/atau
    rentang Serat sama sekali. Kolomnya dibuat nullable dan dibiarkan NULL.
    **Perlu konfirmasi Program Team** sebelum compliance Serat boleh dihitung.
 
-2. **SCRUM-13 baru setengah jalan.** Lihat catatan pemisahan data di atas:
-   enforcement akses sesungguhnya menyusul di layer berikutnya.
+2. ~~**SCRUM-13 baru setengah jalan.**~~ **Selesai.** Role `sppg_public` +
+   `GRANT SELECT` terbatas ada di migrasi `20260819000000_public_db_role`;
+   `/api/public/*` memakainya lewat `publicDb`. Sisa yang masih di aplikasi
+   hanya filter `status = PUBLISHED` untuk konten CMS.
 
 3. **`menu_plans.ingredient_id` belum punya aturan pengisian.** `bahan` adalah
    teks bebas yang ditulis ahli gizi per dapur, sedangkan `ingredient_id`

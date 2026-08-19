@@ -155,6 +155,25 @@ variable "assets_bucket_arn" {
   type = string
 }
 
+variable "assets_bucket_name" {
+  description = "Assets bucket the backend writes uploads to (SCRUM-5/14). Read as S3_BUCKET."
+  type        = string
+}
+
+variable "public_db_secret_key" {
+  description = <<-EOT
+    JSON key inside db_secret_arn holding the connection string for the
+    read-only `sppg_public` role (SCRUM-13). Empty means the key is not
+    provisioned yet and DATABASE_URL_PUBLIC is not injected — the backend then
+    serves /api/public/* over the main connection and warns at boot.
+
+    Set this only AFTER `npm run grant:public-role` has run and the key exists
+    in the secret, otherwise the task cannot start.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "acm_certificate_arn" {
   description = "ACM certificate ARN for the HTTPS listener. Leave empty to skip HTTPS (HTTP-only) until a domain/certificate is available."
   type        = string
