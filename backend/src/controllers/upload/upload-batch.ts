@@ -1,4 +1,5 @@
 import type { RequestHandler } from 'express';
+import { createHash } from 'node:crypto';
 import type { z } from 'zod';
 import { Prisma, UploadStatus } from '@prisma/client';
 import { prisma, type Db } from '../../db.js';
@@ -6,10 +7,13 @@ import { sendError } from '../../middleware/error-handler.js';
 import { sendJson, serialize } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
 import { kitchenScope, kitchenWhere } from '../../lib/scope.js';
+import { parseMenuWorkbook } from '../../lib/menu-workbook.js';
+import { XLSX_MIME, putObject, type PutObject } from '../../lib/s3.js';
 import { dateFilter } from '../../schemas/common.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import type {
   uploadBatchCreate,
+  uploadBatchCreateQuery,
   uploadBatchListQuery,
   uploadBatchUpdate,
 } from '../../schemas/upload-batch.js';
@@ -67,56 +71,139 @@ export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, r
   sendJson(res, row);
 };
 
-/**
- * SCRUM-5 + SCRUM-6. `file_hash` is UNIQUE, so re-registering an identical
- * file collides at the database. We answer 409 *with the existing batch* so
- * the client can tell "already imported, here it is" apart from a plain
- * failure — that is exactly the SCRUM-6 wording, "treated as the same file".
- */
-export const createUploadBatch = (db: Db = prisma): RequestHandler => async (req, res) => {
-  const body = req.valid!.body as z.infer<typeof uploadBatchCreate>;
-  const scope = kitchenScope(req.user!, body.kitchenId);
-  if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
-    return;
-  }
+/** Rows returned by a dry run. Enough to eyeball the mapping, not the file. */
+const PREVIEW_ROWS = 50;
 
-  try {
-    const row = await db.uploadBatch.create({
-      data: {
-        kitchenId: body.kitchenId,
-        uploaderId: req.user!.id,
-        fileName: body.fileName,
-        fileHash: body.fileHash.toLowerCase(),
-        rowCount: body.rowCount,
-        notes: body.notes ?? null,
-        status: UploadStatus.PROCESSING,
-      },
+/**
+ * ponytail: the S3 key is derived from the hash rather than stored in a column,
+ * so `upload_batches` needs no new field and the same bytes can only ever
+ * occupy one object. Add a `storage_key` column if the layout ever has to
+ * change without re-uploading.
+ */
+export const uploadKey = (fileHash: string): string => `upload-batches/${fileHash}.xlsx`;
+
+/**
+ * SCRUM-5 + SCRUM-6. Takes the workbook itself (multipart, field `file`) and
+ * does the whole job in one request: hash, dedup, parse, store, import.
+ *
+ * Three outcomes, all of them recorded:
+ *
+ *   - the file was seen before  → 409 with the existing batch (SCRUM-6 AC3;
+ *     `file_hash` is UNIQUE, so this is enforced by the database)
+ *   - the file parsed badly     → a DITOLAK batch row + 422. The rejection is
+ *     history, not just an error code — SCRUM-5 AC3 wants it in the list
+ *   - the file parsed cleanly   → a DITERIMA batch and its menu_plans, written
+ *     as one nested create so the import is all-or-nothing (SCRUM-6 AC2)
+ */
+export const createUploadBatch =
+  (db: Db = prisma, put: PutObject = putObject): RequestHandler =>
+  async (req, res) => {
+    const body = req.valid!.body as z.infer<typeof uploadBatchCreate>;
+    const { dryRun } = req.valid!.query as z.infer<typeof uploadBatchCreateQuery>;
+    const scope = kitchenScope(req.user!, body.kitchenId);
+    if (!scope.ok) {
+      sendError(res, 'FORBIDDEN');
+      return;
+    }
+
+    const { buffer, originalname } = req.file!;
+    const fileHash = createHash('sha256').update(buffer).digest('hex');
+
+    const existing = await db.uploadBatch.findUnique({
+      where: { fileHash },
       include: withUploader,
     });
-    await writeAuditLog(db, {
-      userId: req.user!.id,
-      action: 'upload_batch.created',
-      entity: 'upload_batches',
-      entityId: row.id,
-      metadata: { fileName: row.fileName, kitchenId: String(row.kitchenId) },
-    });
-    sendJson(res, row, 201);
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      const existing = await db.uploadBatch.findUnique({
-        where: { fileHash: body.fileHash.toLowerCase() },
-        include: withUploader,
-      });
-      sendError(res, 'CONFLICT', {
-        field: 'fileHash',
-        batch: existing === null ? null : serialize(existing),
+    if (existing) {
+      sendError(res, 'CONFLICT', { field: 'fileHash', batch: serialize(existing) });
+      return;
+    }
+
+    const { columns, rows, errors } = await parseMenuWorkbook(buffer);
+
+    // SCRUM-6 AC1: same parse, same validation, nothing written.
+    if (dryRun) {
+      sendJson(res, {
+        fileName: originalname,
+        fileHash,
+        columns,
+        rowCount: rows.length,
+        errors,
+        rows: rows.slice(0, PREVIEW_ROWS),
       });
       return;
     }
-    throw err;
-  }
-};
+
+    const base = {
+      kitchenId: body.kitchenId,
+      uploaderId: req.user!.id,
+      fileName: originalname,
+      fileHash,
+    };
+
+    try {
+      if (errors.length > 0) {
+        const rejected = await db.uploadBatch.create({
+          data: {
+            ...base,
+            rowCount: rows.length,
+            status: UploadStatus.DITOLAK,
+            notes: errors.join('; ').slice(0, 2000),
+          },
+          include: withUploader,
+        });
+        await writeAuditLog(db, {
+          userId: req.user!.id,
+          action: 'upload_batch.rejected',
+          entity: 'upload_batches',
+          entityId: rejected.id,
+          metadata: { fileName: originalname, errorCount: errors.length },
+        });
+        sendError(res, 'UNPROCESSABLE', { errors, batch: serialize(rejected) });
+        return;
+      }
+
+      // Stored before the insert on purpose: an orphaned object costs pennies
+      // and is overwritten by the retry, whereas a committed batch with no file
+      // behind it is a hole in the audit trail.
+      await put(uploadKey(fileHash), buffer, XLSX_MIME);
+
+      const row = await db.uploadBatch.create({
+        data: {
+          ...base,
+          rowCount: rows.length,
+          status: UploadStatus.DITERIMA,
+          notes: body.notes ?? null,
+          // Nested createMany runs inside the same transaction as its parent,
+          // which is what makes the import atomic without a $transaction block.
+          menuPlans: {
+            createMany: { data: rows.map((r) => ({ ...r, kitchenId: body.kitchenId })) },
+          },
+        },
+        include: withUploader,
+      });
+
+      await writeAuditLog(db, {
+        userId: req.user!.id,
+        action: 'upload_batch.imported',
+        entity: 'upload_batches',
+        entityId: row.id,
+        metadata: {
+          fileName: row.fileName,
+          kitchenId: String(row.kitchenId),
+          rowCount: row.rowCount,
+        },
+      });
+      sendJson(res, row, 201);
+    } catch (err) {
+      // The findUnique above catches the ordinary case; this is the race
+      // between two identical uploads landing at once.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        sendError(res, 'CONFLICT', { field: 'fileHash' });
+        return;
+      }
+      throw err;
+    }
+  };
 
 /** SCRUM-5: record the verification outcome (diterima / ditolak + reason). */
 export const updateUploadBatch = (db: Db = prisma): RequestHandler => async (req, res) => {
