@@ -178,11 +178,45 @@ cd backend
 npm install
 cp .env.example .env        # isi AUTH0_DOMAIN, AUTH0_AUDIENCE, AUTH0_ROLES_CLAIM
 npx prisma migrate deploy   # atau: npm run migrate:dev
+npm run seed                # data acuan: 6 dapur + 12 target AKG
 npm run dev
 ```
 
 Butuh Node 20.11+ (`--env-file` dan test runner bawaan). Image produksi pakai
 Node 22.
+
+### Seed data
+
+```bash
+npm run seed
+```
+
+Satu runner, `prisma/seed.ts`, menjalankan setiap berkas di `prisma/seeders/`
+yang belum pernah diterapkan ke database ini, berurutan sesuai nama berkas, lalu
+mencatatnya di tabel `seed_history` — persis peran tabel `SequelizeData` di
+seeder Sequelize. Aman dijalankan berkali-kali: seeder yang sudah tercatat
+dilewati, tidak dijalankan ulang, jadi tidak ada data terduplikasi.
+
+Seeder dan baris `seed_history`-nya ditulis dalam satu transaksi. Seeder yang
+gagal di tengah jalan tidak meninggalkan apa pun untuk di-retry — `npm run seed`
+berikutnya mengulanginya dari awal.
+
+Butuh tambahan seed nanti? Buat berkas baru di `prisma/seeders/`, namanya
+`<YYYYMMDDHHMMSS>-<slug>.ts` (gaya seeder Sequelize, supaya nama berkas sudah
+berurutan sesuai waktu jalannya), yang default-export satu fungsi:
+
+```ts
+import type { Prisma } from '@prisma/client';
+
+export default async function up(db: Prisma.TransactionClient) {
+  // insert/upsert di sini
+}
+```
+
+Jangan pernah mengubah atau mengganti nama seeder yang sudah pernah jalan di
+suatu environment — nama berkasnya adalah identitasnya di `seed_history`, dan
+mengganti nama membuat runner mengira seeder itu belum pernah dijalankan lalu
+menjalankannya lagi.
 
 ### Seed Super Admin
 
@@ -262,14 +296,21 @@ penyaringan kolom biaya SCRUM-13, validasi zod (termasuk bahwa nilai yang ditola
 tidak ikut terkirim di respons 400), dedup `file_hash` SCRUM-6, dan stempel
 publishDate + audit log CMS.
 
+Ditambah untuk fase unggah: parsing workbook (pemetaan header yang toleran
+kapital/tanda baca/satuan, kolom wajib hilang, sel rusak dilaporkan bernomor
+baris, berkas non-xlsx), dan ketiga hasil `POST /api/upload-batches` — impor
+bersih dengan `menu_plans` bersarang, `dryRun` yang tidak menulis apa pun,
+workbook rusak yang tetap tercatat `DITOLAK`, duplikat, dan balapan `P2002`.
+Workbook uji dibangun di memori dengan exceljs, jadi tetap tanpa berkas fixture
+dan tanpa jaringan.
+
 > **Jebakan:** script `test` menyebut file test **satu per satu**. Node 20.11
 > belum mengembangkan glob untuk `--test` (baru di Node 22), jadi file test baru
 > tidak akan jalan sampai ditambahkan ke daftar itu di `package.json`.
 
 Tes memakai stub, jadi tidak ada query Prisma yang benar-benar diadu dengan
 schema. Untuk itu jalankan backend terhadap Postgres lokal (`npm run
-migrate:deploy && npm run seed:reference && npm run dev`) lalu telusuri koleksi
-Postman.
+migrate:deploy && npm run seed && npm run dev`) lalu telusuri koleksi Postman.
 
 ### Postman
 
@@ -301,6 +342,8 @@ setengah benar) kalau ada yang kurang.
 | `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_ROLES_CLAIM` | `.env` | GitHub Environment **variables** → `-var` Terraform → ECS `environment` |
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | `.env` / `DATABASE_URL` | Output Terraform → ECS `environment` |
 | `DB_USERNAME`, `DB_PASSWORD` | `.env` | AWS Secrets Manager → ECS `secrets` |
+| `DATABASE_URL_PUBLIC` | `.env` (opsional) | Secrets Manager → ECS `secrets`, lewat `public_db_secret_key` |
+| `S3_BUCKET`, `AWS_REGION`, `UPLOAD_MAX_BYTES` | `.env` | Output Terraform → ECS `environment` |
 | `AUTH0_M2M_CLIENT_ID`, `AUTH0_M2M_CLIENT_SECRET` | `.env` | GitHub **secrets**, hanya untuk job seed — tidak pernah ke ECS |
 | `SEED_SUPERADMIN_EMAIL`, `SEED_SUPERADMIN_PASSWORD` | shell | GitHub secrets, hanya untuk job seed |
 
@@ -330,11 +373,13 @@ GitHub Environment sehingga tidak ada satu pun yang masuk ke repo.
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma                  16 model, terjemahan sppg_erd.drawio
-│   └── migrations/                    termasuk 2 view publik (SCRUM-13)
+│   ├── schema.prisma                  17 model, terjemahan sppg_erd.drawio + seed_history
+│   ├── migrations/                    2 view publik + role sppg_public (SCRUM-13) + seed_history
+│   ├── seed.ts                        runner: jalankan seeder yang belum tercatat
+│   └── seeders/                       satu berkas per seed, gaya Sequelize
 ├── scripts/
 │   ├── seed-superadmin.ts             Auth0 Management API → Postgres
-│   └── seed-reference-data.ts         6 dapur + 12 baris AKG
+│   └── grant-public-role.ts           password + LOGIN untuk sppg_public
 ├── postman/
 ├── src/
 │   ├── auth/                          seluruh logic auth — terisolasi di sini
@@ -349,13 +394,15 @@ backend/
 │   │   ├── pagination.ts              pageQuery + amplop { data, meta }
 │   │   ├── scope.ts                   filter multi-tenant per dapur
 │   │   ├── visibility.ts              penyaringan kolom biaya (SCRUM-13)
+│   │   ├── menu-workbook.ts           parser Excel → menu_plans (SCRUM-6)
+│   │   ├── s3.ts                      putObject ke bucket assets
 │   │   └── wrap.ts                    async error → next(err)
 │   ├── schemas/                       skema zod per domain
-│   ├── middleware/                    validate, cors, error-handler
+│   ├── middleware/                    validate, upload, cors, error-handler
 │   ├── routes/                        cermin dari controllers/
 │   ├── controllers/                   query Prisma langsung, tanpa layer service
 │   ├── config/env.ts                  satu-satunya pembaca process.env
-│   ├── db.ts                          singleton + type Db (seam DI untuk test)
+│   ├── db.ts                          prisma + publicDb + type Db (seam DI test)
 │   ├── app.ts                         urutan mount: /api/public sebelum /api
 │   └── server.ts
 ```
@@ -392,7 +439,7 @@ Merutekan pada `publicId` (UUID), tidak pernah pada id berurutan.
 | `GET/POST /api/kitchens`, `GET/PATCH /:id` | SUPER_ADMIN | 15 |
 | `GET/POST /api/ingredients`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | — |
 | `GET /api/akg-targets`, `/:id` | read-only (hasil seed) | 8 |
-| `GET/POST /api/upload-batches`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | 5, 6, 7 |
+| `POST /api/upload-batches` (multipart), `GET`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | 5, 6, 7 |
 | `GET /api/menu-plans`, `/:id` | read-only (dari import) | 2 |
 | `GET /api/menu-plans/:id/recipe-costings` | internal-only | 13 |
 | `GET /api/menu-nutritions` | read-only | 12 |
@@ -400,8 +447,51 @@ Merutekan pada `publicId` (UUID), tidak pernah pada id berurutan.
 | `GET /api/akg-compliances` | read-only | 8 |
 | `GET /api/menu-costs` | internal-only | 13 |
 | `GET /api/summaries`, `GET /api/dashboard/summary` | read-only | 9, 11 |
-| `/api/cms/announcements`, `/documents`, `/gallery` (CRUD) | SUPER_ADMIN, CMS_ADMIN | 14 |
+| `/api/cms/announcements` (CRUD, JSON) | SUPER_ADMIN, CMS_ADMIN | 14 |
+| `/api/cms/documents`, `/gallery` (CRUD, multipart) | SUPER_ADMIN, CMS_ADMIN | 14 |
 | `GET /api/admin/users`, `PATCH /:id`, `GET /api/admin/audit-logs` | SUPER_ADMIN | 1 |
+
+### Unggah berkas (SCRUM-5, 6, 14)
+
+Byte-nya lewat API (`multipart/form-data`, multer `memoryStorage`), diparse di
+request yang sama, lalu ditulis ke bucket assets S3. Tidak ada presigned URL:
+backend perlu memegang isi berkasnya untuk bisa memeriksa formatnya sama
+sekali, yang justru inti SCRUM-5 AC2.
+
+```
+POST /api/upload-batches          multipart: file=<menu.xlsx>, kitchenId, notes?
+POST /api/upload-batches?dryRun=true   parse + laporkan, tanpa menulis apa pun
+POST /api/cms/documents           multipart: file=<sop.pdf>, title, category
+POST /api/cms/gallery             multipart: file=<foto.jpg>, imageTitle, ...
+PATCH /api/cms/documents/:id      file opsional — tanpa file, metadata saja
+```
+
+`fileName`, `fileHash`, dan `rowCount` **tidak lagi diterima dari client**:
+server sudah memegang byte-nya, jadi ketiganya diambil dari berkas itu sendiri.
+Begitu juga `storageKey` dan `fileType` CMS. Efeknya, tidak ada lagi record yang
+bisa menunjuk ke objek yang tak pernah diunggah atau mengaku berformat lain.
+
+Tiga hasil `POST /api/upload-batches`, ketiganya tercatat:
+
+| Kondisi | Balasan | Baris `upload_batches` |
+|---|---|---|
+| `file_hash` sudah ada | `409` + batch lama | — (SCRUM-6 AC3) |
+| workbook gagal diparse | `422` + daftar error | `DITOLAK` + `notes` (SCRUM-5 AC3) |
+| workbook bersih | `201` + batch | `DITERIMA` + seluruh `menu_plans` |
+
+Import-nya atomic (SCRUM-6 AC2) tanpa blok `$transaction`: baris menu ikut
+sebagai `menuPlans.createMany` bersarang di `create` batch-nya, dan Prisma
+menjalankan nested write dalam satu transaksi.
+
+Objek S3 ditulis **sebelum** insert: objek yatim harganya receh dan ditimpa
+percobaan berikutnya, sedangkan batch yang sudah commit tanpa berkas di
+belakangnya adalah lubang di jejak audit. Key-nya diturunkan dari hash
+(`upload-batches/<sha256>.xlsx`) sehingga tidak perlu kolom `storage_key` baru.
+
+> **Header Excel-nya masih tebakan.** `HEADERS` di `src/lib/menu-workbook.ts`
+> diturunkan dari `schema.prisma` + form SOP-OPR-001, bukan dari workbook asli —
+> berkasnya belum tersedia. Kalau nama kolom di berkas sungguhan berbeda, ubah
+> label di map itu saja; tidak ada tempat lain yang perlu disentuh.
 
 ### Yang belum terisi datanya
 
@@ -418,14 +508,35 @@ Parsing berkas Excel ke `menu_plans` belum termasuk fase ini: `POST
 
 ### Pemisahan data (SCRUM-13)
 
-Dua lapis, keduanya perlu:
+Tiga lapis, semuanya perlu:
 
-- **Layer data** — dua view SQL yang hanya memuat kolom non-sensitif. Router
-  publik membacanya lewat `$queryRaw`, tidak pernah menyentuh tabel dasar.
-- **Layer aplikasi** — `src/lib/visibility.ts`. `menu_plans.hargaBahan`/
-  `totalHarga` dan `daily_kitchens.jumlahPm` dibuang untuk role di luar
-  SUPER_ADMIN/DATA_ADMIN/INTERNAL; `recipe_costings` dan `menu_costs` sensitif
-  seluruhnya sehingga guard menutup resource-nya.
+- **Layer koneksi** — role Postgres `sppg_public`. `/api/public/*` memakai
+  `publicDb` (`src/db.ts`), client yang terhubung sebagai role itu. Role-nya
+  cuma punya `GRANT SELECT` ke dua view publik, `public_summaries`, dan tiga
+  tabel CMS. `menu_costs`, `menu_plans`, `daily_kitchens`, `recipe_costings`,
+  dan `users` **tidak bisa dibaca sama sekali** dari koneksi itu — kesalahan
+  kode gagal di database, bukan lolos ke publik.
+- **Layer data** — dua view SQL yang hanya memuat kolom non-sensitif. View
+  berjalan dengan hak pemiliknya (bukan `security_invoker`), jadi role publik
+  membacanya tanpa perlu akses ke tabel dasarnya.
+- **Layer aplikasi** — `src/lib/visibility.ts`, untuk route **terautentikasi**.
+  `menu_plans.hargaBahan`/`totalHarga` dan `daily_kitchens.jumlahPm` dibuang
+  untuk role di luar SUPER_ADMIN/DATA_ADMIN/INTERNAL; `recipe_costings` dan
+  `menu_costs` sensitif seluruhnya sehingga guard menutup resource-nya.
 
-Yang **belum** ada: `GRANT`/RLS per role database (Open Question #2). Penegakan
-saat ini masih di aplikasi, bukan di Postgres.
+Menyalakannya (sekali per environment, setelah `migrate:deploy`):
+
+```bash
+PUBLIC_DB_PASSWORD='...' npm run grant:public-role
+```
+
+Migrasi `20260819000000_public_db_role` membuat role-nya `NOLOGIN` — password
+tidak pernah masuk berkas `.sql` yang di-commit. Script di atas yang memberi
+password + `LOGIN`, lalu mencetak `DATABASE_URL_PUBLIC` yang harus disimpan ke
+Secrets Manager. Selama `DATABASE_URL_PUBLIC` kosong, aplikasi jalan dengan
+koneksi utama dan **memperingatkan saat boot**; di `NODE_ENV=production` ia
+menolak start sama sekali.
+
+Yang masih di aplikasi, bukan di database: filter `status = PUBLISHED` untuk
+konten CMS. Role publik bisa membaca ketiga tabel CMS termasuk draft —
+mempersempitnya lagi butuh view per tabel atau RLS.

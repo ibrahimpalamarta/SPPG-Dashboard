@@ -11,8 +11,8 @@ export const kitchenListQuery = pageQuery.extend({
 /**
  * Region, type and coordinates stay optional: the master dapur file has not
  * been received, so all six seeded kitchens have them NULL (see
- * scripts/seed-reference-data.ts). Requiring them here would make the six
- * existing rows uneditable.
+ * prisma/seeders/20260820010000-reference-data.ts). Requiring them here would
+ * make the six existing rows uneditable.
  */
 const kitchenFields = {
   name: z.string().min(1).max(120),

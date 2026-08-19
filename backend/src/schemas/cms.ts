@@ -1,10 +1,15 @@
 import { z } from 'zod';
-import { ContentStatus, DocumentFileType } from '@prisma/client';
+import { ContentStatus } from '@prisma/client';
 import { pageQuery } from '../lib/pagination.js';
 
-/** SCRUM-14. `storageKey` is the S3 object key; uploading the bytes is out of
- * scope for this phase, so the client supplies the key it already wrote to. */
-const storageKey = z.string().min(1).max(1024);
+/**
+ * SCRUM-14 AC2. Documents and gallery images arrive as `multipart/form-data`
+ * with the file in field `file`, so every value here is a form field string.
+ *
+ * `storageKey` and `fileType` are no longer client input: the server writes the
+ * object and reads the type off the file it actually received, so a record can
+ * never point at a key nobody uploaded or claim a type it is not.
+ */
 
 export const cmsListQuery = pageQuery.extend({
   status: z.nativeEnum(ContentStatus).optional(),
@@ -27,8 +32,6 @@ export const announcementUpdate = z.object(announcementFields).partial();
 const documentFields = {
   title: z.string().min(1).max(200),
   category: z.string().min(1).max(120),
-  fileType: z.nativeEnum(DocumentFileType),
-  storageKey,
   status: z.nativeEnum(ContentStatus).optional(),
 };
 
@@ -39,7 +42,6 @@ const galleryFields = {
   imageTitle: z.string().min(1).max(200),
   description: z.string().max(2000).nullish(),
   category: z.string().min(1).max(120),
-  storageKey,
   status: z.nativeEnum(ContentStatus).optional(),
 };
 

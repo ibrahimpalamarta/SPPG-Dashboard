@@ -3,6 +3,7 @@ import type { RequestHandler } from 'express';
 import type { ZodTypeAny } from 'zod';
 import { requireRole } from '../../auth/guard.js';
 import { validate } from '../../middleware/validate.js';
+import { singleFile } from '../../middleware/upload.js';
 import { wrap } from '../../lib/wrap.js';
 import { idParam } from '../../schemas/common.js';
 import {
@@ -38,11 +39,19 @@ function cmsRouter(resource: CmsResource, schemas: {
   const router = Router();
   router.use(cmsRoles);
 
+  // SCRUM-14 AC2. Announcements carry no file, so they get no upload handler at
+  // all. Where there is one it runs before validate(), because multer is what
+  // turns a multipart request into req.body. Mandatory on create, optional on
+  // update — editing a title should not mean re-uploading the SOP.
+  const upload = (required: boolean): RequestHandler[] =>
+    resource.file ? [singleFile('file', resource.file.extensions, { required })] : [];
+
   router.get('/', validate({ query: schemas.list }), wrap(listCms(resource)));
   router.get('/:id', validate({ params: idParam }), wrap(getCms(resource)));
-  router.post('/', validate({ body: schemas.create }), wrap(createCms(resource)));
+  router.post('/', ...upload(true), validate({ body: schemas.create }), wrap(createCms(resource)));
   router.patch(
     '/:id',
+    ...upload(false),
     validate({ params: idParam, body: schemas.update }),
     wrap(updateCms(resource)),
   );

@@ -12,22 +12,35 @@ export const uploadBatchListQuery = refineDateRange(
 );
 
 /**
- * SCRUM-5/6. The client hashes the file it is about to send and registers the
- * batch first; `file_hash` is UNIQUE in Postgres, so an identical re-import
- * collides at the database rather than relying on the application to remember.
+ * SCRUM-5. The workbook itself arrives as `multipart/form-data`, so everything
+ * here is a form field and every value is a string.
  *
- * Parsing the workbook into menu_plans is a separate phase — this endpoint
- * records the batch, not its rows.
+ * `fileName`, `fileHash` and `rowCount` are no longer accepted from the client:
+ * the server has the bytes now, so it takes those from the file itself. A
+ * caller can no longer register a batch whose hash does not match its contents.
  */
 export const uploadBatchCreate = z.object({
   kitchenId: z
     .string()
     .regex(/^\d+$/, 'must be a positive integer id')
     .transform((v) => BigInt(v)),
-  fileName: z.string().min(1).max(255),
-  fileHash: z.string().regex(/^[a-f0-9]{64}$/i, 'must be a hex sha256 digest'),
-  rowCount: z.coerce.number().int().min(0),
   notes: z.string().max(2000).nullish(),
+});
+
+/**
+ * SCRUM-6 AC1. `?dryRun=true` parses the workbook and reports its columns, row
+ * count and errors without writing a single row.
+ *
+ * ponytail: preview and import are the same endpoint because the alternative —
+ * staging the file server-side and confirming it later — needs stored state and
+ * an expiry policy. The cost is that the client uploads twice; for a workbook
+ * this size that is cheaper than owning a staging area.
+ */
+export const uploadBatchCreateQuery = z.object({
+  dryRun: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
 });
 
 /** SCRUM-5: the verification outcome. PROCESSING is the initial state and

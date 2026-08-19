@@ -13,10 +13,13 @@ backend/
       20260811000000_init_auth/            users, audit_logs, enum Role
       20260813000000_add_operational_domain/  model lama (PRD 10)
       20260818000000_reshape_to_erd/       <- membentuk ulang ke ERD
+      20260820000000_add_seed_history/     tabel pelacak seeder
+    seed.ts                 runner: jalankan seeder yang belum tercatat
+    seeders/
+      20260820010000-reference-data.ts     6 dapur + 12 target AKG
     README.md              berkas ini
   scripts/
     seed-superadmin.ts     satu akun Super Admin (butuh Auth0 M2M)
-    seed-reference-data.ts 6 dapur + 12 target AKG
 ```
 
 Prompt tugas meminta folder `migrations/`, `seed/`, dan `README.md` terpisah.
@@ -47,14 +50,38 @@ npm install
 # terapkan seluruh migration (dari database kosong sekalipun)
 npm run migrate:deploy
 
-# isi data referensi: 6 dapur + 12 target AKG. Idempotent, aman diulang.
-npm run seed:reference
+# jalankan setiap seeder di prisma/seeders/ yang belum tercatat di
+# seed_history untuk database ini. Aman diulang — yang sudah tercatat dilewati.
+npm run seed
 
 # opsional: satu akun Super Admin (butuh kredensial Auth0 M2M di .env)
 npm run seed:superadmin
 ```
 
 Untuk mengembangkan schema lebih lanjut: `npm run migrate:dev`.
+
+### Seeding
+
+`prisma/seed.ts` bukan skrip data itu sendiri, melainkan runner-nya: dia
+membaca `prisma/seeders/`, menjalankan tiap berkas yang namanya belum ada di
+tabel `seed_history`, lalu mencatatnya — dalam satu transaksi per seeder,
+supaya seeder yang gagal di tengah tidak meninggalkan jejak setengah jadi untuk
+retry. Ini peran yang sama dengan tabel `SequelizeData` di seeder Sequelize:
+sumber kebenaran "seed apa saja yang sudah pernah diterapkan" ada di database,
+bukan di state lokal, sehingga aman dijalankan dari mesin mana pun atau dari CI
+tanpa mengulang seed yang sudah ada.
+
+Seed baru = berkas baru di `prisma/seeders/`, dinamai
+`<YYYYMMDDHHMMSS>-<slug>.ts` supaya urut sesuai waktu ditulis, default-export
+satu fungsi `(db: Prisma.TransactionClient) => Promise<void>`. Seeder yang sudah
+pernah jalan di suatu environment tidak boleh diubah atau diganti nama — nama
+berkasnya adalah primary key-nya di `seed_history`.
+
+`scripts/seed-superadmin.ts` sengaja **tidak** dipindah ke sistem ini: dia
+memanggil Auth0 Management API dan mencetak password sekali ke stdout, dua hal
+yang tidak cocok dengan seeder data biasa yang idealnya idempotent murni tanpa
+efek samping eksternal maupun rahasia yang tercetak. Tetap dijalankan terpisah
+lewat `npm run seed:superadmin`.
 
 ## Keputusan desain
 
@@ -127,10 +154,14 @@ Yang **tidak pernah** masuk view: seluruh isi `menu_costs` (ditandai
 seluruh `recipe_costings`, `daily_kitchens.jumlah_pm` (hitungan penerima manfaat
 eksak), dan `users` (PII + `auth0_sub`).
 
-> **Belum selesai.** View membatasi kolom apa yang tersedia, bukan siapa yang
-> boleh membacanya. `GRANT SELECT` per role database, pencabutan akses langsung
-> ke tabel dasar, dan kemungkinan row-level security adalah pekerjaan layer
-> berikutnya dan sengaja tidak diputuskan di sini.
+Sejak migrasi `20260819000000_public_db_role`, siapa yang boleh membaca juga
+ditegakkan di database: role `sppg_public` hanya punya `GRANT SELECT` ke dua
+view di atas, `public_summaries`, dan tiga tabel CMS. Karena view berjalan
+dengan hak pemiliknya (bukan `security_invoker`), role itu bisa membacanya tanpa
+punya akses apa pun ke `menu_plans`, `daily_kitchens`, atau `menu_costs`.
+
+Row-level security tidak dipakai. Yang masih di aplikasi: filter
+`status = PUBLISHED` untuk konten CMS — role publik bisa melihat draft.
 
 ## Open Questions
 
@@ -143,8 +174,10 @@ Semua poin di bawah juga ditandai `TODO(catatan):` di `schema.prisma` dan/atau
    rentang Serat sama sekali. Kolomnya dibuat nullable dan dibiarkan NULL.
    **Perlu konfirmasi Program Team** sebelum compliance Serat boleh dihitung.
 
-2. **SCRUM-13 baru setengah jalan.** Lihat catatan pemisahan data di atas:
-   enforcement akses sesungguhnya menyusul di layer berikutnya.
+2. ~~**SCRUM-13 baru setengah jalan.**~~ **Selesai.** Role `sppg_public` +
+   `GRANT SELECT` terbatas ada di migrasi `20260819000000_public_db_role`;
+   `/api/public/*` memakainya lewat `publicDb`. Sisa yang masih di aplikasi
+   hanya filter `status = PUBLISHED` untuk konten CMS.
 
 3. **`menu_plans.ingredient_id` belum punya aturan pengisian.** `bahan` adalah
    teks bebas yang ditulis ahli gizi per dapur, sedangkan `ingredient_id`
