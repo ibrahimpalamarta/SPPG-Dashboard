@@ -635,3 +635,19 @@ model GalleryImage {
   @@index([category])
   @@map("gallery_images")
 }
+
+// ---------------------------------------------------------------------------
+// Seeding
+// ---------------------------------------------------------------------------
+
+/// Which files in `prisma/seeders/` have already run against this database —
+/// the same job Sequelize's `SequelizeData` table does for its seeders. One
+/// row per seeder `name` (its filename, no extension); `prisma/seed.ts` skips
+/// any name already here instead of re-running it.
+model SeedHistory {
+  id    BigInt   @id @default(autoincrement()) @map("seed_id")
+  name  String   @unique
+  ranAt DateTime @default(now()) @map("ran_at")
+
+  @@map("seed_history")
+}
