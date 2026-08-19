@@ -15,6 +15,7 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed:superadmin": "node --env-file=.env --import tsx scripts/seed-superadmin.ts",
     "seed:reference": "node --env-file=.env --import tsx scripts/seed-reference-data.ts",
+    "grant:public-role": "node --env-file=.env --import tsx scripts/grant-public-role.ts",
     "pretest": "prisma generate",
     "test": "node --env-file=.env.test --import tsx --test src/auth/guard.test.ts src/lib/menu-workbook.test.ts src/auth/jwt.test.ts src/auth/user-sync.test.ts src/config/env.test.ts src/controllers/cms/cms.test.ts src/controllers/menu/menu-plan.test.ts src/controllers/upload/upload-batch.test.ts src/lib/scope.test.ts src/lib/serialize.test.ts src/lib/visibility.test.ts src/middleware/validate.test.ts"
   },

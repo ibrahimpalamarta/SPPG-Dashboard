@@ -309,6 +309,7 @@ setengah benar) kalau ada yang kurang.
 | `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_ROLES_CLAIM` | `.env` | GitHub Environment **variables** → `-var` Terraform → ECS `environment` |
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | `.env` / `DATABASE_URL` | Output Terraform → ECS `environment` |
 | `DB_USERNAME`, `DB_PASSWORD` | `.env` | AWS Secrets Manager → ECS `secrets` |
+| `DATABASE_URL_PUBLIC` | `.env` (opsional) | Secrets Manager → ECS `secrets`, lewat `public_db_secret_key` |
 | `S3_BUCKET`, `AWS_REGION`, `UPLOAD_MAX_BYTES` | `.env` | Output Terraform → ECS `environment` |
 | `AUTH0_M2M_CLIENT_ID`, `AUTH0_M2M_CLIENT_SECRET` | `.env` | GitHub **secrets**, hanya untuk job seed — tidak pernah ke ECS |
 | `SEED_SUPERADMIN_EMAIL`, `SEED_SUPERADMIN_PASSWORD` | shell | GitHub secrets, hanya untuk job seed |
@@ -340,10 +341,11 @@ GitHub Environment sehingga tidak ada satu pun yang masuk ke repo.
 backend/
 ├── prisma/
 │   ├── schema.prisma                  16 model, terjemahan sppg_erd.drawio
-│   └── migrations/                    termasuk 2 view publik (SCRUM-13)
+│   └── migrations/                    2 view publik + role sppg_public (SCRUM-13)
 ├── scripts/
 │   ├── seed-superadmin.ts             Auth0 Management API → Postgres
-│   └── seed-reference-data.ts         6 dapur + 12 baris AKG
+│   ├── seed-reference-data.ts         6 dapur + 12 baris AKG
+│   └── grant-public-role.ts           password + LOGIN untuk sppg_public
 ├── postman/
 ├── src/
 │   ├── auth/                          seluruh logic auth — terisolasi di sini
@@ -366,7 +368,7 @@ backend/
 │   ├── routes/                        cermin dari controllers/
 │   ├── controllers/                   query Prisma langsung, tanpa layer service
 │   ├── config/env.ts                  satu-satunya pembaca process.env
-│   ├── db.ts                          singleton + type Db (seam DI untuk test)
+│   ├── db.ts                          prisma + publicDb + type Db (seam DI test)
 │   ├── app.ts                         urutan mount: /api/public sebelum /api
 │   └── server.ts
 ```
@@ -472,14 +474,35 @@ Parsing berkas Excel ke `menu_plans` belum termasuk fase ini: `POST
 
 ### Pemisahan data (SCRUM-13)
 
-Dua lapis, keduanya perlu:
+Tiga lapis, semuanya perlu:
 
-- **Layer data** — dua view SQL yang hanya memuat kolom non-sensitif. Router
-  publik membacanya lewat `$queryRaw`, tidak pernah menyentuh tabel dasar.
-- **Layer aplikasi** — `src/lib/visibility.ts`. `menu_plans.hargaBahan`/
-  `totalHarga` dan `daily_kitchens.jumlahPm` dibuang untuk role di luar
-  SUPER_ADMIN/DATA_ADMIN/INTERNAL; `recipe_costings` dan `menu_costs` sensitif
-  seluruhnya sehingga guard menutup resource-nya.
+- **Layer koneksi** — role Postgres `sppg_public`. `/api/public/*` memakai
+  `publicDb` (`src/db.ts`), client yang terhubung sebagai role itu. Role-nya
+  cuma punya `GRANT SELECT` ke dua view publik, `public_summaries`, dan tiga
+  tabel CMS. `menu_costs`, `menu_plans`, `daily_kitchens`, `recipe_costings`,
+  dan `users` **tidak bisa dibaca sama sekali** dari koneksi itu — kesalahan
+  kode gagal di database, bukan lolos ke publik.
+- **Layer data** — dua view SQL yang hanya memuat kolom non-sensitif. View
+  berjalan dengan hak pemiliknya (bukan `security_invoker`), jadi role publik
+  membacanya tanpa perlu akses ke tabel dasarnya.
+- **Layer aplikasi** — `src/lib/visibility.ts`, untuk route **terautentikasi**.
+  `menu_plans.hargaBahan`/`totalHarga` dan `daily_kitchens.jumlahPm` dibuang
+  untuk role di luar SUPER_ADMIN/DATA_ADMIN/INTERNAL; `recipe_costings` dan
+  `menu_costs` sensitif seluruhnya sehingga guard menutup resource-nya.
 
-Yang **belum** ada: `GRANT`/RLS per role database (Open Question #2). Penegakan
-saat ini masih di aplikasi, bukan di Postgres.
+Menyalakannya (sekali per environment, setelah `migrate:deploy`):
+
+```bash
+PUBLIC_DB_PASSWORD='...' npm run grant:public-role
+```
+
+Migrasi `20260819000000_public_db_role` membuat role-nya `NOLOGIN` — password
+tidak pernah masuk berkas `.sql` yang di-commit. Script di atas yang memberi
+password + `LOGIN`, lalu mencetak `DATABASE_URL_PUBLIC` yang harus disimpan ke
+Secrets Manager. Selama `DATABASE_URL_PUBLIC` kosong, aplikasi jalan dengan
+koneksi utama dan **memperingatkan saat boot**; di `NODE_ENV=production` ia
+menolak start sama sekali.
+
+Yang masih di aplikasi, bukan di database: filter `status = PUBLISHED` untuk
+konten CMS. Role publik bisa membaca ketiga tabel CMS termasuk draft —
+mempersempitnya lagi butuh view per tabel atau RLS.

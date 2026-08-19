@@ -420,10 +420,21 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "S3_BUCKET", value = var.assets_bucket_name },
         { name = "AWS_REGION", value = var.aws_region },
       ]
-      secrets = [
-        { name = "DB_USERNAME", valueFrom = "${var.db_secret_arn}:username::" },
-        { name = "DB_PASSWORD", valueFrom = "${var.db_secret_arn}:password::" },
-      ]
+      # DATABASE_URL_PUBLIC is appended only once the key exists in the secret,
+      # so enabling SCRUM-13's restricted role is a deliberate second step and
+      # never a deploy that cannot start. See variable public_db_secret_key.
+      secrets = concat(
+        [
+          { name = "DB_USERNAME", valueFrom = "${var.db_secret_arn}:username::" },
+          { name = "DB_PASSWORD", valueFrom = "${var.db_secret_arn}:password::" },
+        ],
+        var.public_db_secret_key == "" ? [] : [
+          {
+            name      = "DATABASE_URL_PUBLIC"
+            valueFrom = "${var.db_secret_arn}:${var.public_db_secret_key}::"
+          },
+        ],
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
