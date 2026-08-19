@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
 import type { User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import ExcelJS from 'exceljs';
 import type { Db } from '../../db.js';
 import type { Role } from '../../auth/roles.js';
 import { createUploadBatch, listUploadBatches, updateUploadBatch } from './upload-batch.js';
@@ -10,7 +11,42 @@ import { createUploadBatch, listUploadBatches, updateUploadBatch } from './uploa
 const userWith = (role: Role, scopeId: bigint | null = null): User =>
   ({ id: 1n, role, scopeId } as User);
 
-const VALID_HASH = 'a'.repeat(64);
+/** One importable row, built in memory so the suite needs no fixture file. */
+async function validWorkbook(): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const sheet = wb.addWorksheet('Menu');
+  sheet.addRow([
+    'Tanggal',
+    'Jenis Menu',
+    'Kelompok Porsi',
+    'Menu',
+    'Bahan',
+    'Berat Bersih',
+    'Berat Kotor',
+    'BDD',
+    'Energi',
+    'Protein',
+    'Lemak',
+    'Karbohidrat',
+    'Jumlah PM',
+  ]);
+  sheet.addRow([
+    new Date('2026-08-03'),
+    'Basah',
+    'Kecil',
+    'Ayam Goreng Lengkuas',
+    'Ayam',
+    75,
+    100,
+    75,
+    180.5,
+    16.2,
+    11.4,
+    0,
+    240,
+  ]);
+  return Buffer.from((await wb.xlsx.writeBuffer()) as unknown as ArrayBuffer);
+}
 
 interface Captured {
   status?: number;
@@ -99,32 +135,103 @@ describe('listUploadBatches (SCRUM-7)', () => {
 });
 
 describe('createUploadBatch (SCRUM-5/6)', () => {
-  const body = {
-    kitchenId: 3n,
-    fileName: 'menu-agustus.xlsx',
-    fileHash: VALID_HASH.toUpperCase(),
-    rowCount: 120,
-    notes: null,
-  };
+  const body = { kitchenId: 3n, notes: null };
 
-  test('registers the batch as PROCESSING and attributes the uploader', async () => {
+  /** The file multer would have put on the request. */
+  const withFile = async (buffer?: Buffer, dryRun = false) => ({
+    user: userWith('DATA_ADMIN', 3n),
+    valid: { body, query: { dryRun } },
+    file: {
+      buffer: buffer ?? (await validWorkbook()),
+      originalname: 'menu-agustus.xlsx',
+    } as Express.Multer.File,
+  });
+
+  /** Records what would have been written to S3 without touching the network. */
+  function fakePut() {
+    const puts: { key: string; bytes: number }[] = [];
+    const put = async (key: string, bytes: Buffer) => {
+      puts.push({ key, bytes: bytes.length });
+      return key;
+    };
+    return { put, puts };
+  }
+
+  test('a clean workbook is imported with its rows in the same write', async () => {
     const { db, calls } = fakeDb();
-    const out = await run(createUploadBatch(db), {
-      user: userWith('DATA_ADMIN', 3n),
-      valid: { body },
-    });
+    const { put, puts } = fakePut();
+
+    const out = await run(createUploadBatch(db, put), await withFile());
 
     assert.equal(out.status, 201);
     const created = calls.created as Record<string, unknown>;
-    assert.equal(created.status, 'PROCESSING');
+    // SCRUM-5 AC3: a workbook that parsed is accepted outright, not left
+    // sitting in PROCESSING for someone to click through.
+    assert.equal(created.status, 'DITERIMA');
     assert.equal(created.uploaderId, 1n);
-    // Hashes are normalised, so the same file uploaded twice in different
-    // case still collides on the UNIQUE index.
-    assert.equal(created.fileHash, VALID_HASH);
+    assert.equal(created.fileName, 'menu-agustus.xlsx');
+    assert.equal(created.rowCount, 1);
+
+    // SCRUM-6 AC2: the rows ride along on the parent create, which is what
+    // makes the import all-or-nothing.
+    const nested = created.menuPlans as { createMany: { data: { kitchenId: bigint }[] } };
+    assert.equal(nested.createMany.data.length, 1);
+    assert.equal(nested.createMany.data[0]?.kitchenId, 3n);
+
+    // The object is stored under the hash, so the same bytes never sprawl.
+    assert.equal(puts.length, 1);
+    assert.match(puts[0]!.key, /^upload-batches\/[a-f0-9]{64}\.xlsx$/);
   });
 
-  test('a duplicate file answers 409 and returns the batch already on record', async () => {
+  test('dryRun reports columns and row count without writing anything', async () => {
+    const { db, calls } = fakeDb();
+    const { put, puts } = fakePut();
+
+    const out = await run(createUploadBatch(db, put), await withFile(undefined, true));
+
+    assert.equal(out.status, 200);
+    assert.equal(out.body?.rowCount, 1);
+    assert.ok((out.body?.columns as string[]).includes('Jumlah PM'));
+    // SCRUM-6 AC1: a preview is a read. Nothing reached Postgres or S3.
+    assert.equal(calls.created, undefined);
+    assert.equal(puts.length, 0);
+  });
+
+  test('an unparseable workbook is recorded as DITOLAK rather than only 4xx', async () => {
+    const { db, calls } = fakeDb();
+    const { put, puts } = fakePut();
+
+    const out = await run(
+      createUploadBatch(db, put),
+      await withFile(Buffer.from('not a workbook')),
+    );
+
+    assert.equal(out.status, 422);
+    // SCRUM-5 AC3 wants the rejection in the history, so the batch row exists.
+    const created = calls.created as Record<string, unknown>;
+    assert.equal(created.status, 'DITOLAK');
+    assert.equal(created.rowCount, 0);
+    assert.match(String(created.notes), /not a readable \.xlsx workbook/);
+    // A file we could not read is not a file worth keeping.
+    assert.equal(puts.length, 0);
+  });
+
+  test('a file already on record answers 409 with the existing batch', async () => {
     const existing = { id: 7n, fileName: 'menu-agustus.xlsx', status: 'DITERIMA' };
+    const { db, calls } = fakeDb({ findUnique: async () => existing });
+    const { put } = fakePut();
+
+    const out = await run(createUploadBatch(db, put), await withFile());
+
+    assert.equal(out.status, 409);
+    const details = out.body?.details as { field: string; batch: { id: string } };
+    assert.equal(details.field, 'fileHash');
+    // SCRUM-6 AC3: the client must be able to tell "same file" from "failed".
+    assert.equal(details.batch.id, '7');
+    assert.equal(calls.created, undefined);
+  });
+
+  test('the race between two identical uploads still answers 409', async () => {
     const { db } = fakeDb({
       create: async () => {
         throw new Prisma.PrismaClientKnownRequestError('dup', {
@@ -132,27 +239,23 @@ describe('createUploadBatch (SCRUM-5/6)', () => {
           clientVersion: 'test',
         });
       },
-      findUnique: async () => existing,
     });
+    const { put } = fakePut();
 
-    const out = await run(createUploadBatch(db), {
-      user: userWith('DATA_ADMIN', 3n),
-      valid: { body },
-    });
+    const out = await run(createUploadBatch(db, put), await withFile());
 
     assert.equal(out.status, 409);
     assert.equal(out.body?.error, 'conflict');
-    const details = out.body?.details as { field: string; batch: { id: string } };
-    assert.equal(details.field, 'fileHash');
-    // SCRUM-6: the client must be able to tell "same file" from "failed".
-    assert.equal(details.batch.id, '7');
   });
 
-  test('a DATA_ADMIN cannot register a batch for another dapur', async () => {
+  test('a DATA_ADMIN cannot upload for another dapur', async () => {
     const { db } = fakeDb();
-    const out = await run(createUploadBatch(db), {
-      user: userWith('DATA_ADMIN', 3n),
-      valid: { body: { ...body, kitchenId: 4n } },
+    const { put } = fakePut();
+    const req = await withFile();
+
+    const out = await run(createUploadBatch(db, put), {
+      ...req,
+      valid: { body: { ...body, kitchenId: 4n }, query: { dryRun: false } },
     });
 
     assert.equal(out.status, 403);

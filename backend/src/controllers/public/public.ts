@@ -1,7 +1,7 @@
 import type { RequestHandler } from 'express';
 import type { z } from 'zod';
 import { ContentStatus, Prisma } from '@prisma/client';
-import { prisma, type Db } from '../../db.js';
+import { publicDb, type Db } from '../../db.js';
 import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
@@ -17,10 +17,19 @@ import type { publicContentQuery, publicNutritionQuery } from '../../schemas/pub
 //     built to exclude every internal column. Reading the base tables here
 //     would put that guarantee back in application code.
 //   * CMS content is filtered to status = PUBLISHED. A draft is not public.
+//
+// Every handler defaults to `publicDb`, the client bound to the `sppg_public`
+// Postgres role. That is what makes the guarantees above structural rather than
+// conventional: this connection has no SELECT on menu_costs, menu_plans,
+// daily_kitchens or users, so a mistake here fails loudly instead of leaking.
+//
+// Still enforced in application code, not by the database: the PUBLISHED
+// filter. The role can read all three CMS tables including drafts — narrowing
+// that further needs a per-table view or RLS.
 // ---------------------------------------------------------------------------
 
 /** Program-wide KPI headline (SCRUM-11). The most recent period wins. */
-export const getPublicSummary = (db: Db = prisma): RequestHandler => async (_req, res) => {
+export const getPublicSummary = (db: Db = publicDb): RequestHandler => async (_req, res) => {
   const row = await db.publicSummary.findFirst({
     orderBy: { periodEnd: 'desc' },
     select: {
@@ -78,7 +87,7 @@ interface CoverageRow {
  * dapur file arrives; the map has nothing to plot yet, by design rather than
  * by bug.
  */
-export const listPublicKitchens = (db: Db = prisma): RequestHandler => async (_req, res) => {
+export const listPublicKitchens = (db: Db = publicDb): RequestHandler => async (_req, res) => {
   const rows = await db.$queryRaw<CoverageRow[]>`
     SELECT kitchen_public_id, kitchen_name, province, city_regency, district, village,
            latitude, longitude, period_start, period_end, meals_served,
@@ -131,7 +140,7 @@ interface NutritionRow {
  * concatenation — `$queryRaw` parameterises them, so a UUID or enum arriving
  * from the query string cannot become SQL.
  */
-export const listPublicNutrition = (db: Db = prisma): RequestHandler => async (req, res) => {
+export const listPublicNutrition = (db: Db = publicDb): RequestHandler => async (req, res) => {
   const q = req.valid!.query as z.infer<typeof publicNutritionQuery>;
 
   const conditions: Prisma.Sql[] = [];
@@ -180,7 +189,7 @@ export const listPublicNutrition = (db: Db = prisma): RequestHandler => async (r
 };
 
 /** Published announcements (SCRUM-14). */
-export const listPublicAnnouncements = (db: Db = prisma): RequestHandler => async (req, res) => {
+export const listPublicAnnouncements = (db: Db = publicDb): RequestHandler => async (req, res) => {
   const q = req.valid!.query as z.infer<typeof publicContentQuery>;
   const where = { status: ContentStatus.PUBLISHED };
 
@@ -197,7 +206,7 @@ export const listPublicAnnouncements = (db: Db = prisma): RequestHandler => asyn
   sendJson(res, paginated(rows, total, q));
 };
 
-export const getPublicAnnouncement = (db: Db = prisma): RequestHandler => async (req, res) => {
+export const getPublicAnnouncement = (db: Db = publicDb): RequestHandler => async (req, res) => {
   const { publicId } = req.valid!.params as { publicId: string };
   const row = await db.cmsAnnouncement.findFirst({
     where: { publicId, status: ContentStatus.PUBLISHED },
@@ -213,7 +222,7 @@ export const getPublicAnnouncement = (db: Db = prisma): RequestHandler => async 
 
 /** Downloadable documents (SCRUM-14). `storageKey` is withheld — the object is
  * fetched through the assets bucket, not by handing out its raw key. */
-export const listPublicDocuments = (db: Db = prisma): RequestHandler => async (req, res) => {
+export const listPublicDocuments = (db: Db = publicDb): RequestHandler => async (req, res) => {
   const q = req.valid!.query as z.infer<typeof publicContentQuery>;
   const where = {
     status: ContentStatus.PUBLISHED,
@@ -233,7 +242,7 @@ export const listPublicDocuments = (db: Db = prisma): RequestHandler => async (r
   sendJson(res, paginated(rows, total, q));
 };
 
-export const listPublicGallery = (db: Db = prisma): RequestHandler => async (req, res) => {
+export const listPublicGallery = (db: Db = publicDb): RequestHandler => async (req, res) => {
   const q = req.valid!.query as z.infer<typeof publicContentQuery>;
   const where = {
     status: ContentStatus.PUBLISHED,
