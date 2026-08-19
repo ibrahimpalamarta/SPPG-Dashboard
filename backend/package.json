@@ -16,10 +16,11 @@
     "seed:superadmin": "node --env-file=.env --import tsx scripts/seed-superadmin.ts",
     "seed:reference": "node --env-file=.env --import tsx scripts/seed-reference-data.ts",
     "pretest": "prisma generate",
-    "test": "node --env-file=.env.test --import tsx --test src/config/env.test.ts src/auth/jwt.test.ts src/auth/user-sync.test.ts src/auth/guard.test.ts"
+    "test": "node --env-file=.env.test --import tsx --test src/auth/guard.test.ts src/auth/jwt.test.ts src/auth/user-sync.test.ts src/config/env.test.ts src/controllers/cms/cms.test.ts src/controllers/menu/menu-plan.test.ts src/controllers/upload/upload-batch.test.ts src/lib/scope.test.ts src/lib/serialize.test.ts src/lib/visibility.test.ts src/middleware/validate.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
+    "cors": "^2.8.6",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "jose": "^5.9.6",
@@ -27,6 +28,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
