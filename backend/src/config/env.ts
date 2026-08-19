@@ -51,6 +51,15 @@ const schema = z.object({
   DB_USERNAME: z.string().optional(),
   DB_PASSWORD: z.string().optional(),
 
+  // S3 assets bucket (Terraform output `bucket_name`). Credentials come from
+  // the ECS task role — the app configures nothing beyond bucket and region.
+  S3_BUCKET: z.string().min(1),
+  AWS_REGION: z.string().min(1).default('ap-southeast-3'),
+
+  /** Upload ceiling. A menu workbook is a few hundred KB; 10 MB is slack, not a
+   * target, and it is what stops an upload from becoming a memory lever. */
+  UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
+
   // Auth0 — none of these are secrets: the API only ever verifies tokens.
   // The Management API credentials live in the seed script's own env, not here.
   AUTH0_DOMAIN: auth0Domain,

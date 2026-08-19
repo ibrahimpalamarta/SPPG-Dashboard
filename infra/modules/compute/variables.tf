@@ -155,6 +155,11 @@ variable "assets_bucket_arn" {
   type = string
 }
 
+variable "assets_bucket_name" {
+  description = "Assets bucket the backend writes uploads to (SCRUM-5/14). Read as S3_BUCKET."
+  type        = string
+}
+
 variable "acm_certificate_arn" {
   description = "ACM certificate ARN for the HTTPS listener. Leave empty to skip HTTPS (HTTP-only) until a domain/certificate is available."
   type        = string
