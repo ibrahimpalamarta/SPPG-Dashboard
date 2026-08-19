@@ -59,6 +59,24 @@ const schema = z.object({
 
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60_000),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+
+  // The public dashboard is unauthenticated, so its limiter is separate: no
+  // token verification and no find-or-create write behind it, but also no
+  // caller identity to attribute abuse to.
+  PUBLIC_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  PUBLIC_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
+
+  // Comma-separated browser origins allowed to call this API cross-origin.
+  // Empty (the default) sends no CORS headers at all — see middleware/cors.ts.
+  CORS_ORIGINS: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean),
+    ),
 });
 
 /**
