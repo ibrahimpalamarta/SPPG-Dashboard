@@ -807,7 +807,7 @@
                 "akg-targets"
               ]
             },
-            "description": "SCRUM-8. Read-only: diisi `npm run seed:reference`, bukan lewat API."
+            "description": "SCRUM-8. Read-only: diisi `npm run seed`, bukan lewat API."
           }
         }
       ]

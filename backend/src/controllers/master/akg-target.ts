@@ -9,8 +9,8 @@ import type { akgTargetListQuery } from '../../schemas/akg-target.js';
 
 /**
  * SCRUM-8. Read-only by design: the 12 rows are Tabel 2 of SOP-OPR-001
- * (Juknis 401.1/2025) and are loaded by `npm run seed:reference`, not entered
- * through the API.
+ * (Juknis 401.1/2025) and are loaded by `npm run seed`, not entered through
+ * the API.
  *
  * `seratMin` / `seratMax` come back null on every row — the official reference
  * table has no fibre range. Do not treat that as missing data to fill in.

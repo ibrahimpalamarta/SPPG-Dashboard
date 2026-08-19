@@ -1,20 +1,12 @@
-/**
- * Seeds the two reference tables the rest of the schema points at:
- * 6 SPPG Dapur (SCRUM-15) and the 12-group AKG target table (SCRUM-8).
- * Idempotent; safe to re-run.
- *
- *   npm run seed:reference
- *
- * Needs only DATABASE_URL. Refuses to run against NODE_ENV=production
- * without --force, same guard as seed-superadmin.ts.
- */
-import { prisma } from '../src/db.js';
-import type { PendistribusianMbg } from '@prisma/client';
-
-const force = process.argv.includes('--force');
+import type { PendistribusianMbg, Prisma } from '@prisma/client';
 
 /**
- * SCRUM-15: 6 dapur saat peluncuran.
+ * SCRUM-15: 6 dapur saat peluncuran, dan tabel rujukan AKG (SCRUM-8, 12
+ * kelompok sasaran). Ditulis dengan `upsert` walau `prisma/seed.ts` sudah
+ * memastikan seeder ini paling banyak jalan sekali per database — itu
+ * mencegah re-run di database yang SAMA, bukan tabrakan `name`/`kelompokSasaran`
+ * kalau seeder yang sama sengaja dijalankan lagi terhadap database lain yang
+ * sebagiannya sudah terisi manual.
  *
  * TODO(catatan): hanya nama yang tersedia. Master dapur belum ada sebagai
  * berkas — "SPPG Data points" 9.1 menandai tabel kitchen "build new" dan
@@ -24,14 +16,7 @@ const force = process.argv.includes('--force');
  * ke Malang sedangkan Simalungun ada di Sumatera Utara, jadi menebak wilayah
  * dari nama akan salah. Lengkapi setelah master dapur diterima.
  */
-const KITCHENS = [
-  'Donomulyo',
-  'Sukun',
-  'Lawang',
-  'Poncokusumo',
-  'Simalungun',
-  'Turen',
-];
+const KITCHENS = ['Donomulyo', 'Sukun', 'Lawang', 'Poncokusumo', 'Simalungun', 'Turen'];
 
 interface AkgRow {
   kelompokSasaran: string;
@@ -68,13 +53,9 @@ const AKG_TARGETS: AkgRow[] = [
   { kelompokSasaran: 'Ibu Menyusui', pendistribusianMbg: 'SIANG', rujukanPctAkg: '30-35%', energi: [782, 912], protein: [26.3, 30.6], lemak: [20.2, 23.5], karbohidrat: [123.0, 143.5] },
 ];
 
-async function main() {
-  if (process.env.NODE_ENV === 'production' && !force) {
-    throw new Error('refusing to seed against NODE_ENV=production without --force');
-  }
-
+export default async function up(db: Prisma.TransactionClient) {
   for (const name of KITCHENS) {
-    await prisma.kitchen.upsert({
+    await db.kitchen.upsert({
       where: { name },
       create: { name },
       // Nama adalah kunci alaminya; kolom lain sengaja tidak ditimpa supaya
@@ -95,7 +76,7 @@ async function main() {
       karbohidratMin: t.karbohidrat[0],
       karbohidratMax: t.karbohidrat[1],
     };
-    await prisma.akgTarget.upsert({
+    await db.akgTarget.upsert({
       where: {
         kelompokSasaran_pendistribusianMbg: {
           kelompokSasaran: t.kelompokSasaran,
@@ -110,18 +91,4 @@ async function main() {
       update: values,
     });
   }
-
-  const [kitchens, akgTargets] = await Promise.all([
-    prisma.kitchen.count(),
-    prisma.akgTarget.count(),
-  ]);
-  console.log(`kitchens:    ${kitchens}`);
-  console.log(`akg_targets: ${akgTargets}`);
 }
-
-main()
-  .catch((err) => {
-    console.error(err instanceof Error ? err.message : err);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
