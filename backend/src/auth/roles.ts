@@ -1,4 +1,4 @@
-export const ROLES = ['SUPER_ADMIN', 'DATA_ADMIN', 'INTERNAL', 'PUBLIC'] as const;
+export const ROLES = ['SUPER_ADMIN', 'DATA_ADMIN', 'CMS_ADMIN', 'INTERNAL', 'PUBLIC'] as const;
 export type Role = (typeof ROLES)[number];
 
 /**
@@ -8,11 +8,27 @@ export type Role = (typeof ROLES)[number];
 export const AUTH0_ROLE_NAMES: Record<string, Role> = {
   super_admin: 'SUPER_ADMIN',
   data_admin: 'DATA_ADMIN',
+  cms_admin: 'CMS_ADMIN',
   internal: 'INTERNAL',
   public: 'PUBLIC',
 };
 
-const RANK: Record<Role, number> = { PUBLIC: 0, INTERNAL: 1, DATA_ADMIN: 2, SUPER_ADMIN: 3 };
+/**
+ * Only used to collapse multiple role claims down to one, so it needs a total
+ * order even where the roles are not really comparable.
+ *
+ * TODO(catatan): CMS_ADMIN (kelola konten publik, SCRUM-14) dan DATA_ADMIN
+ * (entri data operasional) sebetulnya dua sumbu berbeda, bukan tingkatan.
+ * CMS_ADMIN ditaruh di bawah DATA_ADMIN supaya urutannya pasti — konfirmasi ke
+ * tim mana yang menang kalau satu akun memegang kedua klaim sekaligus.
+ */
+const RANK: Record<Role, number> = {
+  PUBLIC: 0,
+  INTERNAL: 1,
+  CMS_ADMIN: 2,
+  DATA_ADMIN: 3,
+  SUPER_ADMIN: 4,
+};
 
 /**
  * Reduce the roles claim to the single effective role.

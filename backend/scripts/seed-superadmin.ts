@@ -161,16 +161,16 @@ async function main() {
     create: {
       auth0Sub: user.user_id,
       email: cfg.SEED_SUPERADMIN_EMAIL.toLowerCase(),
-      name: user.name ?? 'Super Admin',
+      fullName: user.name ?? 'Super Admin',
       role: 'SUPER_ADMIN',
     },
     update: { role: 'SUPER_ADMIN' },
   });
 
   await writeAuditLog(prisma, {
-    actorId: row.id,
+    userId: row.id,
     action: created ? 'seed.superadmin_created' : 'seed.superadmin_verified',
-    entityType: 'user',
+    entity: 'user',
     entityId: row.id,
   });
 

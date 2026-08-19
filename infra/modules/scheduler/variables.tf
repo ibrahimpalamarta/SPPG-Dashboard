@@ -61,3 +61,13 @@ variable "stop_cron" {
   type        = string
   default     = "cron(5 21 ? * MON-FRI *)"
 }
+
+# Set while the environment is parked (staging before UAT): the start schedules
+# never fire, so nothing comes back up. The stop schedules stay enabled on
+# purpose — AWS force-starts an RDS instance that has been stopped for 7 days,
+# and the nightly rds-stop puts it back down without anyone having to remember.
+variable "suspended" {
+  description = "Disable the start schedules so the environment stays scaled to zero"
+  type        = bool
+  default     = false
+}
