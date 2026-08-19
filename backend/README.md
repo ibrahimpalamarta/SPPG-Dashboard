@@ -1,11 +1,11 @@
-# SPPG Dashboard — Backend (Fase 1: Auth + RBAC)
+# SPPG Dashboard — Backend (Fase 2: REST API)
 
 Express + TypeScript, Postgres via Prisma, autentikasi Auth0 (Universal Login).
 
-Fase ini **hanya** fondasi auth: verifikasi token, sinkronisasi user, role guard,
-audit log kosong, dan seed Super Admin. Belum ada entitas bisnis (SPPG Dapur,
-pengeluaran, references, dokumen) — guard-nya sudah siap dipasang saat entitas
-itu menyusul.
+Fase 1 membangun fondasi auth (verifikasi token, sinkronisasi user, role guard,
+audit log, seed Super Admin). Fase 2 memasang permukaan REST di atasnya: master
+data, upload batch, menu plan, tabel mart, CMS, admin, dan dashboard publik —
+lihat [Permukaan API](#permukaan-api).
 
 ---
 
@@ -56,14 +56,15 @@ Catatan desain:
 
 ### Role
 
-Empat role, didefinisikan di Auth0 (Roles & Permissions) dan disalin ke enum
+Lima role, didefinisikan di Auth0 (Roles & Permissions) dan disalin ke enum
 `Role` di Postgres:
 
 | Auth0 role name | Enum | Akses |
 |---|---|---|
-| `super_admin` | `SUPER_ADMIN` | Penuh — kelola akun & role, input data, audit, pengeluaran, references, dokumen |
-| `data_admin` | `DATA_ADMIN` | Data entry, discope ke satu SPPG Dapur lewat `users.scope_id` |
-| `internal` | `INTERNAL` | Read-only |
+| `super_admin` | `SUPER_ADMIN` | Penuh — kelola akun & role, master data, audit, seluruh data operasional |
+| `data_admin` | `DATA_ADMIN` | Data entry, discope ke satu SPPG Dapur lewat `users.scope_id`; melihat kolom biaya |
+| `cms_admin` | `CMS_ADMIN` | Konten publik (pengumuman, dokumen, galeri) saja — **tidak** melihat biaya |
+| `internal` | `INTERNAL` | Read-only seluruh dapur, termasuk kolom biaya |
 | `public` | `PUBLIC` | Paling terbatas; default untuk token tanpa role yang dikenal |
 
 Claim yang tidak dikenal, salah bentuk, atau tidak ada → `PUBLIC`. Tidak pernah
@@ -72,32 +73,53 @@ menang.
 
 ### Memasang guard di endpoint
 
+`requireAuth()` + `attachUser()` sudah terpasang sekali untuk seluruh `/api` di
+`src/routes/index.ts`. Route tinggal menyebut role yang boleh:
+
 ```ts
-import { requireAuth } from './auth/jwt.js';
-import { attachUser, requireRole, resolveScopeId } from './auth/guard.js';
-
-const api = express.Router();
-api.use(requireAuth(), attachUser());          // sekali, untuk semua route /api
-
-api.get('/references', requireRole('SUPER_ADMIN', 'DATA_ADMIN', 'INTERNAL'), handler);
-api.post('/pengeluaran', requireRole('SUPER_ADMIN', 'DATA_ADMIN'), handler);
-api.delete('/users/:id', requireRole('SUPER_ADMIN'), handler);
+// src/routes/master/kitchen.ts
+kitchenRouter.get('/', validate({ query: kitchenListQuery }), wrap(listKitchens()));
+kitchenRouter.post(
+  '/',
+  requireRole('SUPER_ADMIN'),
+  validate({ body: kitchenCreate }),
+  wrap(createKitchen()),
+);
 ```
 
-`INTERNAL` dan `PUBLIC` jadi read-only bukan lewat flag khusus, tapi karena
-tidak pernah masuk allow-list route yang mengubah data.
+`INTERNAL`, `CMS_ADMIN`, dan `PUBLIC` jadi read-only atas data operasional bukan
+lewat flag khusus, tapi karena tidak pernah masuk allow-list route yang
+mengubahnya.
 
-Untuk route yang discope per SPPG Dapur, `resolveScopeId(req.user)` mengembalikan
-`null` untuk Super Admin (tanpa batas) atau `scope_id` milik Data Admin — pakai
-itu sebagai filter query, jangan `scope_id` yang dikirim client.
+Untuk route yang discope per SPPG Dapur, jangan pakai `kitchenId` dari client
+begitu saja — lewatkan ke `kitchenScope(req.user, requested)` di
+`src/lib/scope.ts`. Helper itu membungkus `resolveScopeId` dan menolak (403)
+kalau seorang Data Admin meminta dapur di luar `scope_id`-nya:
+
+```ts
+const scope = kitchenScope(req.user!, q.kitchenId);
+if (!scope.ok) return sendError(res, 'FORBIDDEN');
+const where = { ...kitchenWhere(scope), /* filter lain */ };
+```
+
+Tiga pola wajib di setiap endpoint baru: `validate({...})` untuk input,
+`wrap(...)` supaya rejection async sampai ke error handler (Express 4 tidak
+menangkapnya sendiri), dan `sendJson` supaya BigInt/Decimal tidak menggagalkan
+`res.json`.
 
 ### Audit log
 
-`writeAuditLog(prisma, { actorId, action, entityType, entityId, metadata })`.
-Tabelnya sudah ada; fase ini baru menulis `user.provisioned`,
-`user.role_synced`, dan event seed. Kegagalan tulis audit tidak pernah
-menggagalkan request yang memicunya. Jangan pernah taruh token, password, atau
-body request mentah di `metadata`.
+`writeAuditLog(db, { userId, action, entity, entityId, metadata })`.
+
+Setiap endpoint yang mengubah data menulis satu baris — itu syarat eksplisit
+SCRUM-1 dan SCRUM-14 ("all actions logged"). Action-nya dinamai
+`<tabel>.<peristiwa>`, mis. `kitchen.created`, `upload_batch.reviewed`,
+`cms_announcements.status_changed`. Di luar itu ada `user.provisioned`,
+`user.role_synced`, dan event seed dari fase 1.
+
+Kegagalan tulis audit tidak pernah menggagalkan request yang memicunya. Jangan
+pernah taruh token, password, atau body request mentah di `metadata` — isi nama
+field yang berubah, bukan nilainya.
 
 ---
 
@@ -229,10 +251,25 @@ npm test
 ```
 
 Node test runner bawaan — tanpa Jest, tanpa database, tanpa panggilan jaringan.
-Token ditandatangani dengan keypair lokal dan Prisma diganti stub in-memory.
+Token ditandatangani dengan keypair lokal dan Prisma diganti stub in-memory
+lewat parameter `db` yang setiap controller terima (`listKitchens(db)`), dengan
+default ke singleton di produksi.
+
 Yang ditutup: token valid/expired/salah key/salah issuer/salah audience/tanpa
 sub/malformed, keseragaman pesan 401, find-or-create + idempotensi + sinkronisasi
-role, dan penolakan 403 untuk tiap role yang tidak berwenang.
+role, penolakan 403 per role, serialisasi BigInt/Decimal/Date, scoping per dapur,
+penyaringan kolom biaya SCRUM-13, validasi zod (termasuk bahwa nilai yang ditolak
+tidak ikut terkirim di respons 400), dedup `file_hash` SCRUM-6, dan stempel
+publishDate + audit log CMS.
+
+> **Jebakan:** script `test` menyebut file test **satu per satu**. Node 20.11
+> belum mengembangkan glob untuk `--test` (baru di Node 22), jadi file test baru
+> tidak akan jalan sampai ditambahkan ke daftar itu di `package.json`.
+
+Tes memakai stub, jadi tidak ada query Prisma yang benar-benar diadu dengan
+schema. Untuk itu jalankan backend terhadap Postgres lokal (`npm run
+migrate:deploy && npm run seed:reference && npm run dev`) lalu telusuri koleksi
+Postman.
 
 ### Postman
 
@@ -293,10 +330,11 @@ GitHub Environment sehingga tidak ada satu pun yang masuk ke repo.
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma                  users + audit_logs + enum Role
-│   └── migrations/
+│   ├── schema.prisma                  16 model, terjemahan sppg_erd.drawio
+│   └── migrations/                    termasuk 2 view publik (SCRUM-13)
 ├── scripts/
-│   └── seed-superadmin.ts             Auth0 Management API → Postgres
+│   ├── seed-superadmin.ts             Auth0 Management API → Postgres
+│   └── seed-reference-data.ts         6 dapur + 12 baris AKG
 ├── postman/
 ├── src/
 │   ├── auth/                          seluruh logic auth — terisolasi di sini
@@ -306,13 +344,88 @@ backend/
 │   │   ├── user-sync.ts               find-or-create
 │   │   ├── audit.ts                   writeAuditLog
 │   │   └── *.test.ts
+│   ├── lib/                           helper lintas-endpoint
+│   │   ├── serialize.ts               BigInt/Decimal/Date → JSON
+│   │   ├── pagination.ts              pageQuery + amplop { data, meta }
+│   │   ├── scope.ts                   filter multi-tenant per dapur
+│   │   ├── visibility.ts              penyaringan kolom biaya (SCRUM-13)
+│   │   └── wrap.ts                    async error → next(err)
+│   ├── schemas/                       skema zod per domain
+│   ├── middleware/                    validate, cors, error-handler
+│   ├── routes/                        cermin dari controllers/
+│   ├── controllers/                   query Prisma langsung, tanpa layer service
 │   ├── config/env.ts                  satu-satunya pembaca process.env
-│   ├── db.ts
-│   ├── app.ts                         routes + rate limit
+│   ├── db.ts                          singleton + type Db (seam DI untuk test)
+│   ├── app.ts                         urutan mount: /api/public sebelum /api
 │   └── server.ts
 ```
 
 Kalau suatu saat provider auth berganti, yang berubah hanya `src/auth/jwt.ts`
-(cara token diverifikasi) dan `roles.ts` (dari mana role dibaca). Bentuk
-`req.user`, `requireRole`, dan seluruh endpoint di fase berikutnya tidak ikut
-berubah.
+(cara token diverifikasi) dan `roles.ts` (dari mana role dibaca).
+
+---
+
+## Permukaan API
+
+Semua di bawah `/api` **wajib** bearer token Auth0, kecuali `/api/public/*` dan
+`/health`. Endpoint list mengembalikan `{ data, meta }`; endpoint tunggal
+mengembalikan objek telanjang. Seluruh BigInt keluar sebagai string.
+
+### Publik — tanpa token (SCRUM-10/13)
+
+Di-mount **sebelum** router terautentikasi, dengan rate limiter sendiri.
+Merutekan pada `publicId` (UUID), tidak pernah pada id berurutan.
+
+| Endpoint | Sumber |
+|---|---|
+| `GET /api/public/summary` | `public_summaries`, periode terbaru |
+| `GET /api/public/kitchens` | view `public_kitchen_coverage_view` |
+| `GET /api/public/nutrition` | view `public_menu_nutrition_view` |
+| `GET /api/public/announcements`, `/:publicId` | hanya status `PUBLISHED` |
+| `GET /api/public/documents` | hanya `PUBLISHED` |
+| `GET /api/public/gallery` | hanya `PUBLISHED` |
+
+### Terautentikasi
+
+| Endpoint | Role penulis | Scrum |
+|---|---|---|
+| `GET/POST /api/kitchens`, `GET/PATCH /:id` | SUPER_ADMIN | 15 |
+| `GET/POST /api/ingredients`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | — |
+| `GET /api/akg-targets`, `/:id` | read-only (hasil seed) | 8 |
+| `GET/POST /api/upload-batches`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | 5, 6, 7 |
+| `GET /api/menu-plans`, `/:id` | read-only (dari import) | 2 |
+| `GET /api/menu-plans/:id/recipe-costings` | internal-only | 13 |
+| `GET /api/menu-nutritions` | read-only | 12 |
+| `GET /api/daily-kitchens` | read-only | 11 |
+| `GET /api/akg-compliances` | read-only | 8 |
+| `GET /api/menu-costs` | internal-only | 13 |
+| `GET /api/summaries`, `GET /api/dashboard/summary` | read-only | 9, 11 |
+| `/api/cms/announcements`, `/documents`, `/gallery` (CRUD) | SUPER_ADMIN, CMS_ADMIN | 14 |
+| `GET /api/admin/users`, `PATCH /:id`, `GET /api/admin/audit-logs` | SUPER_ADMIN | 1 |
+
+### Yang belum terisi datanya
+
+Kelima tabel mart (`akg_compliances`, `menu_nutritions`, `daily_kitchens`,
+`menu_costs`, `public_summaries`) diturunkan dari data operasional dan **belum
+punya penulis** — mekanisme refresh-nya belum diputuskan (Open Question #8 di
+`prisma/README.md`). Endpointnya jalan dan membalas halaman kosong. Khusus
+`akg_compliances`, pemetaan 4 `portion_class` ke 12 kelompok sasaran AKG juga
+belum ada (#4), jadi tabelnya tidak bisa diisi sama sekali sampai itu diputuskan.
+
+Parsing berkas Excel ke `menu_plans` belum termasuk fase ini: `POST
+/api/upload-batches` mencatat metadata batch dan menegakkan dedup lewat
+`file_hash` UNIQUE, tapi tidak membaca isi berkasnya.
+
+### Pemisahan data (SCRUM-13)
+
+Dua lapis, keduanya perlu:
+
+- **Layer data** — dua view SQL yang hanya memuat kolom non-sensitif. Router
+  publik membacanya lewat `$queryRaw`, tidak pernah menyentuh tabel dasar.
+- **Layer aplikasi** — `src/lib/visibility.ts`. `menu_plans.hargaBahan`/
+  `totalHarga` dan `daily_kitchens.jumlahPm` dibuang untuk role di luar
+  SUPER_ADMIN/DATA_ADMIN/INTERNAL; `recipe_costings` dan `menu_costs` sensitif
+  seluruhnya sehingga guard menutup resource-nya.
+
+Yang **belum** ada: `GRANT`/RLS per role database (Open Question #2). Penegakan
+saat ini masih di aplikasi, bukan di Postgres.

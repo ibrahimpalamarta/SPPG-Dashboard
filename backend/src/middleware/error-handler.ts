@@ -1,10 +1,17 @@
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
 import { ERRORS, type ErrorKey } from '../constants/errors.js';
 
-/** Every error response in the API goes through this — status and body stay in sync with ERRORS. */
-export function sendError(res: Response, key: ErrorKey) {
+/**
+ * Every error response in the API goes through this — status and body stay in
+ * sync with ERRORS.
+ *
+ * `details` carries machine-readable context the fixed body cannot: which
+ * fields failed validation, or the id of the row that already exists. Never
+ * put a submitted *value* in here — field names only.
+ */
+export function sendError(res: Response, key: ErrorKey, details?: unknown) {
   const { status, body } = ERRORS[key];
-  res.status(status).json(body);
+  res.status(status).json(details === undefined ? body : { ...body, details });
 }
 
 const notFound: RequestHandler = (_req, res) => sendError(res, 'NOT_FOUND');
