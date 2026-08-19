@@ -178,11 +178,45 @@ cd backend
 npm install
 cp .env.example .env        # isi AUTH0_DOMAIN, AUTH0_AUDIENCE, AUTH0_ROLES_CLAIM
 npx prisma migrate deploy   # atau: npm run migrate:dev
+npm run seed                # data acuan: 6 dapur + 12 target AKG
 npm run dev
 ```
 
 Butuh Node 20.11+ (`--env-file` dan test runner bawaan). Image produksi pakai
 Node 22.
+
+### Seed data
+
+```bash
+npm run seed
+```
+
+Satu runner, `prisma/seed.ts`, menjalankan setiap berkas di `prisma/seeders/`
+yang belum pernah diterapkan ke database ini, berurutan sesuai nama berkas, lalu
+mencatatnya di tabel `seed_history` — persis peran tabel `SequelizeData` di
+seeder Sequelize. Aman dijalankan berkali-kali: seeder yang sudah tercatat
+dilewati, tidak dijalankan ulang, jadi tidak ada data terduplikasi.
+
+Seeder dan baris `seed_history`-nya ditulis dalam satu transaksi. Seeder yang
+gagal di tengah jalan tidak meninggalkan apa pun untuk di-retry — `npm run seed`
+berikutnya mengulanginya dari awal.
+
+Butuh tambahan seed nanti? Buat berkas baru di `prisma/seeders/`, namanya
+`<YYYYMMDDHHMMSS>-<slug>.ts` (gaya seeder Sequelize, supaya nama berkas sudah
+berurutan sesuai waktu jalannya), yang default-export satu fungsi:
+
+```ts
+import type { Prisma } from '@prisma/client';
+
+export default async function up(db: Prisma.TransactionClient) {
+  // insert/upsert di sini
+}
+```
+
+Jangan pernah mengubah atau mengganti nama seeder yang sudah pernah jalan di
+suatu environment — nama berkasnya adalah identitasnya di `seed_history`, dan
+mengganti nama membuat runner mengira seeder itu belum pernah dijalankan lalu
+menjalankannya lagi.
 
 ### Seed Super Admin
 
@@ -268,8 +302,7 @@ publishDate + audit log CMS.
 
 Tes memakai stub, jadi tidak ada query Prisma yang benar-benar diadu dengan
 schema. Untuk itu jalankan backend terhadap Postgres lokal (`npm run
-migrate:deploy && npm run seed:reference && npm run dev`) lalu telusuri koleksi
-Postman.
+migrate:deploy && npm run seed && npm run dev`) lalu telusuri koleksi Postman.
 
 ### Postman
 
@@ -330,11 +363,12 @@ GitHub Environment sehingga tidak ada satu pun yang masuk ke repo.
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma                  16 model, terjemahan sppg_erd.drawio
-│   └── migrations/                    termasuk 2 view publik (SCRUM-13)
+│   ├── schema.prisma                  17 model, terjemahan sppg_erd.drawio + seed_history
+│   ├── migrations/                    termasuk 2 view publik (SCRUM-13)
+│   ├── seed.ts                        runner: jalankan seeder yang belum tercatat
+│   └── seeders/                       satu berkas per seed, gaya Sequelize
 ├── scripts/
-│   ├── seed-superadmin.ts             Auth0 Management API → Postgres
-│   └── seed-reference-data.ts         6 dapur + 12 baris AKG
+│   └── seed-superadmin.ts             Auth0 Management API → Postgres
 ├── postman/
 ├── src/
 │   ├── auth/                          seluruh logic auth — terisolasi di sini
