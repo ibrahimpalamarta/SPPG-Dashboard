@@ -1,10 +1,13 @@
 import type { RequestHandler } from 'express';
+import { randomUUID } from 'node:crypto';
+import { extname } from 'node:path';
 import type { z } from 'zod';
-import { ContentStatus, Prisma } from '@prisma/client';
+import { ContentStatus, DocumentFileType, Prisma } from '@prisma/client';
 import { prisma, type Db } from '../../db.js';
 import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
+import { putObject, type PutObject } from '../../lib/s3.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import type {
   announcementCreate,
@@ -36,6 +39,42 @@ export interface CmsResource {
   /** Only cms_announcements has a publishDate column to stamp. */
   hasPublishDate: boolean;
   hasCategory: boolean;
+  /** Set for resources backed by an uploaded file (SCRUM-14 AC2). */
+  file?: {
+    /** Accepted extensions, and the S3 prefix objects are written under. */
+    extensions: readonly string[];
+    prefix: string;
+    /** cms_documents also records which of the three formats it received. */
+    typeColumn?: boolean;
+  };
+}
+
+const DOCUMENT_TYPES: Record<string, DocumentFileType> = {
+  '.pdf': DocumentFileType.PDF,
+  '.docx': DocumentFileType.DOCX,
+  '.xlsx': DocumentFileType.XLSX,
+};
+
+/**
+ * Writes the upload and returns the columns that describe it. The key is a
+ * fresh UUID rather than the file name: two people uploading "SOP.pdf" must not
+ * collide, and a caller-supplied name must never steer where we write.
+ */
+async function storeFile(
+  resource: CmsResource,
+  upload: Express.Multer.File,
+  put: PutObject,
+): Promise<Record<string, unknown>> {
+  const ext = extname(upload.originalname).toLowerCase();
+  const storageKey = await put(
+    `${resource.file!.prefix}/${randomUUID()}${ext}`,
+    upload.buffer,
+    upload.mimetype,
+  );
+  return {
+    storageKey,
+    ...(resource.file!.typeColumn && { fileType: DOCUMENT_TYPES[ext] }),
+  };
 }
 
 export const ANNOUNCEMENT: CmsResource = {
@@ -54,6 +93,7 @@ export const DOCUMENT: CmsResource = {
   authorField: 'uploadedById',
   hasPublishDate: false,
   hasCategory: true,
+  file: { extensions: Object.keys(DOCUMENT_TYPES), prefix: 'cms/documents', typeColumn: true },
 };
 
 export const GALLERY: CmsResource = {
@@ -63,6 +103,7 @@ export const GALLERY: CmsResource = {
   authorField: 'uploadedById',
   hasPublishDate: false,
   hasCategory: true,
+  file: { extensions: ['.jpg', '.jpeg', '.png', '.webp'], prefix: 'cms/gallery' },
 };
 
 /**
@@ -121,7 +162,11 @@ function publishStamp(resource: CmsResource, status: ContentStatus | undefined) 
   return status === ContentStatus.PUBLISHED ? { publishDate: new Date() } : {};
 }
 
-export function createCms(resource: CmsResource, db: Db = prisma): RequestHandler {
+export function createCms(
+  resource: CmsResource,
+  db: Db = prisma,
+  put: PutObject = putObject,
+): RequestHandler {
   return async (req, res) => {
     const body = req.valid!.body as z.infer<
       typeof announcementCreate & typeof documentCreate & typeof galleryCreate
@@ -129,6 +174,7 @@ export function createCms(resource: CmsResource, db: Db = prisma): RequestHandle
     const row = await delegate(db, resource).create({
       data: {
         ...body,
+        ...(resource.file && req.file ? await storeFile(resource, req.file, put) : {}),
         [resource.authorField]: req.user!.id,
         ...publishStamp(resource, body.status),
       },
@@ -146,7 +192,11 @@ export function createCms(resource: CmsResource, db: Db = prisma): RequestHandle
   };
 }
 
-export function updateCms(resource: CmsResource, db: Db = prisma): RequestHandler {
+export function updateCms(
+  resource: CmsResource,
+  db: Db = prisma,
+  put: PutObject = putObject,
+): RequestHandler {
   return async (req, res) => {
     const { id } = req.valid!.params as { id: bigint };
     const body = req.valid!.body as Record<string, unknown> & { status?: ContentStatus };
@@ -164,7 +214,14 @@ export function updateCms(resource: CmsResource, db: Db = prisma): RequestHandle
         ? publishStamp(resource, body.status)
         : {};
 
-    const row = await delegate(db, resource).update({ where: { id }, data: { ...body, ...stamp } });
+    // Replacing the file is optional on update: no `file` part means only the
+    // metadata changes and the record keeps pointing at the object it had.
+    const replaced = resource.file && req.file ? await storeFile(resource, req.file, put) : {};
+
+    const row = await delegate(db, resource).update({
+      where: { id },
+      data: { ...body, ...replaced, ...stamp },
+    });
 
     await writeAuditLog(db, {
       userId: req.user!.id,
@@ -175,7 +232,7 @@ export function updateCms(resource: CmsResource, db: Db = prisma): RequestHandle
       entity: resource.entity,
       entityId: id,
       metadata: {
-        fields: Object.keys(body),
+        fields: [...Object.keys(body), ...Object.keys(replaced)],
         ...(body.status && { from: String(current.status), to: String(body.status) }),
       },
     });

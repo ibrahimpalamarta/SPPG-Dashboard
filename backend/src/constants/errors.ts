@@ -9,6 +9,10 @@ export const ERRORS = {
   FORBIDDEN: { status: 403, body: { error: 'forbidden', message: 'Insufficient role' } },
   NOT_FOUND: { status: 404, body: { error: 'not_found' } },
   CONFLICT: { status: 409, body: { error: 'conflict', message: 'Resource already exists' } },
+  UNPROCESSABLE: {
+    status: 422,
+    body: { error: 'unprocessable', message: 'File was read but its contents were rejected' },
+  },
   TOO_MANY_REQUESTS: { status: 429, body: { error: 'too_many_requests', message: 'Rate limit exceeded' } },
   INTERNAL_ERROR: { status: 500, body: { error: 'internal_error' } },
 } as const;

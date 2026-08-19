@@ -415,6 +415,10 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "AUTH0_DOMAIN", value = var.auth0_domain },
         { name = "AUTH0_AUDIENCE", value = var.auth0_audience },
         { name = "AUTH0_ROLES_CLAIM", value = var.auth0_roles_claim },
+        # Uploads (SCRUM-5/14). Not a secret: the bucket name is visible in
+        # every object URL, and access comes from the task role, not from a key.
+        { name = "S3_BUCKET", value = var.assets_bucket_name },
+        { name = "AWS_REGION", value = var.aws_region },
       ]
       secrets = [
         { name = "DB_USERNAME", valueFrom = "${var.db_secret_arn}:username::" },

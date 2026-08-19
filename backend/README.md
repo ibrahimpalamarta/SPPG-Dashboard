@@ -262,6 +262,14 @@ penyaringan kolom biaya SCRUM-13, validasi zod (termasuk bahwa nilai yang ditola
 tidak ikut terkirim di respons 400), dedup `file_hash` SCRUM-6, dan stempel
 publishDate + audit log CMS.
 
+Ditambah untuk fase unggah: parsing workbook (pemetaan header yang toleran
+kapital/tanda baca/satuan, kolom wajib hilang, sel rusak dilaporkan bernomor
+baris, berkas non-xlsx), dan ketiga hasil `POST /api/upload-batches` — impor
+bersih dengan `menu_plans` bersarang, `dryRun` yang tidak menulis apa pun,
+workbook rusak yang tetap tercatat `DITOLAK`, duplikat, dan balapan `P2002`.
+Workbook uji dibangun di memori dengan exceljs, jadi tetap tanpa berkas fixture
+dan tanpa jaringan.
+
 > **Jebakan:** script `test` menyebut file test **satu per satu**. Node 20.11
 > belum mengembangkan glob untuk `--test` (baru di Node 22), jadi file test baru
 > tidak akan jalan sampai ditambahkan ke daftar itu di `package.json`.
@@ -301,6 +309,7 @@ setengah benar) kalau ada yang kurang.
 | `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_ROLES_CLAIM` | `.env` | GitHub Environment **variables** → `-var` Terraform → ECS `environment` |
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | `.env` / `DATABASE_URL` | Output Terraform → ECS `environment` |
 | `DB_USERNAME`, `DB_PASSWORD` | `.env` | AWS Secrets Manager → ECS `secrets` |
+| `S3_BUCKET`, `AWS_REGION`, `UPLOAD_MAX_BYTES` | `.env` | Output Terraform → ECS `environment` |
 | `AUTH0_M2M_CLIENT_ID`, `AUTH0_M2M_CLIENT_SECRET` | `.env` | GitHub **secrets**, hanya untuk job seed — tidak pernah ke ECS |
 | `SEED_SUPERADMIN_EMAIL`, `SEED_SUPERADMIN_PASSWORD` | shell | GitHub secrets, hanya untuk job seed |
 
@@ -349,9 +358,11 @@ backend/
 │   │   ├── pagination.ts              pageQuery + amplop { data, meta }
 │   │   ├── scope.ts                   filter multi-tenant per dapur
 │   │   ├── visibility.ts              penyaringan kolom biaya (SCRUM-13)
+│   │   ├── menu-workbook.ts           parser Excel → menu_plans (SCRUM-6)
+│   │   ├── s3.ts                      putObject ke bucket assets
 │   │   └── wrap.ts                    async error → next(err)
 │   ├── schemas/                       skema zod per domain
-│   ├── middleware/                    validate, cors, error-handler
+│   ├── middleware/                    validate, upload, cors, error-handler
 │   ├── routes/                        cermin dari controllers/
 │   ├── controllers/                   query Prisma langsung, tanpa layer service
 │   ├── config/env.ts                  satu-satunya pembaca process.env
@@ -392,7 +403,7 @@ Merutekan pada `publicId` (UUID), tidak pernah pada id berurutan.
 | `GET/POST /api/kitchens`, `GET/PATCH /:id` | SUPER_ADMIN | 15 |
 | `GET/POST /api/ingredients`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | — |
 | `GET /api/akg-targets`, `/:id` | read-only (hasil seed) | 8 |
-| `GET/POST /api/upload-batches`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | 5, 6, 7 |
+| `POST /api/upload-batches` (multipart), `GET`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | 5, 6, 7 |
 | `GET /api/menu-plans`, `/:id` | read-only (dari import) | 2 |
 | `GET /api/menu-plans/:id/recipe-costings` | internal-only | 13 |
 | `GET /api/menu-nutritions` | read-only | 12 |
@@ -400,8 +411,51 @@ Merutekan pada `publicId` (UUID), tidak pernah pada id berurutan.
 | `GET /api/akg-compliances` | read-only | 8 |
 | `GET /api/menu-costs` | internal-only | 13 |
 | `GET /api/summaries`, `GET /api/dashboard/summary` | read-only | 9, 11 |
-| `/api/cms/announcements`, `/documents`, `/gallery` (CRUD) | SUPER_ADMIN, CMS_ADMIN | 14 |
+| `/api/cms/announcements` (CRUD, JSON) | SUPER_ADMIN, CMS_ADMIN | 14 |
+| `/api/cms/documents`, `/gallery` (CRUD, multipart) | SUPER_ADMIN, CMS_ADMIN | 14 |
 | `GET /api/admin/users`, `PATCH /:id`, `GET /api/admin/audit-logs` | SUPER_ADMIN | 1 |
+
+### Unggah berkas (SCRUM-5, 6, 14)
+
+Byte-nya lewat API (`multipart/form-data`, multer `memoryStorage`), diparse di
+request yang sama, lalu ditulis ke bucket assets S3. Tidak ada presigned URL:
+backend perlu memegang isi berkasnya untuk bisa memeriksa formatnya sama
+sekali, yang justru inti SCRUM-5 AC2.
+
+```
+POST /api/upload-batches          multipart: file=<menu.xlsx>, kitchenId, notes?
+POST /api/upload-batches?dryRun=true   parse + laporkan, tanpa menulis apa pun
+POST /api/cms/documents           multipart: file=<sop.pdf>, title, category
+POST /api/cms/gallery             multipart: file=<foto.jpg>, imageTitle, ...
+PATCH /api/cms/documents/:id      file opsional — tanpa file, metadata saja
+```
+
+`fileName`, `fileHash`, dan `rowCount` **tidak lagi diterima dari client**:
+server sudah memegang byte-nya, jadi ketiganya diambil dari berkas itu sendiri.
+Begitu juga `storageKey` dan `fileType` CMS. Efeknya, tidak ada lagi record yang
+bisa menunjuk ke objek yang tak pernah diunggah atau mengaku berformat lain.
+
+Tiga hasil `POST /api/upload-batches`, ketiganya tercatat:
+
+| Kondisi | Balasan | Baris `upload_batches` |
+|---|---|---|
+| `file_hash` sudah ada | `409` + batch lama | — (SCRUM-6 AC3) |
+| workbook gagal diparse | `422` + daftar error | `DITOLAK` + `notes` (SCRUM-5 AC3) |
+| workbook bersih | `201` + batch | `DITERIMA` + seluruh `menu_plans` |
+
+Import-nya atomic (SCRUM-6 AC2) tanpa blok `$transaction`: baris menu ikut
+sebagai `menuPlans.createMany` bersarang di `create` batch-nya, dan Prisma
+menjalankan nested write dalam satu transaksi.
+
+Objek S3 ditulis **sebelum** insert: objek yatim harganya receh dan ditimpa
+percobaan berikutnya, sedangkan batch yang sudah commit tanpa berkas di
+belakangnya adalah lubang di jejak audit. Key-nya diturunkan dari hash
+(`upload-batches/<sha256>.xlsx`) sehingga tidak perlu kolom `storage_key` baru.
+
+> **Header Excel-nya masih tebakan.** `HEADERS` di `src/lib/menu-workbook.ts`
+> diturunkan dari `schema.prisma` + form SOP-OPR-001, bukan dari workbook asli —
+> berkasnya belum tersedia. Kalau nama kolom di berkas sungguhan berbeda, ubah
+> label di map itu saja; tidak ada tempat lain yang perlu disentuh.
 
 ### Yang belum terisi datanya
 
