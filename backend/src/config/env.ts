@@ -51,6 +51,13 @@ const schema = z.object({
   DB_USERNAME: z.string().optional(),
   DB_PASSWORD: z.string().optional(),
 
+  // Read-only credentials for /api/public/*. A separate Postgres role that can
+  // SELECT the two public views and nothing else, so SCRUM-13 is enforced by
+  // the database rather than by the application remembering to filter.
+  // Required in production; falls back to the main client elsewhere so a fresh
+  // clone still runs without provisioning a second role first.
+  DATABASE_URL_PUBLIC: z.string().min(1).optional(),
+
   // S3 assets bucket (Terraform output `bucket_name`). Credentials come from
   // the ECS task role — the app configures nothing beyond bucket and region.
   S3_BUCKET: z.string().min(1),
@@ -115,6 +122,15 @@ if (!env.DATABASE_URL) {
   } else if (env.NODE_ENV !== 'test') {
     throw new Error('Set DATABASE_URL, or DB_HOST/DB_NAME/DB_USERNAME/DB_PASSWORD.');
   }
+}
+
+// The whole point of the restricted role is that production cannot serve the
+// public dashboard through a connection that is able to read menu_costs. A
+// missing URL there is a silent downgrade, so refuse to boot instead.
+if (env.NODE_ENV === 'production' && !env.DATABASE_URL_PUBLIC) {
+  throw new Error(
+    'Set DATABASE_URL_PUBLIC (role sppg_public). See scripts/grant-public-role.ts.',
+  );
 }
 
 /** Auth0 issuer. Always https — Auth0 does not serve tokens over anything else. */
