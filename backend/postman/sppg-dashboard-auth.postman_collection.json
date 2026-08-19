@@ -1,16 +1,30 @@
 {
   "info": {
-    "name": "SPPG Dashboard — Auth (Fase 1)",
-    "description": "Endpoint fase 1: health check, /api/me (find-or-create user), dan contoh route ber-guard /api/admin/ping.\n\nSetiap endpoint punya varian happy-path plus varian ditolak (401 tanpa token / token invalid, 403 role tidak berwenang), karena yang diuji di fase ini justru penolakannya.\n\n**Cara pakai**\n1. Import environment `local.postman_environment.json`, isi `auth0_domain`, `auth0_audience`, `auth0_client_id`, `auth0_client_secret`, dan kredensial akun uji (`username` / `password`).\n2. Jalankan `Auth / Get Access Token` — token disimpan otomatis ke variabel `access_token`, dan roles-nya dicetak di console.\n3. Jalankan request lain. Auth bearer sudah di-set di level collection.\n\nLogin-nya satu request saja: mau super admin atau akun low-privilege, bedanya cuma kredensial di `username`/`password`. Untuk menguji yang butuh 403, ganti kredensial ke akun non-super-admin lalu login ulang.\n\nRequest token memakai Resource Owner Password grant varian **password-realm**, yang menyebut connection-nya eksplisit lewat `auth0_connection` — jadi tidak bergantung pada setelan tenant *Default Directory*, yang kalau kosong membuat `grant_type: password` biasa gagal untuk semua client. Grant ini harus diaktifkan dulu di Auth0 (Application > Advanced Settings > Grant Types > Password) dan **hanya** untuk tenant staging/dev — jangan diaktifkan di prod. Kalau tidak mau mengaktifkannya, login lewat Universal Login, salin access token dari browser, lalu tempel manual ke variabel `access_token`.",
+    "name": "SPPG Dashboard — API (Fase 2)",
+    "description": "Permukaan API lengkap fase 2: master data, upload batch, menu plan, tabel mart, CMS, admin, dan dashboard publik.\n\n**Cara pakai**\n1. Import `local.postman_environment.json`, isi kredensial Auth0 dan akun uji.\n2. Jalankan `Auth / Get Access Token` — token tersimpan ke `access_token`.\n3. Folder `Public (tanpa token)` sengaja tidak memakai auth: itu permukaan dashboard transparansi (SCRUM-13), dan harus tetap 200 tanpa Authorization header.\n\nBeberapa endpoint mengembalikan halaman kosong sampai job recompute mart dibangun — itu keadaan yang diharapkan, bukan kegagalan.\n\nUntuk menguji 403, login ulang dengan akun ber-role lebih rendah lalu jalankan request yang sama.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
     "type": "bearer",
-    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8080", "type": "string" },
-    { "key": "access_token", "value": "", "type": "string" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
@@ -56,7 +70,7 @@
                   "    });",
                   "",
                   "    // Role tidak di-assert di sini: request ini dipakai untuk akun mana pun.",
-                  "    // Yang menentukan lolos/tidaknya guard adalah request /api/admin/ping.",
+                  "    // Yang menentukan lolos/tidaknya guard adalah request ber-guard, mis. /api/admin/users.",
                   "    console.log('roles:', claims[rolesClaim]); // sengaja hanya roles, bukan token penuh",
                   "}"
                 ]
@@ -64,9 +78,16 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"grant_type\": \"http://auth0.com/oauth/grant-type/password-realm\",\n  \"realm\": \"{{auth0_connection}}\",\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"audience\": \"{{auth0_audience}}\",\n  \"scope\": \"openid profile email\",\n  \"client_id\": \"{{auth0_client_id}}\",\n  \"client_secret\": \"{{auth0_client_secret}}\"\n}"
@@ -74,8 +95,13 @@
             "url": {
               "raw": "https://{{auth0_domain}}/oauth/token",
               "protocol": "https",
-              "host": ["{{auth0_domain}}"],
-              "path": ["oauth", "token"]
+              "host": [
+                "{{auth0_domain}}"
+              ],
+              "path": [
+                "oauth",
+                "token"
+              ]
             },
             "description": "Login untuk akun mana pun — super admin hasil `npm run seed:superadmin` maupun akun `internal`/`public`. Bedanya cuma isi `username`/`password` di environment; alurnya sama persis, jadi request-nya satu saja. Selalu https."
           }
@@ -101,13 +127,19 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{base_url}}/health",
-              "host": ["{{base_url}}"],
-              "path": ["health"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
             },
             "description": "Dipakai health check ALB. Sengaja tanpa auth dan tanpa rate limit."
           }
@@ -147,8 +179,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/me",
-              "host": ["{{base_url}}"],
-              "path": ["api", "me"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
             },
             "description": "Panggilan pertama akan membuat row `users` (find-or-create). Panggilan berikutnya tidak menulis apa pun — jalankan dua kali untuk membuktikan idempotensi."
           }
@@ -168,13 +205,20 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/me",
-              "host": ["{{base_url}}"],
-              "path": ["api", "me"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
             }
           }
         },
@@ -201,14 +245,25 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "not.a.valid.jwt", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "not.a.valid.jwt",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/me",
-              "host": ["{{base_url}}"],
-              "path": ["api", "me"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
             },
             "description": "Token expired, salah signature, dan salah audience semuanya harus menghasilkan respons yang identik — alasan penolakan tidak boleh bocor ke client."
           }
@@ -216,18 +271,21 @@
       ]
     },
     {
-      "name": "Admin (role guard)",
+      "name": "Public (tanpa token)",
+      "description": "Dashboard transparansi. Tidak ada satu pun request di folder ini yang mengirim Authorization header — kalau salah satunya membalas 401, berarti router publik ter-mount di belakang requireAuth dan SCRUM-13 bocor ke arah sebaliknya.",
       "item": [
         {
-          "name": "GET /api/admin/ping — super admin (200)",
+          "name": "GET /api/public/summary",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('lolos guard', () => pm.expect(pm.response.json().ok).to.be.true);"
+                  "pm.test('200 tanpa token', () => pm.response.to.have.status(200));",
+                  "pm.test('angka KPI ada walau belum ada periode', () => {",
+                  "    pm.expect(pm.response.json()).to.include.keys('mealsServed', 'kitchensActive', 'coverageCount');",
+                  "});"
                 ]
               }
             }
@@ -236,23 +294,891 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/admin/ping",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "ping"]
+              "raw": "{{base_url}}/api/public/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "summary"
+              ]
             },
-            "description": "Contoh route dengan `requireRole('SUPER_ADMIN')`. Endpoint fitur (pengeluaran, references, dokumen) menyusul di fase berikutnya dengan guard yang sama."
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "SCRUM-11. Sebelum job recompute jalan, seluruh angka 0 dan periode null — itu bentuk kosong yang disengaja, bukan 404."
           }
         },
         {
-          "name": "GET /api/admin/ping — role tidak berwenang (403)",
+          "name": "GET /api/public/kitchens",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('403 Forbidden, bukan 401', () => pm.response.to.have.status(403));",
-                  "pm.test('dibedakan dari kegagalan autentikasi', () => {",
+                  "pm.test('200 tanpa token', () => pm.response.to.have.status(200));",
+                  "pm.test('hanya publicId UUID, tanpa id berurutan', () => {",
+                  "    const rows = pm.response.json().data;",
+                  "    if (rows.length === 0) return;",
+                  "    pm.expect(rows[0]).to.have.property('publicId').that.matches(/^[0-9a-f-]{36}$/);",
+                  "    pm.expect(rows[0]).to.not.have.property('id');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/kitchens",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "kitchens"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Dibaca dari view `public_kitchen_coverage_view`. Wilayah dan koordinat null sampai master dapur diterima."
+          }
+        },
+        {
+          "name": "GET /api/public/nutrition",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/nutrition?page=1&pageSize=25",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "nutrition"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "25"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "SCRUM-12, dari `public_menu_nutrition_view`. Filter opsional: `kitchen` (UUID), `portionClass`, `dateFrom`, `dateTo`."
+          }
+        },
+        {
+          "name": "GET /api/public/nutrition — filter invalid (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('menyebut field, tidak membocorkan nilainya', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.error).to.eql('validation_error');",
+                  "    pm.expect(Object.keys(b.details.fields)).to.include('query.kitchen');",
+                  "    pm.expect(JSON.stringify(b)).to.not.include('bukan-uuid');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/nutrition?kitchen=bukan-uuid&pageSize=5000",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "nutrition"
+              ],
+              "query": [
+                {
+                  "key": "kitchen",
+                  "value": "bukan-uuid"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "5000"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "GET /api/public/announcements",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/announcements",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "announcements"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Hanya status PUBLISHED. Draft tidak pernah muncul di sini."
+          }
+        },
+        {
+          "name": "GET /api/public/documents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "documents"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "GET /api/public/gallery",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/gallery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "gallery"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "GET /api/public/nope — 404 bukan 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('bukan 401 - path publik tak dikenal tidak boleh jatuh ke router terautentikasi', () => {",
+                  "    pm.expect(pm.response.json().error).to.eql('not_found');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/nope",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "nope"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Master data",
+      "item": [
+        {
+          "name": "GET /api/kitchens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/kitchens",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "kitchens"
+              ]
+            },
+            "description": "SCRUM-15. Filter: `status`, `type`, `search`."
+          }
+        },
+        {
+          "name": "GET /api/kitchens/:id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('BigInt keluar sebagai string', () => pm.expect(pm.response.json().id).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/kitchens/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "kitchens",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/kitchens — super admin (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/kitchens",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "kitchens"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dapur Uji Postman\",\n  \"province\": \"Jawa Timur\",\n  \"type\": \"BASAH\"\n}"
+            },
+            "description": "SUPER_ADMIN saja. Nama dapur UNIQUE — kirim dua kali untuk melihat 409."
+          }
+        },
+        {
+          "name": "POST /api/kitchens — nama duplikat (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('menunjuk field yang bentrok', () => pm.expect(pm.response.json().details.field).to.eql('name'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/kitchens",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "kitchens"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dapur Uji Postman\"\n}"
+            }
+          }
+        },
+        {
+          "name": "GET /api/ingredients",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ingredients?search=ayam",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ingredients"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "ayam"
+                }
+              ]
+            },
+            "description": "Pencarian mencakup `name` dan `aliases`."
+          }
+        },
+        {
+          "name": "GET /api/akg-targets",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('12 kelompok sasaran hasil seed', () => pm.expect(pm.response.json().meta.total).to.eql(12));",
+                  "pm.test('serat sengaja null - tabel rujukan resmi tidak memuatnya', () => {",
+                  "    pm.expect(pm.response.json().data[0].seratMin).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/akg-targets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "akg-targets"
+              ]
+            },
+            "description": "SCRUM-8. Read-only: diisi `npm run seed:reference`, bukan lewat API."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Upload batch (SCRUM-5/6/7)",
+      "item": [
+        {
+          "name": "GET /api/upload-batches",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/upload-batches",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "upload-batches"
+              ]
+            },
+            "description": "SCRUM-7 riwayat unggah. DATA_ADMIN otomatis terbatas pada dapurnya sendiri."
+          }
+        },
+        {
+          "name": "POST /api/upload-batches (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/upload-batches",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "upload-batches"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kitchenId\": \"1\",\n  \"fileName\": \"menu-agustus.xlsx\",\n  \"fileHash\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"rowCount\": 120\n}"
+            },
+            "description": "Klien menghitung sha256 berkas lalu mendaftarkan batch. Parsing isi Excel belum masuk fase ini."
+          }
+        },
+        {
+          "name": "POST /api/upload-batches — berkas sama (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('SCRUM-6: mengembalikan batch yang sudah tercatat, bukan sekadar gagal', () => {",
+                  "    pm.expect(pm.response.json().details.batch).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/upload-batches",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "upload-batches"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kitchenId\": \"1\",\n  \"fileName\": \"menu-agustus.xlsx\",\n  \"fileHash\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"rowCount\": 120\n}"
+            },
+            "description": "SCRUM-6 ditegakkan oleh UNIQUE `file_hash` di Postgres, bukan oleh ingatan aplikasi."
+          }
+        },
+        {
+          "name": "PATCH /api/upload-batches/:id — verifikasi",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/upload-batches/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "upload-batches",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DITOLAK\",\n  \"notes\": \"kolom BDD kosong di 12 baris\"\n}"
+            },
+            "description": "SCRUM-5: hasil pemeriksaan berkas (diterima / ditolak + alasan)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Menu & mart (read-only)",
+      "description": "Kelima tabel mart diturunkan dari data operasional dan belum punya penulis — job recompute-nya belum dibangun. Endpointnya jalan dan membalas halaman kosong; itu yang diharapkan.",
+      "item": [
+        {
+          "name": "GET /api/menu-plans",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/menu-plans",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "menu-plans"
+              ]
+            },
+            "description": "SCRUM-2, satu baris per bahan. Filter: kitchenId, uploadBatchId, portionClass, menuType, search, dateFrom/dateTo."
+          }
+        },
+        {
+          "name": "GET /api/menu-plans/:id/recipe-costings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/menu-plans/1/recipe-costings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "menu-plans",
+                "1",
+                "recipe-costings"
+              ]
+            },
+            "description": "SCRUM-13: seluruh tabel internal-only. Role di luar SUPER_ADMIN/DATA_ADMIN/INTERNAL dapat 403."
+          }
+        },
+        {
+          "name": "GET /api/menu-nutritions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/menu-nutritions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "menu-nutritions"
+              ]
+            },
+            "description": "SCRUM-12."
+          }
+        },
+        {
+          "name": "GET /api/daily-kitchens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/daily-kitchens",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "daily-kitchens"
+              ]
+            },
+            "description": "SCRUM-11. `jumlahPm` hilang untuk role tanpa clearance biaya."
+          }
+        },
+        {
+          "name": "GET /api/akg-compliances",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/akg-compliances",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "akg-compliances"
+              ]
+            },
+            "description": "SCRUM-8. Tetap kosong sampai pemetaan 4 portion_class ke 12 kelompok sasaran AKG diputuskan."
+          }
+        },
+        {
+          "name": "GET /api/menu-costs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/menu-costs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "menu-costs"
+              ]
+            },
+            "description": "SCRUM-13: tabel ini sensitif seluruhnya, jadi guard-nya menutup resource, bukan menyaring kolom."
+          }
+        },
+        {
+          "name": "GET /api/menu-costs — role tanpa clearance (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('403 bukan 401 - tokennya sah, rolenya yang ditolak', () => {",
                   "    pm.expect(pm.response.json().error).to.eql('forbidden');",
                   "});"
                 ]
@@ -263,33 +1189,560 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/admin/ping",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "ping"]
+              "raw": "{{base_url}}/api/menu-costs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "menu-costs"
+              ]
             },
-            "description": "Token-nya sah — yang ditolak adalah role-nya. Isi `username`/`password` di environment dengan akun non-super-admin, jalankan `Get Access Token`, baru request ini."
+            "description": "Login ulang dengan akun role PUBLIC atau CMS_ADMIN sebelum menjalankan ini."
           }
         },
         {
-          "name": "GET /api/admin/ping — tanpa token (401)",
+          "name": "GET /api/summaries",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
-                "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"]
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
               }
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/admin/ping",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "ping"]
+              "raw": "{{base_url}}/api/summaries",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "summaries"
+              ]
             }
+          }
+        },
+        {
+          "name": "GET /api/dashboard/summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('membawa lastRefreshedAt supaya UI bisa bilang seberapa basi angkanya', () => {",
+                  "    pm.expect(pm.response.json()).to.have.property('lastRefreshedAt');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/dashboard/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "dashboard",
+                "summary"
+              ]
+            },
+            "description": "SCRUM-9/11. Blok `cost` hanya muncul untuk role dengan clearance biaya — absennya kunci lebih jujur daripada nilai null."
+          }
+        }
+      ]
+    },
+    {
+      "name": "CMS (SCRUM-14)",
+      "description": "SUPER_ADMIN dan CMS_ADMIN. Setiap mutasi menulis baris audit_logs.",
+      "item": [
+        {
+          "name": "GET /api/cms/announcements",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/cms/announcements",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cms",
+                "announcements"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/cms/announcements (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cms/announcements",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cms",
+                "announcements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Pengumuman uji\",\n  \"body\": \"Isi pengumuman.\",\n  \"status\": \"DRAFT\"\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/cms/announcements/:id — publish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('publishDate distempel saat DRAFT -> PUBLISHED', () => {",
+                  "    pm.expect(pm.response.json().publishDate).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cms/announcements/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cms",
+                "announcements",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PUBLISHED\"\n}"
+            },
+            "description": "Setelah ini, item yang sama harus muncul di `GET /api/public/announcements`."
+          }
+        },
+        {
+          "name": "DELETE /api/cms/announcements/:id (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/cms/announcements/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cms",
+                "announcements",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/cms/documents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/cms/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cms",
+                "documents"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/cms/documents (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cms/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cms",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"SOP-OPR-001\",\n  \"category\": \"SOP\",\n  \"fileType\": \"PDF\",\n  \"storageKey\": \"docs/sop-opr-001.pdf\"\n}"
+            },
+            "description": "`storageKey` adalah object key S3. Unggah berkasnya sendiri di luar scope fase ini."
+          }
+        },
+        {
+          "name": "GET /api/cms/gallery",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/cms/gallery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cms",
+                "gallery"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin (SUPER_ADMIN)",
+      "item": [
+        {
+          "name": "GET /api/admin/users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/admin/users — role lain (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden, bukan 401', () => pm.response.to.have.status(403));",
+                  "pm.test('dibedakan dari kegagalan autentikasi', () => pm.expect(pm.response.json().error).to.eql('forbidden'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Token sah, role yang ditolak. Login ulang dengan akun non-super-admin."
+          }
+        },
+        {
+          "name": "GET /api/admin/users — tanpa token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/admin/users/:id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/users/2",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users",
+                "2"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"DATA_ADMIN\",\n  \"scopeId\": \"1\"\n}"
+            },
+            "description": "Hanya role/status/scopeId yang bisa diubah — email dan nama dimiliki Auth0. Set role DATA_ADMIN tanpa scopeId membalas 400."
+          }
+        },
+        {
+          "name": "PATCH /api/admin/users/:id — turunkan role sendiri (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('mencegah admin terakhir mengunci dirinya sendiri', () => {",
+                  "    pm.expect(pm.response.json().details.reason).to.include('own role');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/users/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"PUBLIC\"\n}"
+            },
+            "description": "Ganti `1` dengan id akun Anda sendiri (lihat `GET /api/me`)."
+          }
+        },
+        {
+          "name": "GET /api/admin/audit-logs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('amplop halaman lengkap', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(b.meta).to.include.keys('page', 'pageSize', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/audit-logs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "audit-logs"
+              ]
+            },
+            "description": "SCRUM-1. Bisa dibaca, tidak pernah bisa ditulis lewat API."
           }
         }
       ]
@@ -326,8 +1779,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/me",
-              "host": ["{{base_url}}"],
-              "path": ["api", "me"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
             }
           }
         }
