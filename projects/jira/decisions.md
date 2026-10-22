@@ -32,6 +32,12 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 
 **D-08 · 2026-10-23 · Fixture sintetis (B-FIXTURE-PII).** Fixture test meniru header & layout sampel nyata, dengan nilai karangan. Sampel mentah tidak masuk repo.
 
+**D-09 · 2026-10-23 · Auth0 di frontend: `@auth0/nextjs-auth0` 4.31.1, dipin exact.** Ini SDK resmi untuk Next App Router dan mendukung Next 16 (`proxy.ts`). Dipilih versi berumur ≥ 2 minggu: 4.33.0 terbit 22 Okt, terlalu baru untuk dipasang. Sesi di cookie terenkripsi, tanpa store baru. Satu-satunya dependensi baru di SCRUM-21.
+
+**D-10 · 2026-10-23 · Halaman ↔ permission.** Overview, Finance & Cost, Data Health = `dashboard:view`; Unggah Data = `upload:view`; Mapping & Validasi = `mapping:view`; Data Reference = `reference:view`; Manual / Quick Entry = `upload:create` (fallback hanya untuk yang boleh memasukkan data). Slug URL Bahasa Indonesia mengikuti mockup (`/unggah-data`, `/kesehatan-data`, …). Label menu mengikuti nama halaman PRD §5.
+
+**D-11 · 2026-10-23 · Tidak ada `loading.tsx` level layout.** Boundary loading di `(app)` membuat `forbidden()` keluar dengan HTTP 200. Halaman yang nanti mengambil data memasang `<Suspense>` **setelah** `requirePage()`.
+
 ## Konflik dokumen
 
 **K-01 · OD-01 Lawang (B-LWG).** PRD §0/§14: Lawang = "Phase 1 comparison", masuk setelah alur Sukun stabil. BRD §1 "Kitchen mana yang didahulukan": Lawang = "Phase 2 – rollout", didahulukan dari DNM/PCK. **Dipakai PRD**, sebagai nilai config `rollout_status`, bukan hardcode.

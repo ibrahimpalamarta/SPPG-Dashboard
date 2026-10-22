@@ -23,6 +23,8 @@ Setiap tiket `BLOCKED` (seluruhnya atau sebagian) di STATUS.md punya entri di si
 | B-EMAIL | SCRUM-121 | keputusan | Pengirim email undangan belum ada di repo. | Pakai email Auth0 / link salin dulu — PM | OPEN | 2026-10-23 |
 | B-TUREN | SCRUM-20, 132 | keputusan | Dapur Turen ada di seed tapi tidak punya kode kitchen (PRD hanya menyebut SKN, LWG, DNM, PCK, SML). | Kode resmi Turen — Product | OPEN | 2026-10-23 |
 | B-FIXTURE-PII | SCRUM-35, 36, 118, 30 | sampel | Sampel nyata memuat nomor rekening dan nama penerima (Input Maker). Fixture yang di-commit dibuat **sintetis** (header & layout sama, nilai karangan). Sampel mentah tidak masuk repo. | Konfirmasi pendekatan ini cukup untuk UAT — Data Steward | OPEN | 2026-10-23 |
+| B-AUTH0-FE | SCRUM-21 dst. (semua UI) | dependensi | Belum ada aplikasi Auth0 *Regular Web Application* untuk frontend-admin (tenant hanya punya M2M client). Task definition ECS frontend-admin juga belum punya env `AUTH0_*`, `APP_BASE_URL`, `API_BASE_URL`; tanpa itu login di staging gagal. Tidak dibuat sendiri karena mengubah tenant/infra. | Buat aplikasi (callback `<origin>/admin/auth/callback`, logout `<origin>/admin`) + secret di infra — Tech lead / DevOps | OPEN | 2026-10-23 |
+| B-NEXT-CVE | frontend-admin | dependensi | `npm audit`: `next` 16.0.0–16.4.0 punya advisory **critical** (terpasang 16.3.1, sudah dipin sebelum sesi ini), plus 7 high (braces, sharp). Tidak di-upgrade diam-diam karena mengubah versi framework. | Keputusan upgrade Next — Tech lead | OPEN | 2026-10-23 |
 
 ## Selesai
 
