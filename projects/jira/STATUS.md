@@ -5,7 +5,7 @@ Semua branch masih **lokal** (belum di-push).
 
 | Tiket | Judul | Tahap | Status | Status Jira (per 22 Okt) | Branch/PR | Update terakhir | Catatan singkat |
 |---|---|---|---|---|---|---|---|
-| SCRUM-20 | RBAC 2 role | 1 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-ROLE) | In Progress | `feature/scrum-20-rbac` | 2026-10-23 | Backend selesai; skema `user_kitchen_scopes` + `kitchens.code` menunggu approval; penolakan di UI menunggu SCRUM-21 |
+| SCRUM-20 | RBAC 2 role | 1 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-ROLE) | In Progress | `feature/scrum-20-rbac` | 2026-10-23 | Backend + test PII selesai; skema menunggu approval; penolakan di UI menunggu SCRUM-21 |
 | SCRUM-21 | App shell & navigation | 1 | IN_PROGRESS | In Progress | — | 2026-10-23 | Baru mockup statis (data palsu, tanpa Auth0) |
 | SCRUM-132 | [DATA-052] Dapur reference & rollout status | 3 (ditarik maju) | IN_PROGRESS | To Do | — | 2026-10-23 | Tabel `kitchens` + `code` sudah ada; bucket/rollout_status belum |
 | SCRUM-22 | Create upload batch & metadata | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-ASSIGN) | In Progress | `feature/scrum-22-upload-batch` | 2026-10-23 | Backend selesai; kolom di luar [PRD] menunggu approval |
