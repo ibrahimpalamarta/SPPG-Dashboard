@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { auth0 } from "@/lib/auth0";
+import { apiGet } from "@/lib/api";
 import { KITCHEN_COOKIE } from "@/lib/nav";
 
 /** Mirrors backend `PERMISSIONS` (backend/src/auth/roles.ts). */
@@ -32,15 +32,7 @@ export type Me = {
  * re-checks permission and kitchen scope on every call; this only decides what
  * the shell draws.
  */
-export const getMe = cache(async (): Promise<Me> => {
-  const { token } = await auth0.getAccessToken();
-  const res = await fetch(`${process.env.API_BASE_URL}/api/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`GET /api/me gagal: ${res.status}`);
-  return res.json();
-});
+export const getMe = cache(() => apiGet<Me>("/me"));
 
 /**
  * The kitchen picked in the header, if it is still inside the user's scope —

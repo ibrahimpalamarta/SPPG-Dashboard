@@ -7,7 +7,7 @@ Semua branch masih **lokal** (belum di-push).
 |---|---|---|---|---|---|---|---|
 | SCRUM-20 | RBAC 2 role | 1 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-ROLE) | In Progress | `feature/scrum-20-rbac` | 2026-10-23 | Semua AC terpenuhi (API + UI + PII); tersisa approval skema & konfirmasi role |
 | SCRUM-21 | App shell & navigation | 1 | IN_PROGRESS (sebagian BLOCKED: B-AUTH0-FE) | In Progress | `feature/scrum-21-app-shell` | 2026-10-23 | Shell + 7 halaman + guard 403 selesai & diverifikasi dengan sesi lokal; login Auth0 nyata menunggu aplikasi Auth0 + env infra |
-| SCRUM-132 | [DATA-052] Dapur reference & rollout status | 3 (ditarik maju) | IN_PROGRESS | To Do | — | 2026-10-23 | Tabel `kitchens` + `code` sudah ada; bucket/rollout_status belum |
+| SCRUM-132 | [DATA-052] Dapur reference & rollout status | 3 (ditarik maju) | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-LWG, B-TUREN) | To Do | `feature/scrum-132-kitchen-reference` | 2026-10-23 | bucket/rollout via config + API + Data Reference read-only; kolom menunggu approval |
 | SCRUM-22 | Create upload batch & metadata | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-ASSIGN) | In Progress | `feature/scrum-22-upload-batch` | 2026-10-23 | Backend selesai; kolom di luar [PRD] menunggu approval |
 | SCRUM-37 | [DATA-001] Upload batch common metadata | 2 | IN_PROGRESS | To Do | `feature/scrum-22-upload-batch` | 2026-10-23 | Satu unit dengan SCRUM-22 |
 | SCRUM-24 | Excel upload pipeline | 2 | IN_PROGRESS | In Progress | — | 2026-10-23 | Multipart + S3 + batas ukuran ada; parser registry/staging belum |
