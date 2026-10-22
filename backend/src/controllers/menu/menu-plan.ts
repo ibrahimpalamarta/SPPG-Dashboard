@@ -27,7 +27,7 @@ export const listMenuPlans = (db: Db = prisma): RequestHandler => async (req, re
   const q = req.valid!.query as z.infer<typeof menuPlanListQuery>;
   const scope = kitchenScope(req.user!, q.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 
@@ -69,7 +69,7 @@ export const getMenuPlan = (db: Db = prisma): RequestHandler => async (req, res)
   }
   const scope = kitchenScope(req.user!, row.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
   sendJson(res, menuPlanForRole(row, req.user!.role));
@@ -92,7 +92,7 @@ export const listRecipeCostings = (db: Db = prisma): RequestHandler => async (re
   }
   const scope = kitchenScope(req.user!, menuPlan.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 

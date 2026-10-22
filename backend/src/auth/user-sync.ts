@@ -1,34 +1,47 @@
-import type { User } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { prisma, type Db } from '../db.js';
 import { roleFromClaims } from './roles.js';
 import { writeAuditLog } from './audit.js';
 import type { AuthContext } from './jwt.js';
 
+export const withKitchenScopes = {
+  kitchenScopes: { select: { kitchenId: true } },
+} satisfies Prisma.UserInclude;
+
+/** `req.user`: the user row plus the dapur it may touch (SCRUM-20). */
+export type AppUser = Prisma.UserGetPayload<{ include: typeof withKitchenScopes }>;
+
 /**
  * Find-or-create the Postgres row backing an Auth0 identity.
  *
- * Auth0 owns roles, so the claim is copied down on every login; the DB copy is
- * what authorization then reads. `scopeId` is never touched here — it is set by
- * a Super Admin, not by anything the caller can influence.
+ * SCRUM-20: Postgres owns the role. The Auth0 claim only seeds it the first
+ * time an identity is seen; after that a role or kitchen scope is changed
+ * through the admin API (and audited there), so an invited member keeps the
+ * role the invitation gave them. Revoking access is therefore an admin-API
+ * action, not an Auth0 one.
  *
  * Steady state costs one indexed read and no write.
  */
-export async function findOrCreateUser(auth: AuthContext, db: Db = prisma): Promise<User> {
-  const role = roleFromClaims(auth.roleClaims);
+export async function findOrCreateUser(auth: AuthContext, db: Db = prisma): Promise<AppUser> {
   const email = auth.email?.toLowerCase();
   const fullName = auth.name;
 
-  const existing = await db.user.findUnique({ where: { auth0Sub: auth.sub } });
-  if (existing && existing.role === role && existing.email === (email ?? null)) {
+  const existing = await db.user.findUnique({
+    where: { auth0Sub: auth.sub },
+    include: withKitchenScopes,
+  });
+  if (existing && existing.email === (email ?? null)) {
     return existing;
   }
 
   // upsert, not create: two concurrent first requests would otherwise race on
   // the auth0_sub unique index.
+  const role = roleFromClaims(auth.roleClaims);
   const user = await db.user.upsert({
     where: { auth0Sub: auth.sub },
     create: { auth0Sub: auth.sub, email, fullName, role },
-    update: { email, fullName, role },
+    update: { email, fullName },
+    include: withKitchenScopes,
   });
 
   if (!existing) {
@@ -38,14 +51,6 @@ export async function findOrCreateUser(auth: AuthContext, db: Db = prisma): Prom
       entity: 'user',
       entityId: user.id,
       metadata: { role },
-    });
-  } else if (existing.role !== role) {
-    await writeAuditLog(db, {
-      userId: user.id,
-      action: 'user.role_synced',
-      entity: 'user',
-      entityId: user.id,
-      metadata: { from: existing.role, to: role },
     });
   }
 

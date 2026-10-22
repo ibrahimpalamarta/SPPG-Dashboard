@@ -1,22 +1,21 @@
 import type { RequestHandler } from 'express';
-import type { User } from '@prisma/client';
 import { prisma, type Db } from '../db.js';
-import { findOrCreateUser } from './user-sync.js';
-import type { Role } from './roles.js';
+import { findOrCreateUser, type AppUser } from './user-sync.js';
+import { hasPermission, type Permission, type Role } from './roles.js';
 import { sendError } from '../middleware/error-handler.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      user?: User;
+      user?: AppUser;
     }
   }
 }
 
 /**
  * Turns an authenticated token into `req.user`, provisioning the row on first
- * sight. Mount after requireAuth and before any requireRole.
+ * sight. Mount after requireAuth and before any requireRole/requirePermission.
  */
 export function attachUser(db: Db = prisma): RequestHandler {
   return async (req, res, next) => {
@@ -37,8 +36,7 @@ export function attachUser(db: Db = prisma): RequestHandler {
  * Authorization. Separate from requireAuth on purpose: 401 means "who are
  * you?", 403 means "not you".
  *
- * Reads the role off `req.user` (Postgres), never off the raw token, so a
- * revoked role takes effect on the next login rather than on token expiry.
+ * Reads the role off `req.user` (Postgres), never off the raw token.
  *
  *   router.post('/pengeluaran', requireAuth(), attachUser(), requireRole('SUPER_ADMIN', 'DATA_ADMIN'), handler)
  *
@@ -59,12 +57,30 @@ export function requireRole(...allowed: Role[]): RequestHandler {
   };
 }
 
+/** SCRUM-20: same as requireRole, against ROLE_PERMISSIONS instead of a list. */
+export function requirePermission(perm: Permission): RequestHandler {
+  return (req, res, next) => {
+    if (!req.user) {
+      sendError(res, 'INVALID_TOKEN');
+      return;
+    }
+    if (!hasPermission(req.user.role, perm)) {
+      sendError(res, 'FORBIDDEN');
+      return;
+    }
+    next();
+  };
+}
+
 /**
- * A DATA_ADMIN may only touch its own SPPG Dapur. `scope_id` is now a real FK
- * to `kitchens`, so this value can be used directly to filter feature queries.
+ * The dapur a caller may touch.
  *
- * @returns null when the caller is unrestricted (SUPER_ADMIN).
+ * @returns null when unrestricted: SUPER_ADMIN always, and any other role that
+ * has no scope rows. A DATA_ADMIN with no rows gets `[]` — it sees nothing,
+ * never everything.
  */
-export function resolveScopeId(user: User): bigint | null {
-  return user.role === 'SUPER_ADMIN' ? null : user.scopeId;
+export function resolveKitchenIds(user: AppUser): bigint[] | null {
+  if (user.role === 'SUPER_ADMIN') return null;
+  const ids = user.kitchenScopes.map((s) => s.kitchenId);
+  return ids.length === 0 && user.role !== 'DATA_ADMIN' ? null : ids;
 }

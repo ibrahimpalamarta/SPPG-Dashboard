@@ -1,12 +1,12 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
-import type { User } from '@prisma/client';
+import type { AppUser } from '../../auth/user-sync.js';
 import type { Db } from '../../db.js';
 import type { AuditEntry } from '../../auth/audit.js';
 import { ANNOUNCEMENT, createCms, updateCms } from './cms.js';
 
-const admin = { id: 1n, role: 'CMS_ADMIN' } as User;
+const admin = { id: 1n, role: 'CMS_ADMIN', kitchenScopes: [] } as unknown as AppUser;
 
 async function run(handler: ReturnType<typeof createCms>, req: Partial<Request>) {
   let status: number | undefined;

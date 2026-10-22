@@ -137,6 +137,7 @@ dari prompt.
 | `cms_announcements`, `cms_documents` | **SCRUM-14** CMS Admin | draft/published; title + category; seluruh aksi tercatat di `audit_logs` |
 | `kitchens` | **SCRUM-15** Kitchen Master | 6 dapur; name, region, type, status, lat/lng |
 | `ingredients`, `recipe_costings`, `menu_costs` | pendukung | Master bahan kanonik dan biaya; `menu_costs` internal-only |
+| `user_kitchen_scopes`, `kitchens.code` | **SCRUM-20** RBAC 2 role (Phase 1) | Satu akun bisa memegang beberapa dapur; menggantikan `users.scope_id`. Kode dapur SKN/LWG/DNM/PCK/SML |
 
 Epic terkait tanpa tabel langsung: SCRUM-3 (Authentication), SCRUM-4 (Data
 management), SCRUM-9 (Internal Dashboard), SCRUM-10 (External Dashboard).

@@ -7,6 +7,11 @@ export const ERRORS = {
   MISSING_TOKEN: { status: 401, body: { error: 'unauthorized', message: 'Missing bearer token' } },
   INVALID_TOKEN: { status: 401, body: { error: 'unauthorized', message: 'Invalid or expired token' } },
   FORBIDDEN: { status: 403, body: { error: 'forbidden', message: 'Insufficient role' } },
+  // SCRUM-20: PRD §9 copy, shown to the user as-is.
+  FORBIDDEN_KITCHEN: {
+    status: 403,
+    body: { error: 'forbidden_kitchen', message: 'Anda tidak memiliki akses ke kitchen ini.' },
+  },
   NOT_FOUND: { status: 404, body: { error: 'not_found' } },
   CONFLICT: { status: 409, body: { error: 'conflict', message: 'Resource already exists' } },
   UNPROCESSABLE: {

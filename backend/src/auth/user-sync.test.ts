@@ -1,13 +1,13 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import type { User } from '@prisma/client';
+import type { AppUser } from './user-sync.js';
 import type { Db } from '../db.js';
 import { findOrCreateUser } from './user-sync.js';
 import { roleFromClaims } from './roles.js';
 import type { AuthContext } from './jwt.js';
 
 /** Minimal in-memory stand-in for the two tables the auth module touches. */
-function fakeDb(seed: User[] = []) {
+function fakeDb(seed: AppUser[] = []) {
   const users = new Map(seed.map((u) => [u.auth0Sub, u]));
   const audits: { action: string; entityId: bigint | null }[] = [];
   const calls = { findUnique: 0, upsert: 0 };
@@ -21,11 +21,11 @@ function fakeDb(seed: User[] = []) {
       async upsert({ where, create, update }: any) {
         calls.upsert++;
         const existing = users.get(where.auth0Sub);
-        const next: User = existing
+        const next: AppUser = existing
           ? { ...existing, ...stripUndefined(update), updatedAt: new Date() }
           : {
               id: BigInt(users.size + 1),
-              scopeId: null,
+              kitchenScopes: [],
               createdAt: new Date(),
               updatedAt: new Date(),
               email: null,
@@ -88,7 +88,7 @@ describe('findOrCreateUser', () => {
     assert.equal(user.auth0Sub, 'auth0|abc123');
     assert.equal(user.email, 'person@example.com');
     assert.equal(user.role, 'INTERNAL');
-    assert.equal(user.scopeId, null);
+    assert.deepEqual(user.kitchenScopes, []);
     assert.deepEqual(
       audits.map((a) => a.action),
       ['user.provisioned'],
@@ -106,15 +106,19 @@ describe('findOrCreateUser', () => {
     assert.equal(audits.length, 1);
   });
 
-  test('syncs a role change from Auth0 and records it', async () => {
+  test('SCRUM-20: a later token claim never changes the stored role', async () => {
     const { db, audits } = fakeDb();
     await findOrCreateUser(ctx(), db);
-    const promoted = await findOrCreateUser(ctx({ roleClaims: ['super_admin'] }), db);
+    const again = await findOrCreateUser(
+      ctx({ email: 'new@example.com', roleClaims: ['super_admin'] }),
+      db,
+    );
 
-    assert.equal(promoted.role, 'SUPER_ADMIN');
+    assert.equal(again.role, 'INTERNAL');
+    assert.equal(again.email, 'new@example.com');
     assert.deepEqual(
       audits.map((a) => a.action),
-      ['user.provisioned', 'user.role_synced'],
+      ['user.provisioned'],
     );
   });
 
@@ -124,15 +128,15 @@ describe('findOrCreateUser', () => {
     assert.equal(user.role, 'PUBLIC');
   });
 
-  test('never lets a token claim set scopeId', async () => {
+  test('never lets a token claim set kitchen scope', async () => {
     const { db } = fakeDb();
     const user = await findOrCreateUser(
-      // scope_id is not a field the token can carry — prove it stays null even
-      // when a caller stuffs one into the claims.
-      { ...ctx(), roleClaims: ['data_admin'], ...({ scopeId: 'attacker-scope' } as object) },
+      // Kitchen scope is not a field the token can carry — prove it stays empty
+      // even when a caller stuffs one into the claims.
+      { ...ctx(), roleClaims: ['data_admin'], ...({ kitchenScopes: [{ kitchenId: 9n }] } as object) },
       db,
     );
-    assert.equal(user.scopeId, null);
+    assert.deepEqual(user.kitchenScopes, []);
     assert.equal(user.role, 'DATA_ADMIN');
   });
 

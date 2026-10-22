@@ -1662,9 +1662,9 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"role\": \"DATA_ADMIN\",\n  \"scopeId\": \"1\"\n}"
+              "raw": "{\n  \"role\": \"DATA_ADMIN\",\n  \"kitchenIds\": [\"1\"]\n}"
             },
-            "description": "Hanya role/status/scopeId yang bisa diubah — email dan nama dimiliki Auth0. Set role DATA_ADMIN tanpa scopeId membalas 400."
+            "description": "Hanya role/status/kitchenIds yang bisa diubah — email dan nama dimiliki Auth0. kitchenIds mengganti seluruh daftar dapur. Set role DATA_ADMIN tanpa dapur membalas 400."
           }
         },
         {
