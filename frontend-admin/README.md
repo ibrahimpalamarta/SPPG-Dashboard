@@ -1,13 +1,19 @@
-# SPPG Dashboard — Frontend Admin (Fase 0: Coming Soon)
+# SPPG Dashboard — Frontend Admin
 
-Next.js (App Router) + TypeScript. Nantinya menampung Backoffice (Data Admin,
-CMS Admin) dan Internal Dashboard (Internal User) — role-gated, di belakang Auth0.
+Next.js 16 (App Router) + TypeScript + Tailwind 4. Backoffice + Dashboard Internal
+di belakang Auth0 (SCRUM-21).
 
-Fase ini **hanya** fondasi deployment: satu halaman statis "Segera Hadir", tanpa
-data fetching, tanpa integrasi Auth0, tanpa RBAC, tanpa design system. Desain
-UI/UX masih berjalan. Yang sudah jadi dan tidak perlu disentuh lagi saat
-membangun halaman: struktur folder, Docker build, provisioning Terraform, dan
-pipeline CI/CD ke staging.
+- `proxy.ts` (Next 16: pengganti middleware) memasang rute `/auth/*` Auth0 dan
+  mengirim siapa pun tanpa sesi ke login.
+- `lib/nav.ts` = tujuh halaman PRD §5 + permission tiap halaman. Daftar ini dipakai
+  sidebar (menu disembunyikan) **dan** `requirePage()` (deep-link → 403).
+- `lib/me.ts` memanggil `GET /api/me` dengan access token sesi. Backend tetap
+  memeriksa permission + scope dapur di setiap request; frontend hanya menggambar.
+- Halaman tanpa fitur menampilkan `EmptyState` ("belum tersedia"), tidak pernah angka palsu.
+
+Variabel lingkungan: lihat `.env.example` (salin ke `.env.local`). Butuh aplikasi
+Auth0 tipe *Regular Web Application* dengan callback
+`<APP_BASE_URL>/admin/auth/callback` dan logout URL `<APP_BASE_URL>/admin`.
 
 ---
 
@@ -21,8 +27,8 @@ npm run dev     # http://localhost:3000/admin  <- perhatikan prefix-nya
 App ini memakai `basePath: "/admin"`, jadi root (`/`) memang 404 — termasuk di
 lokal. Itu perilaku yang benar, bukan bug.
 
-`npm run build` sekaligus jadi type-check (`next build` menjalankan tsc), sama
-seperti backend. Belum ada linter maupun test — repo ini belum punya keduanya.
+`npm run build` sekaligus jadi type-check (`next build` menjalankan tsc). Lint:
+`npm run lint`, kode mati: `npm run knip`. Belum ada test runner.
 
 ## Docker
 

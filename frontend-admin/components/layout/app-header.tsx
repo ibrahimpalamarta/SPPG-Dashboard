@@ -1,62 +1,55 @@
 "use client";
 
-import { Bell, CircleCheck, Menu, Search, Settings } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { Menu } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { NavLinks, type NavItem } from "@/components/layout/app-sidebar";
+import type { Kitchen } from "@/lib/me";
+import { KITCHEN_COOKIE } from "@/lib/nav";
 
-// ponytail: static mock collaborators; replace with real presence data later.
-const collaborators = [
-  { initials: "DL", color: "bg-blue-600" },
-  { initials: "BP", color: "bg-teal-600" },
-  { initials: "RK", color: "bg-indigo-500" },
-];
-
-const titles: Record<string, string> = { "/overview": "Overview", "/unggah-data": "Unggah Data", "/finance": "Finance & Cost", "/kelengkapan": "Kelengkapan Data" };
-
-const iconButton =
-  "relative inline-flex size-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600";
-
-export function AppHeader() {
+export function AppHeader({ items, kitchens, kitchenId }: { items: readonly NavItem[]; kitchens: Kitchen[]; kitchenId?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const title = items.find((n) => n.href === pathname)?.label;
+
+  function selectKitchen(id: string) {
+    // Read back server-side by selectedKitchen(), which re-checks it against
+    // the user's scope — this cookie is a preference, never an authorization.
+    document.cookie = `${KITCHEN_COOKIE}=${id}; path=${process.env.NEXT_PUBLIC_BASE_PATH}; max-age=31536000; samesite=lax`;
+    router.refresh();
+  }
 
   return (
     <header className="flex min-h-16 items-center gap-4 border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8">
-      <button className="inline-flex size-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:hidden" aria-label="Buka navigasi">
-        <Menu className="size-5" aria-hidden="true" />
-      </button>
-      <div className="hidden items-center gap-2 text-sm sm:flex">
+      {/* Desktop-first: below lg the sidebar collapses into this native disclosure. */}
+      <details className="relative lg:hidden">
+        <summary className="inline-flex size-9 cursor-pointer list-none items-center justify-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Buka navigasi">
+          <Menu className="size-5" aria-hidden="true" />
+        </summary>
+        <nav className="absolute left-0 top-11 z-10 flex w-64 flex-col gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-lg" aria-label="Menu utama">
+          <NavLinks items={items} />
+        </nav>
+      </details>
+
+      <div className="flex items-center gap-2 text-sm">
         <span className="text-slate-400">Dashboard</span>
         <span className="text-slate-300" aria-hidden="true">/</span>
-        <span className="font-medium text-slate-800">{titles[pathname]}</span>
-        <span className="ml-2 inline-flex items-center gap-2 rounded-full border border-dashed border-slate-300 px-3 py-1 text-xs text-slate-600">
-          <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-          Pilot demo · data terkontrol
-        </span>
+        <span className="font-medium text-slate-800">{title}</span>
       </div>
-      <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3">
-        <label className="relative hidden h-10 min-w-0 flex-1 lg:block">
-          <span className="sr-only">Cari file atau data</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-          <input className="size-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-14 text-sm outline-none placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20" placeholder="Cari file atau data..." />
-          <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-400">⌘K</kbd>
-        </label>
-        <div className="hidden items-center -space-x-2 xl:flex" aria-label="Kolaborator aktif">
-          {collaborators.map(({ initials, color }) => (
-            <span key={initials} className={`flex size-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold text-white ${color}`}>{initials}</span>
-          ))}
-          <span className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-slate-200 text-xs font-semibold text-slate-600">+5</span>
-        </div>
-        <button className={iconButton} aria-label="Pengaturan">
-          <Settings className="size-4" aria-hidden="true" />
-        </button>
-        <button className={iconButton} aria-label="Notifikasi">
-          <Bell className="size-4" aria-hidden="true" />
-          <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500" aria-hidden="true" />
-        </button>
-        <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">
-          <CircleCheck className="size-4" aria-hidden="true" />
-          <span className="hidden sm:inline">Review Pekerjaan</span>
-        </button>
-      </div>
+
+      <label className="ml-auto flex items-center gap-2 text-sm text-slate-500">
+        <span>Dapur</span>
+        {kitchens.length === 0 ? (
+          <span className="text-slate-400">Tidak ada dapur dalam akses Anda</span>
+        ) : (
+          <select value={kitchenId} onChange={(e) => selectKitchen(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20">
+            {kitchens.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.code ? `${k.code} · ${k.name}` : k.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </label>
     </header>
   );
 }

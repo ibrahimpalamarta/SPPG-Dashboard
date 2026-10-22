@@ -25,7 +25,7 @@ Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-ROLE) | Terakhir d
 
 ## Acceptance criteria
 - [x] Akses ke kitchen lain ditolak di API langsung (403 `forbidden_kitchen`)
-- [ ] Akses ke kitchen lain ditolak di UI (SCRUM-21)
+- [x] Ditolak di UI: menu & halaman difilter permission, selector dapur hanya berisi dapur dalam scope (SCRUM-21)
 - [x] Tidak ada PII di respons (`me.test.ts`)
 - [x] Test happy path + minimal satu kasus akses ditolak
 
