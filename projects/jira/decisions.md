@@ -38,6 +38,12 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 
 **D-11 · 2026-10-23 · Tidak ada `loading.tsx` level layout.** Boundary loading di `(app)` membuat `forbidden()` keluar dengan HTTP 200. Halaman yang nanti mengambil data memasang `<Suspense>` **setelah** `requirePage()`.
 
+**D-12 · 2026-10-23 · Kontrak Cashflow Upload v1 = template Sukun.** `MBG_SPPG_Cashflow_Template_1.xlsx` (SPPG Kebonsari Sukun) dipakai sebagai kontrak Cashflow, karena ia satu-satunya sumber dengan Kamus_Data per kolom. Nama berkas "Template_1" dibaca sebagai v1. **ASUMSI**: belum dikonfirmasi bahwa ini "Cashflow Upload v1" yang dimaksud PRD §12.
+
+**D-13 · 2026-10-23 · `Insentif_Penggajian` tidak di-staging.** Sheet ini berisi nama, nomor rekening, dan pemilik rekening per orang. Nominalnya sudah ada di baris `Transaksi_Kas` (tipe INSENTIF/PENGGAJIAN), jadi analitik finance tidak kehilangan apa pun. Minimalkan data pribadi (PRD §2, OS8, NFR-02). Berkas asli tetap di S3 untuk audit. Kolom `no_rekening` di `Transaksi_Kas` (rekening **pemasok**) tetap di-staging mentah dan tidak boleh tampil di UI/export.
+
+**D-14 · 2026-10-23 · Registry parser = map statis.** `registerParser()` dari SCRUM-24 diganti objek `parsers` di `pipeline.ts`: lebih sedikit kode, tanpa efek samping saat import, dan tidak ada siklus import.
+
 ## Konflik dokumen
 
 **K-01 · OD-01 Lawang (B-LWG).** PRD §0/§14: Lawang = "Phase 1 comparison", masuk setelah alur Sukun stabil. BRD §1 "Kitchen mana yang didahulukan": Lawang = "Phase 2 – rollout", didahulukan dari DNM/PCK. **Dipakai PRD**, sebagai nilai config `rollout_status`, bukan hardcode.
@@ -47,3 +53,5 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 **K-03 · Nama field Pengeluaran.** BRD §5.3 memakai prefiks `exp_*` (`exp_nilai_rp`, `exp_no_bukti`, …). PRD §6.5/§7.4 memakai `transaction_total`, `line_amount`, `review_status`. Aturan: **Data Dictionary v0.2 menang**, tapi berkas itu belum ada (B-DD). Sementara itu, profil memakai nama PRD bila disebut eksplisit dan nama BRD untuk sisanya, ditandai `TODO(B-DD)`.
 
 **K-04 · Sampel vs tiket.** SCRUM-118 menyebut Input Maker **Sukun**. Di Drive ada `Input Maker .xlsx` (milik sppgkebonsarisukun, berarti Sukun) dan `Input Maker – SPPG Simalungun`. Sesi 22 Okt hanya menemukan yang SML. Dipakai yang Sukun untuk SCRUM-118.
+
+**K-05 · Layout Cashflow beda per dapur.** Sukun: 3 sheet ternormalisasi (`Transaksi_Kas` + `Rincian_Belanja` + `Insentif_Penggajian`). Donomulyo: 1 sheet "Transaksi Kas" yang menggabungkan header dan item (`id, txn_id, …, jumlah_baris, total, …`). Parser staging menerima keduanya; pembedaan layout menjadi tugas profil mapping (SCRUM-26/39), bukan parser.

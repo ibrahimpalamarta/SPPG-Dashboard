@@ -1,73 +1,17 @@
-import type { SourceSystem, UploadDomain } from '@prisma/client';
-import {
-  DEFAULT_HEADER_OPTIONS,
-  WorkbookError,
-  detectHeaderRow,
-  isBlankRow,
-  readWorkbook,
-  type RawSheet,
-} from './workbook.js';
-import { sourceRecordId, type StagedBatch, type StagedSheet, type StagingRepository, type StagingRow } from './staging.js';
-
-export type ParseContext = {
-  uploadBatchId: string;
-  kitchenCode: string;
-  domain: UploadDomain;
-  sourceSystem: SourceSystem;
-  sourceFileName: string;
-  fileHash: string;
-  loadedAt: Date;
-};
-
-/** Turns the raw sheets into staged rows for one domain. */
-export type DomainParser = (sheets: RawSheet[], ctx: ParseContext) => Pick<StagedBatch, 'sheets' | 'rows'>;
+import type { UploadDomain } from '@prisma/client';
+import { WorkbookError, readWorkbook } from './workbook.js';
+import { stageRows, type DomainParser, type ParseContext, type StagedBatch, type StagingRepository } from './staging.js';
+import { cashflowParser } from './cashflow.js';
 
 /**
- * Domain parsers register here (SCRUM-35 Cashflow, 36 Menu, 118 Input Maker).
- * A domain with none falls back to `rawParser`: every sheet, every non-blank
- * row below the detected header, cells untouched — the generic raw staging
- * that RAB/PO/Payment read in Tahap 3 (B-RAW).
+ * The generic fallback: every sheet. Domains with no dedicated parser
+ * (RAB/PO/Payment/GR) are staged this way for Tahap 3 to read (B-RAW).
  */
-const parsers = new Map<UploadDomain, DomainParser>();
+const rawParser: DomainParser = (sheets, ctx) => stageRows(sheets, ctx);
 
-export function registerParser(domain: UploadDomain, parser: DomainParser): void {
-  parsers.set(domain, parser);
-}
-
-export const rawParser: DomainParser = (sheets, ctx) => {
-  const staged: StagedSheet[] = [];
-  const rows: StagingRow[] = [];
-
-  for (const sheet of sheets) {
-    const header = detectHeaderRow(sheet, DEFAULT_HEADER_OPTIONS);
-    const dataRows = header ? sheet.rows.filter((r) => r.rowNumber > header.rowNumber && !isBlankRow(r)) : [];
-
-    staged.push({
-      name: sheet.name,
-      index: sheet.index,
-      headerRow: header?.rowNumber ?? null,
-      headers: Object.fromEntries(Object.entries(header?.cells ?? {}).map(([col, c]) => [col, String(c.value ?? '')])),
-      rowCount: dataRows.length,
-    });
-
-    for (const r of dataRows) {
-      rows.push({
-        uploadBatchId: ctx.uploadBatchId,
-        sourceRecordId: sourceRecordId(ctx.kitchenCode, ctx.domain, ctx.fileHash, sheet.name, r.rowNumber),
-        kitchenId: ctx.kitchenCode,
-        sourceSystem: ctx.sourceSystem,
-        sourceFileName: ctx.sourceFileName,
-        // diisi di SCRUM-130/39: read from the template's metadata cell or the profile.
-        templateVersion: null,
-        mappingProfileId: null,
-        loadedAt: ctx.loadedAt,
-        sheetName: sheet.name,
-        sourceRowNumber: r.rowNumber,
-        cells: r.cells,
-      });
-    }
-  }
-  return { sheets: staged, rows };
+/** One entry per domain with its own staging rules (SCRUM-35, 36, 118). */
+const parsers: Partial<Record<UploadDomain, DomainParser>> = {
+  CASHFLOW: cashflowParser,
 };
 
 export type PipelineResult =
@@ -82,7 +26,7 @@ export type PipelineResult =
 export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging: StagingRepository): Promise<PipelineResult> {
   try {
     const sheets = await readWorkbook(buffer);
-    const parsed = (parsers.get(ctx.domain) ?? rawParser)(sheets, ctx);
+    const parsed = (parsers[ctx.domain] ?? rawParser)(sheets, ctx);
     if (parsed.rows.length === 0) {
       await staging.deleteBatch(ctx.uploadBatchId);
       return { ok: false, errorCode: 'EMPTY_FILE', errorSummary: 'File tidak berisi baris data. Periksa isi file lalu upload ulang.' };
