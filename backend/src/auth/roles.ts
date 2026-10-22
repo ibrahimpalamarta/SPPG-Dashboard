@@ -19,6 +19,7 @@ export const PERMISSIONS = [
   'batch:review',
   'batch:publish',
   'mapping:view',
+  'mapping:propose',
   'reference:view',
   'reference:edit',
   'member:invite',
@@ -38,7 +39,9 @@ export type Permission = (typeof PERMISSIONS)[number];
  */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   SUPER_ADMIN: PERMISSIONS,
-  DATA_ADMIN: ['upload:create', 'upload:view', 'mapping:view', 'reference:view', 'dashboard:view'],
+  // mapping:propose: whoever uploads can suggest a column mapping for a file
+  // the registry did not recognise (SCRUM-124); only PM approves it.
+  DATA_ADMIN: ['upload:create', 'upload:view', 'mapping:view', 'mapping:propose', 'reference:view', 'dashboard:view'],
   INTERNAL: ['upload:view', 'mapping:view', 'reference:view', 'dashboard:view'],
   CMS_ADMIN: [],
   PUBLIC: [],
