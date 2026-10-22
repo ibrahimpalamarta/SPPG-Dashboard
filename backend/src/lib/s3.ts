@@ -14,9 +14,8 @@ export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsh
 export type PutObject = (key: string, body: Buffer, contentType: string) => Promise<string>;
 
 /**
- * Writes one object and returns its key. Overwriting is fine and expected:
- * upload keys are derived from the file hash, so the same bytes always land on
- * the same key.
+ * Writes one object and returns its key. Keys are chosen by the caller and
+ * never contain a user-supplied file name.
  */
 export const putObject: PutObject = async (key, body, contentType) => {
   await client.send(

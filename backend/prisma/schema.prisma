@@ -51,11 +51,37 @@ enum PendistribusianMbg {
   SIANG
 }
 
-/// Hasil pemeriksaan format berkas saat diunggah (SCRUM-5).
+/// Status batch unggahan (PRD FR-UP-05, SCRUM-22/37). Transisi yang sah ada
+/// di `src/lib/upload-status.ts`, bukan di sini.
 enum UploadStatus {
-  DITERIMA
-  DITOLAK
   PROCESSING
+  NEEDS_REVIEW
+  NEEDS_MAPPING_UPDATE
+  READY
+  PUBLISHED
+  FAILED
+}
+
+/// Domain berkas yang diunggah (PRD Phase 1).
+enum UploadDomain {
+  CASHFLOW
+  MENU
+  RAB
+  PO
+  GOODS_RECEIPT
+  VENDOR_PAYMENT
+  INPUT_MAKER
+}
+
+/// Sistem asal data (field traceability `source_system`).
+enum SourceSystem {
+  INTERNAL
+  EFI
+  SIPGN
+  POP
+  AKSIS
+  MPM
+  WEB_MANUAL
 }
 
 /// Jenis menu pada form perencanaan menu SOP-OPR-001.
@@ -295,9 +321,21 @@ model AkgTarget {
 // Unggah & data operasional
 // ---------------------------------------------------------------------------
 
-/// Satu berkas Excel yang diunggah Data Admin (SCRUM-5, 6, 7).
+/// Satu percobaan unggah berkas (SCRUM-5, 6, 7; metadata umum SCRUM-22/37).
+/// Satu baris per percobaan: berkas yang sama diunggah ulang menjadi batch
+/// baru, bukan ditolak.
 model UploadBatch {
   id BigInt @id @default(autoincrement()) @map("batch_id")
+
+  /// `upload_batch_id` di PRD — ID yang keluar ke klien dan masuk ke
+  /// `source_record_id` staging. BigInt `id` tetap internal.
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  domain       UploadDomain
+  sourceSystem SourceSystem @default(INTERNAL) @map("source_system")
+
+  /// Periode data, "YYYY-MM". Nullable: tidak semua domain punya periode.
+  period String?
 
   kitchenId BigInt  @map("kitchen_id")
   kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
@@ -308,16 +346,38 @@ model UploadBatch {
   uploadDate DateTime @default(now()) @map("upload_date")
   fileName   String   @map("file_name")
 
-  /// Sidik jari berkas. UNIQUE - inilah yang membuat SCRUM-6 ("re-import berkas
-  /// yang sama diperlakukan sebagai berkas yang sama bila tidak ada perubahan")
-  /// bisa ditegakkan di level database, bukan hanya di aplikasi.
-  fileHash String @unique @map("file_hash")
+  /// SHA-256 berkas. Tidak UNIQUE lagi (SCRUM-22): unggah ulang berkas yang
+  /// sama membuat batch baru plus peringatan duplikat; penggandaan fakta bisnis
+  /// dicegah saat publish, bukan di sini.
+  fileHash String @map("file_hash")
 
-  rowCount Int          @map("row_count")
+  /// Byte. Nullable hanya untuk batch sebelum SCRUM-22.
+  fileSize Int? @map("file_size")
+
+  /// Object key di S3. Tidak pernah memuat nama berkas asli. NULL bila berkas
+  /// gagal sebelum sempat disimpan.
+  storageKey String? @map("storage_key")
+
+  /// Diisi deteksi profile (SCRUM-39) dan parser (SCRUM-35/36), NULL selama
+  /// belum terdeteksi.
+  mappingProfileId String? @map("mapping_profile_id")
+  templateVersion  String? @map("template_version")
+
+  rowCount Int          @default(0) @map("row_count")
   status   UploadStatus @default(PROCESSING)
 
-  /// Alasan penolakan / catatan verifikasi.
+  /// Kode mesin dan ringkasan kegagalan, untuk status FAILED /
+  /// NEEDS_MAPPING_UPDATE.
+  errorCode    String? @map("error_code")
+  errorSummary String? @map("error_summary")
+  durationMs   Int?    @map("duration_ms")
+
+  /// Catatan verifikasi.
   notes String?
+
+  /// Diisi SCRUM-33 (validasi) dan SCRUM-95 (publish).
+  validatedAt DateTime? @map("validated_at")
+  publishedAt DateTime? @map("published_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -325,6 +385,8 @@ model UploadBatch {
   menuPlans MenuPlan[]
 
   @@index([kitchenId, uploadDate])
+  @@index([kitchenId, domain, uploadDate])
+  @@index([fileHash])
   @@map("upload_batches")
 }
 

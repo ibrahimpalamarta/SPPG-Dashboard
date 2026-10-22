@@ -298,14 +298,14 @@ Yang ditutup: token valid/expired/salah key/salah issuer/salah audience/tanpa
 sub/malformed, keseragaman pesan 401, find-or-create + idempotensi + sinkronisasi
 role, penolakan 403 per role, serialisasi BigInt/Decimal/Date, scoping per dapur,
 penyaringan kolom biaya SCRUM-13, validasi zod (termasuk bahwa nilai yang ditolak
-tidak ikut terkirim di respons 400), dedup `file_hash` SCRUM-6, dan stempel
+tidak ikut terkirim di respons 400), peringatan duplikat `file_hash`, dan stempel
 publishDate + audit log CMS.
 
 Ditambah untuk fase unggah: parsing workbook (pemetaan header yang toleran
 kapital/tanda baca/satuan, kolom wajib hilang, sel rusak dilaporkan bernomor
-baris, berkas non-xlsx), dan ketiga hasil `POST /api/upload-batches` — impor
-bersih dengan `menu_plans` bersarang, `dryRun` yang tidak menulis apa pun,
-workbook rusak yang tetap tercatat `DITOLAK`, duplikat, dan balapan `P2002`.
+baris, berkas non-xlsx), dan hasil `POST /api/upload-batches` —
+batch PROCESSING → NEEDS_MAPPING_UPDATE, `dryRun` yang tidak menulis apa pun,
+duplikat jadi peringatan, S3 gagal → FAILED, dan transisi status tak sah (SCRUM-22).
 Workbook uji dibangun di memori dengan exceljs, jadi tetap tanpa berkas fixture
 dan tanpa jaringan.
 
@@ -476,22 +476,28 @@ server sudah memegang byte-nya, jadi ketiganya diambil dari berkas itu sendiri.
 Begitu juga `storageKey` dan `fileType` CMS. Efeknya, tidak ada lagi record yang
 bisa menunjuk ke objek yang tak pernah diunggah atau mengaku berformat lain.
 
-Tiga hasil `POST /api/upload-batches`, ketiganya tercatat:
+Sejak SCRUM-22/37 upload **hanya membuka batch dan menyimpan berkas**: tidak
+ada lagi tulisan ke `menu_plans` (tabel kanonik diisi saat publish nanti).
+Field form: `file`, `kitchenId`, `domain` (CASHFLOW, MENU, RAB, PO,
+GOODS_RECEIPT, VENDOR_PAYMENT, INPUT_MAKER), `sourceSystem?` (default
+INTERNAL), `period?` (`YYYY-MM`), `notes?`.
 
 | Kondisi | Balasan | Baris `upload_batches` |
 |---|---|---|
-| `file_hash` sudah ada | `409` + batch lama | — (SCRUM-6 AC3) |
-| workbook gagal diparse | `422` + daftar error | `DITOLAK` + `notes` (SCRUM-5 AC3) |
-| workbook bersih | `201` + batch | `DITERIMA` + seluruh `menu_plans` |
+| bukan zip / bukan .xlsx | `400` | — |
+| `kitchenId` di luar scope | `403 forbidden_kitchen` | — |
+| berkas tersimpan | `201` + batch | `PROCESSING` → `NEEDS_MAPPING_UPDATE` (`error_code = PROFILE_NOT_DETECTED`) sampai parser registry SCRUM-24 dan deteksi profile SCRUM-39 ada |
+| hash sama untuk kitchen + domain yang sama | `201` + batch baru + `warning.code = DUPLICATE_FILE` | batch baru; penggandaan dicegah saat publish |
+| S3 gagal | `500` | `FAILED` (`error_code = STORAGE_FAILED`) — tidak tertinggal di PROCESSING |
 
-Import-nya atomic (SCRUM-6 AC2) tanpa blok `$transaction`: baris menu ikut
-sebagai `menuPlans.createMany` bersarang di `create` batch-nya, dan Prisma
-menjalankan nested write dalam satu transaksi.
+Key S3-nya `upload-batches/<publicId>.xlsx` (kolom `storage_key`), tidak pernah
+memuat nama berkas asli. Batch lama sebelum SCRUM-22 tetap di key turunan hash.
 
-Objek S3 ditulis **sebelum** insert: objek yatim harganya receh dan ditimpa
-percobaan berikutnya, sedangkan batch yang sudah commit tanpa berkas di
-belakangnya adalah lubang di jejak audit. Key-nya diturunkan dari hash
-(`upload-batches/<sha256>.xlsx`) sehingga tidak perlu kolom `storage_key` baru.
+Transisi status hanya lewat `canTransition` di `src/lib/upload-status.ts`;
+`PATCH /api/upload-batches/:id` (permission `batch:review`) menolak transisi
+tak sah dengan `409 invalid_transition`. Event `upload_started`,
+`upload_completed`, `upload_failed` ditulis sebagai satu baris JSON di stdout
+lewat `trackEvent` (`src/lib/events.ts`).
 
 > **Header Excel-nya masih tebakan.** `HEADERS` di `src/lib/menu-workbook.ts`
 > diturunkan dari `schema.prisma` + form SOP-OPR-001, bukan dari workbook asli —
@@ -507,9 +513,8 @@ punya penulis** — mekanisme refresh-nya belum diputuskan (Open Question #8 di
 `akg_compliances`, pemetaan 4 `portion_class` ke 12 kelompok sasaran AKG juga
 belum ada (#4), jadi tabelnya tidak bisa diisi sama sekali sampai itu diputuskan.
 
-Parsing berkas Excel ke `menu_plans` belum termasuk fase ini: `POST
-/api/upload-batches` mencatat metadata batch dan menegakkan dedup lewat
-`file_hash` UNIQUE, tapi tidak membaca isi berkasnya.
+Parsing berkas ke tabel staging per domain belum ada (SCRUM-24/35/36/118):
+`POST /api/upload-batches` menyimpan berkas dan metadata batch saja.
 
 ### Pemisahan data (SCRUM-13)
 
