@@ -13,6 +13,9 @@ import { dateFilter } from '../../schemas/common.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
 import { canTransition } from '../../lib/upload-status.js';
+import { WorkbookError, assertXlsxContainer } from '../../lib/ingest/workbook.js';
+import { parseToStaging } from '../../lib/ingest/pipeline.js';
+import { stagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
 import type {
   uploadBatchCreate,
   uploadBatchCreateQuery,
@@ -77,10 +80,6 @@ export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, r
 /** Rows returned by a dry run. Enough to eyeball the mapping, not the file. */
 const PREVIEW_ROWS = 50;
 
-/** Every .xlsx is a zip; anything else renamed to .xlsx stops here. */
-const isZip = (buf: Buffer): boolean =>
-  buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
-
 /**
  * The S3 key is built from the batch's public id, never from the original file
  * name (SCRUM-22 security note): one object per attempt, nothing user-supplied
@@ -92,20 +91,26 @@ export const uploadKey = (publicId: string): string => `upload-batches/${publicI
 const NOT_RECOGNISED = 'Format file belum dikenali untuk kitchen/source ini. File belum dipublish.';
 
 /**
- * SCRUM-22 + SCRUM-37. Takes the workbook (multipart, field `file`), stores it
- * and opens a batch for it. Nothing is published or written to canonical
- * tables here.
+ * SCRUM-22/37 + SCRUM-24. Takes the workbook (multipart, field `file`), opens
+ * a batch, stores the original and parses every sheet into staging. Nothing
+ * is published or written to canonical tables here.
  *
- *   - every attempt is its own batch; an identical earlier file for the same
- *     kitchen + domain only adds a `warning` (duplicates are stopped at
- *     publish, not at upload)
- *   - the batch starts PROCESSING and is finalised in the same request. Until
- *     the parser registry (SCRUM-24) and profile detection (SCRUM-39) exist it
- *     always ends NEEDS_MAPPING_UPDATE — never READY, so it can never publish
+ *   - every attempt is its own batch, failed ones included; an identical
+ *     earlier file for the same kitchen + domain only adds a `warning`
+ *     (duplicates are stopped at publish, not at upload)
+ *   - a file that is not an .xlsx container (renamed, password-protected) is
+ *     FAILED and never stored; a corrupt or empty workbook is FAILED with no
+ *     staged rows left behind
+ *   - a parsed file ends NEEDS_MAPPING_UPDATE until profile detection
+ *     (SCRUM-39) exists — never READY, so it can never publish
  *   - a storage failure marks the batch FAILED instead of leaving it PROCESSING
+ *
+ * ponytail: synchronous within the request, like the rest of the repo; the
+ * UPLOAD_MAX_BYTES cap (10 MB) keeps that bounded. Move to a queue if real
+ * files start timing out the ALB.
  */
 export const createUploadBatch =
-  (db: Db = prisma, put: PutObject = putObject): RequestHandler =>
+  (db: Db = prisma, put: PutObject = putObject, staging: StagingRepository = stagingRepository): RequestHandler =>
   async (req, res) => {
     const started = Date.now();
     const body = req.valid!.body as z.infer<typeof uploadBatchCreate>;
@@ -117,15 +122,18 @@ export const createUploadBatch =
     }
 
     const { buffer, originalname, size } = req.file!;
-    if (!isZip(buffer)) {
-      sendError(res, 'VALIDATION_ERROR', { fields: { file: ['not a valid .xlsx workbook'] } });
-      return;
-    }
     const fileHash = createHash('sha256').update(buffer).digest('hex');
 
     // SCRUM-6 AC1: parse and report, nothing written. Menu only until the
     // staging parsers (SCRUM-24/36) replace this preview.
     if (dryRun) {
+      try {
+        assertXlsxContainer(buffer);
+      } catch (err) {
+        if (!(err instanceof WorkbookError)) throw err;
+        sendError(res, 'VALIDATION_ERROR', { fields: { file: [err.message] } });
+        return;
+      }
       if (body.domain !== UploadDomain.MENU) {
         sendError(res, 'VALIDATION_ERROR', { fields: { dryRun: ['only available for MENU'] } });
         return;
@@ -176,36 +184,66 @@ export const createUploadBatch =
     });
     const done = { ...event, batch_id: batch.publicId };
 
-    const storageKey = uploadKey(batch.publicId);
-    try {
-      await put(storageKey, buffer, XLSX_MIME);
-    } catch (err) {
-      await db.uploadBatch.update({
+    const finish = (data: Prisma.UploadBatchUncheckedUpdateInput) =>
+      db.uploadBatch.update({
         where: { id: batch.id },
-        data: {
+        data: { ...data, durationMs: Date.now() - started },
+        include: withUploader,
+      });
+
+    let sheets: unknown[] = [];
+    const ingest = async () => {
+      try {
+        assertXlsxContainer(buffer);
+      } catch (err) {
+        if (!(err instanceof WorkbookError)) throw err;
+        // Not stored: a renamed or encrypted file has no business in the bucket.
+        return finish({ status: UploadStatus.FAILED, errorCode: err.code, errorSummary: err.message });
+      }
+
+      const storageKey = uploadKey(batch.publicId);
+      try {
+        await put(storageKey, buffer, XLSX_MIME);
+      } catch (err) {
+        await finish({
           status: UploadStatus.FAILED,
           errorCode: 'STORAGE_FAILED',
           errorSummary: 'File gagal disimpan. Silakan upload ulang.',
-          durationMs: Date.now() - started,
-        },
-      });
-      trackEvent('upload_failed', { ...done, status: UploadStatus.FAILED, error_code: 'STORAGE_FAILED' });
-      throw err;
-    }
+        });
+        trackEvent('upload_failed', { ...done, status: UploadStatus.FAILED, error_code: 'STORAGE_FAILED' });
+        throw err;
+      }
 
-    const row = await db.uploadBatch.update({
-      where: { id: batch.id },
-      data: {
+      const parsed = await parseToStaging(
+        buffer,
+        {
+          uploadBatchId: batch.publicId,
+          // Turen has no code yet (B-TUREN); its numeric id is just as stable.
+          kitchenCode: kitchen.code ?? String(kitchen.id),
+          domain: body.domain,
+          sourceSystem: body.sourceSystem,
+          sourceFileName: originalname,
+          fileHash,
+          loadedAt: new Date(),
+        },
+        staging,
+      );
+      if (!parsed.ok) {
+        return finish({ storageKey, status: UploadStatus.FAILED, errorCode: parsed.errorCode, errorSummary: parsed.errorSummary });
+      }
+
+      sheets = parsed.batch.sheets;
+      return finish({
         storageKey,
-        // diisi di SCRUM-24/39: parser registry + profile detection decide
-        // between NEEDS_REVIEW and NEEDS_MAPPING_UPDATE.
+        rowCount: parsed.batch.rows.length,
+        // diisi di SCRUM-39: profile detection decides between NEEDS_REVIEW
+        // and NEEDS_MAPPING_UPDATE.
         status: UploadStatus.NEEDS_MAPPING_UPDATE,
         errorCode: 'PROFILE_NOT_DETECTED',
         errorSummary: NOT_RECOGNISED,
-        durationMs: Date.now() - started,
-      },
-      include: withUploader,
-    });
+      });
+    };
+    const row = await ingest();
 
     await writeAuditLog(db, {
       userId: req.user!.id,
@@ -219,7 +257,7 @@ export const createUploadBatch =
         status: row.status,
       },
     });
-    trackEvent('upload_completed', {
+    trackEvent(row.status === UploadStatus.FAILED ? 'upload_failed' : 'upload_completed', {
       ...done,
       rows: row.rowCount,
       duration: row.durationMs,
@@ -227,18 +265,21 @@ export const createUploadBatch =
       error_code: row.errorCode,
     });
 
+    // `sheets` (names, header row, headers, row counts) is not persisted yet
+    // (B-SCHEMA); it rides on the response so the upload page can show it.
     sendJson(
       res,
-      duplicate
-        ? {
-            ...row,
-            warning: {
-              code: 'DUPLICATE_FILE',
-              message: `File identik sudah pernah diupload (batch ${duplicate.publicId}).`,
-              duplicateOf: duplicate.publicId,
-            },
-          }
-        : row,
+      {
+        ...row,
+        sheets,
+        ...(duplicate && {
+          warning: {
+            code: 'DUPLICATE_FILE',
+            message: `File identik sudah pernah diupload (batch ${duplicate.publicId}).`,
+            duplicateOf: duplicate.publicId,
+          },
+        }),
+      },
       201,
     );
   };
