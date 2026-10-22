@@ -6,6 +6,7 @@ import type { Db } from '../../db.js';
 import type { Role } from '../../auth/roles.js';
 import type { AppUser } from '../../auth/user-sync.js';
 import { createUploadBatch, listUploadBatches, updateUploadBatch } from './upload-batch.js';
+import { InMemoryStagingRepository } from '../../lib/ingest/staging.js';
 
 const userWith = (role: Role, kitchenId: bigint | null = null): AppUser =>
   ({ id: 1n, role, kitchenScopes: kitchenId === null ? [] : [{ kitchenId }] }) as AppUser;
@@ -218,15 +219,54 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.equal(final.errorCode, 'STORAGE_FAILED');
   });
 
-  test('a non-zip file renamed to .xlsx is rejected before anything is written', async () => {
+  test('a non-zip file renamed to .xlsx is a FAILED batch that is never stored (SCRUM-24)', async () => {
     const { db, calls } = fakeDb();
     const { put, puts } = fakePut();
 
-    const out = await run(createUploadBatch(db, put), await withFile(Buffer.from('not a workbook')));
+    const out = await run(createUploadBatch(db, put, new InMemoryStagingRepository()), await withFile(Buffer.from('not a workbook')));
 
-    assert.equal(out.status, 400);
-    assert.equal(calls.created, undefined);
+    assert.equal(out.status, 201, 'the attempt still gets its batch id (FR-UP-03)');
+    const final = calls.updates.at(-1) as Record<string, unknown>;
+    assert.equal(final.status, 'FAILED');
+    assert.equal(final.errorCode, 'NOT_XLSX');
     assert.equal(puts.length, 0);
+  });
+
+  test('a password-protected (OLE) file fails as ENCRYPTED_FILE', async () => {
+    const { db, calls } = fakeDb();
+    const { put } = fakePut();
+    const ole = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+
+    await run(createUploadBatch(db, put, new InMemoryStagingRepository()), await withFile(ole));
+
+    assert.equal((calls.updates.at(-1) as Record<string, unknown>).errorCode, 'ENCRYPTED_FILE');
+  });
+
+  test('a valid workbook is staged under the batch and its row count recorded (SCRUM-24)', async () => {
+    const { db, calls } = fakeDb();
+    const { put } = fakePut();
+    const staging = new InMemoryStagingRepository();
+
+    const out = await run(createUploadBatch(db, put, staging), await withFile());
+
+    const final = calls.updates.at(-1) as Record<string, unknown>;
+    assert.equal(final.rowCount, 1);
+    const staged = await staging.getBatch('pub-1');
+    assert.equal(staged?.rows.length, 1);
+    assert.equal(staged?.rows[0].uploadBatchId, 'pub-1');
+    assert.equal((out.body?.sheets as { name: string }[])[0].name, 'Menu');
+  });
+
+  test('a corrupt zip is FAILED with no staged rows left behind', async () => {
+    const { db, calls } = fakeDb();
+    const { put } = fakePut();
+    const staging = new InMemoryStagingRepository();
+    const corrupt = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(64, 7)]);
+
+    await run(createUploadBatch(db, put, staging), await withFile(corrupt));
+
+    assert.equal((calls.updates.at(-1) as Record<string, unknown>).errorCode, 'CORRUPT_FILE');
+    assert.equal(await staging.getBatch('pub-1'), undefined);
   });
 
   test('an unknown kitchen id is a 400, not a 500 from the FK', async () => {
