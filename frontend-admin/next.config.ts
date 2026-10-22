@@ -18,8 +18,15 @@ const nextConfig: NextConfig = {
   // those routes need it too. Derived here so basePath stays the one source.
   env: { NEXT_PUBLIC_BASE_PATH: basePath },
 
-  // forbidden() for deep links to a page the role may not open (SCRUM-21).
-  experimental: { authInterrupts: true },
+  experimental: {
+    // forbidden() for deep links to a page the role may not open (SCRUM-21).
+    authInterrupts: true,
+    // SCRUM-5: uploads go browser → Server Action → backend. Both limits sit
+    // just above the backend's UPLOAD_MAX_BYTES (10 MB) to leave room for the
+    // multipart overhead; the backend stays the one that enforces the cap.
+    serverActions: { bodySizeLimit: "11mb" },
+    proxyClientMaxBodySize: "11mb",
+  },
 };
 
 export default nextConfig;

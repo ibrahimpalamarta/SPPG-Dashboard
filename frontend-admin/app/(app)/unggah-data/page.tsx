@@ -1,14 +1,34 @@
 import type { Metadata } from "next";
-import { EmptyState } from "@/components/ui/empty-state";
 import { requirePage } from "@/lib/guard";
+import { selectedKitchen } from "@/lib/me";
+import { EmptyState } from "@/components/ui/empty-state";
+import { UploadForm } from "./upload-form";
 
 export const metadata: Metadata = { title: "Unggah Data · SPPG Internal" };
 
 export default async function Page() {
-  await requirePage("/unggah-data");
+  const me = await requirePage("/unggah-data");
+  const kitchen = await selectedKitchen(me);
+
   return (
-    <EmptyState title="Unggah Data belum tersedia">
-      <p>Unggah berkas laporan dapur (Cashflow, Menu, RAB, PO, dan lainnya) akan tersedia di halaman ini.</p>
-    </EmptyState>
+    <div className="mx-auto max-w-3xl space-y-4">
+      <div>
+        <h1 className="text-lg font-semibold text-slate-800">Unggah Data</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Unggah laporan yang sudah dibuat dapur. File diproses ke staging dan belum dipublikasikan sampai lolos mapping dan validasi.
+        </p>
+      </div>
+      {!me.permissions.includes("upload:create") ? (
+        <EmptyState title="Hanya lihat">
+          <p>Peran Anda dapat melihat riwayat unggahan, tetapi tidak dapat mengunggah file.</p>
+        </EmptyState>
+      ) : me.kitchens.length === 0 ? (
+        <EmptyState title="Belum ada dapur">
+          <p>Akun Anda belum ditautkan ke dapur mana pun. Hubungi Project Manager MBG.</p>
+        </EmptyState>
+      ) : (
+        <UploadForm kitchens={me.kitchens} kitchenId={kitchen?.id} />
+      )}
+    </div>
   );
 }
