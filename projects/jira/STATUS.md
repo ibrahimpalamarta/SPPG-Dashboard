@@ -11,7 +11,7 @@ Semua branch masih **lokal** (belum di-push).
 | SCRUM-22 | Create upload batch & metadata | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-ASSIGN) | In Progress | `feature/scrum-22-upload-batch` | 2026-10-23 | Backend selesai; kolom di luar [PRD] menunggu approval |
 | SCRUM-37 | [DATA-001] Upload batch common metadata | 2 | IN_PROGRESS | To Do | `feature/scrum-22-upload-batch` | 2026-10-23 | Satu unit dengan SCRUM-22 |
 | SCRUM-24 | Excel upload pipeline | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-RAW) | In Progress | `feature/scrum-24-excel-pipeline` | 2026-10-23 | Reader semua sheet + registry + staging in-memory + FAILED codes selesai; staging persisten menunggu skema |
-| SCRUM-5 | Halaman Upload Data | 2 | IN_PROGRESS | In Progress | — | 2026-10-23 | Endpoint ada; UI hanya mockup |
+| SCRUM-5 | Halaman Upload Data | 2 | IN_PROGRESS (sebagian BLOCKED: B-AUTH0-FE) | In Progress | `feature/scrum-5-upload-page` | 2026-10-23 | Form + Server Action + hasil/status/duplikat selesai; tautan history menunggu SCRUM-25 |
 | SCRUM-35 | [DATA-002] Cashflow Upload v1 parser | 2 | TODO | To Do | — | 2026-10-23 | Sampel yang ada: DNM, bukan SKN/LWG |
 | SCRUM-36 | [DATA-003] Menu Upload v1 parser | 2 | TODO | To Do | — | 2026-10-23 | Parser lama `menu-workbook.ts` hanya untuk dryRun, header tebakan |
 | SCRUM-25 | Upload history/status | 2 | IN_PROGRESS | In Progress | — | 2026-10-23 | List/detail endpoint ada; UI hanya mockup |
