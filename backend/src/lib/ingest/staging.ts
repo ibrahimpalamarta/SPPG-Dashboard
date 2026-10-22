@@ -1,5 +1,5 @@
 import type { SourceSystem, UploadDomain } from '@prisma/client';
-import type { RawCell } from './workbook.js';
+import { DEFAULT_HEADER_OPTIONS, detectHeaderRow, isBlankRow, type RawCell, type RawSheet } from './workbook.js';
 
 /**
  * One staged source row. The first block is PRD §7.2 traceability [PRD]; the
@@ -31,6 +31,8 @@ export type StagedSheet = {
   /** Column letter → header text as written. */
   headers: Record<string, string>;
   rowCount: number;
+  /** Why a sheet was deliberately not staged (e.g. personal data). */
+  skipped?: string;
 };
 
 export type StagedBatch = { domain: UploadDomain; sheets: StagedSheet[]; rows: StagingRow[] };
@@ -42,6 +44,72 @@ export type StagedBatch = { domain: UploadDomain; sheets: StagedSheet[]; rows: S
  */
 export const sourceRecordId = (kitchen: string, domain: UploadDomain, fileHash: string, sheet: string, row: number) =>
   `${kitchen}:${domain}:${fileHash.slice(0, 12)}:${encodeURIComponent(sheet)}:${row}`;
+
+export type ParseContext = {
+  uploadBatchId: string;
+  kitchenCode: string;
+  domain: UploadDomain;
+  sourceSystem: SourceSystem;
+  sourceFileName: string;
+  fileHash: string;
+  loadedAt: Date;
+};
+
+/** Turns the raw sheets into staged rows for one domain. */
+export type DomainParser = (sheets: RawSheet[], ctx: ParseContext) => Pick<StagedBatch, 'sheets' | 'rows'>;
+
+/**
+ * Says why a sheet must not be staged, or null to stage it. Gets the header
+ * texts so a rule can look at columns instead of trusting sheet names.
+ */
+export type SheetRule = (sheet: RawSheet, headers: string[]) => string | null;
+
+/** Lowercase, letters and digits only: "Transaksi_Kas", "transaksi kas" and
+ * "TRANSAKSI-KAS" compare equal (FR-MAP-03: local differences are tolerated). */
+export const loose = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Every non-blank row below each sheet's detected header, cells untouched.
+ * Sheets `rule` rejects are listed in the summary with the reason and no rows.
+ */
+export function stageRows(sheets: RawSheet[], ctx: ParseContext, rule?: SheetRule): Pick<StagedBatch, 'sheets' | 'rows'> {
+  const staged: StagedSheet[] = [];
+  const rows: StagingRow[] = [];
+
+  for (const sheet of sheets) {
+    const header = detectHeaderRow(sheet, DEFAULT_HEADER_OPTIONS);
+    const headers = Object.fromEntries(Object.entries(header?.cells ?? {}).map(([col, c]) => [col, String(c.value ?? '')]));
+    const skipped = header ? (rule?.(sheet, Object.values(headers)) ?? undefined) : undefined;
+    const dataRows = header && !skipped ? sheet.rows.filter((r) => r.rowNumber > header.rowNumber && !isBlankRow(r)) : [];
+
+    staged.push({
+      name: sheet.name,
+      index: sheet.index,
+      headerRow: header?.rowNumber ?? null,
+      headers,
+      rowCount: dataRows.length,
+      ...(skipped && { skipped }),
+    });
+
+    for (const r of dataRows) {
+      rows.push({
+        uploadBatchId: ctx.uploadBatchId,
+        sourceRecordId: sourceRecordId(ctx.kitchenCode, ctx.domain, ctx.fileHash, sheet.name, r.rowNumber),
+        kitchenId: ctx.kitchenCode,
+        sourceSystem: ctx.sourceSystem,
+        sourceFileName: ctx.sourceFileName,
+        // diisi di SCRUM-130/39: read from the template's metadata cell or the profile.
+        templateVersion: null,
+        mappingProfileId: null,
+        loadedAt: ctx.loadedAt,
+        sheetName: sheet.name,
+        sourceRowNumber: r.rowNumber,
+        cells: r.cells,
+      });
+    }
+  }
+  return { sheets: staged, rows };
+}
 
 export interface StagingRepository {
   /** Delete-then-insert for one batch, so a re-parse never leaves stale rows. */

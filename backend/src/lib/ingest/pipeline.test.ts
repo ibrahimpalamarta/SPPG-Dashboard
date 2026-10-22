@@ -1,8 +1,8 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
-import { parseToStaging, type ParseContext } from './pipeline.js';
-import { InMemoryStagingRepository, sourceRecordId } from './staging.js';
+import { parseToStaging } from './pipeline.js';
+import { InMemoryStagingRepository, sourceRecordId, type ParseContext } from './staging.js';
 
 const ctx: ParseContext = {
   uploadBatchId: 'b-1',
