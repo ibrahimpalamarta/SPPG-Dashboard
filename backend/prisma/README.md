@@ -127,8 +127,8 @@ dari prompt.
 |---|---|---|
 | `users`, `audit_logs` | **SCRUM-1** Authentication - Login RBAC | 5 role; `audit_logs` menopang "history (jejak audit)" |
 | `menu_plans` | **SCRUM-2** Implement excel template tables to database | Satu baris per bahan; kolom template sama untuk tiap SPPG, isi berbeda |
-| `upload_batches` | **SCRUM-5** Upload Menu/Master File | `status` diterima/ditolak/processing; `notes` menampung alasan penolakan |
-| `upload_batches.file_hash` | **SCRUM-6** Import to Database | UNIQUE — "re-import berkas yang sama diperlakukan sama bila tidak ada perubahan" |
+| `upload_batches` | **SCRUM-5** Upload Menu/Master File | Sejak SCRUM-22/37: status PROCESSING / NEEDS_REVIEW / NEEDS_MAPPING_UPDATE / READY / PUBLISHED / FAILED (data lama: diterima→PUBLISHED, ditolak→FAILED); `domain`, `source_system`, `period`, `storage_key`, `error_code` |
+| `upload_batches.file_hash` | **SCRUM-6** Import to Database | Sejak SCRUM-22 **tidak UNIQUE**: unggah ulang = batch baru + peringatan duplikat; penggandaan dicegah saat publish |
 | `upload_batches` | **SCRUM-7** Upload History | Punya date, uploader, kitchen, row count, status; index `(kitchen_id, upload_date)` untuk sort by date |
 | `akg_targets`, `akg_compliances` | **SCRUM-8** Load AKG reference and compute compliance | 12 kelompok sasaran; `status` within/below/above |
 | `daily_kitchens`, `public_summaries` | **SCRUM-11** Program Summary KPI | meals, kitchens, coverage; `last_refreshed_at` untuk "shows last-refreshed time" |

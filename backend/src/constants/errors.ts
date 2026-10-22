@@ -14,6 +14,10 @@ export const ERRORS = {
   },
   NOT_FOUND: { status: 404, body: { error: 'not_found' } },
   CONFLICT: { status: 409, body: { error: 'conflict', message: 'Resource already exists' } },
+  INVALID_TRANSITION: {
+    status: 409,
+    body: { error: 'invalid_transition', message: 'Status batch tidak bisa diubah ke status tersebut.' },
+  },
   UNPROCESSABLE: {
     status: 422,
     body: { error: 'unprocessable', message: 'File was read but its contents were rejected' },

@@ -857,47 +857,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('201', () => pm.response.to.have.status(201));"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/upload-batches",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "upload-batches"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kitchenId\": \"1\",\n  \"fileName\": \"menu-agustus.xlsx\",\n  \"fileHash\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"rowCount\": 120\n}"
-            },
-            "description": "Klien menghitung sha256 berkas lalu mendaftarkan batch. Parsing isi Excel belum masuk fase ini."
-          }
-        },
-        {
-          "name": "POST /api/upload-batches — berkas sama (409)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
-                  "pm.test('SCRUM-6: mengembalikan batch yang sudah tercatat, bukan sekadar gagal', () => {",
-                  "    pm.expect(pm.response.json().details.batch).to.not.be.null;",
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "pm.test('SCRUM-22: batch belum dikenali, tidak pernah langsung READY', () => {",
+                  "    pm.expect(pm.response.json().status).to.eql('NEEDS_MAPPING_UPDATE');",
                   "});"
                 ]
               }
@@ -905,12 +867,7 @@
           ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/upload-batches",
               "host": [
@@ -922,10 +879,56 @@
               ]
             },
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kitchenId\": \"1\",\n  \"fileName\": \"menu-agustus.xlsx\",\n  \"fileHash\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"rowCount\": 120\n}"
+              "mode": "formdata",
+              "formdata": [
+                { "key": "kitchenId", "value": "1", "type": "text" },
+                { "key": "domain", "value": "CASHFLOW", "type": "text" },
+                { "key": "period", "value": "2026-02", "type": "text" },
+                { "key": "file", "type": "file", "src": [] }
+              ]
             },
-            "description": "SCRUM-6 ditegakkan oleh UNIQUE `file_hash` di Postgres, bukan oleh ingatan aplikasi."
+            "description": "SCRUM-22/37: multipart, field `file` (.xlsx). Server menghitung sha256, menyimpan berkas di S3 dengan key `upload-batches/<publicId>.xlsx`, dan membuka batch. Pilih berkas di tab Body sebelum kirim."
+          }
+        },
+        {
+          "name": "POST /api/upload-batches — berkas sama (201 + peringatan)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "pm.test('SCRUM-22: batch baru, dengan peringatan duplikat', () => {",
+                  "    pm.expect(pm.response.json().warning.code).to.eql('DUPLICATE_FILE');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/upload-batches",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "upload-batches"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "kitchenId", "value": "1", "type": "text" },
+                { "key": "domain", "value": "CASHFLOW", "type": "text" },
+                { "key": "period", "value": "2026-02", "type": "text" },
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            },
+            "description": "Kirim berkas yang sama dengan request sebelumnya. Setiap percobaan jadi batch sendiri; penggandaan data dicegah saat publish, bukan saat upload."
           }
         },
         {
@@ -964,7 +967,7 @@
               "mode": "raw",
               "raw": "{\n  \"status\": \"DITOLAK\",\n  \"notes\": \"kolom BDD kosong di 12 baris\"\n}"
             },
-            "description": "SCRUM-5: hasil pemeriksaan berkas (diterima / ditolak + alasan)."
+            "description": "SCRUM-22: review batch (NEEDS_REVIEW / READY / FAILED). Transisi yang tidak sah dibalas 409 invalid_transition. Butuh permission batch:review (PM MBG)."
           }
         }
       ]

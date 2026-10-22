@@ -1,7 +1,6 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
-import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import type { Db } from '../../db.js';
 import type { Role } from '../../auth/roles.js';
@@ -74,8 +73,12 @@ async function run(handler: ReturnType<typeof createUploadBatch>, req: Partial<R
 }
 
 /** Records what the handler asked the database to do. */
-function fakeDb(overrides: Partial<Record<string, unknown>> = {}) {
-  const calls: { findManyWhere?: unknown; created?: unknown; updated?: unknown } = {};
+function fakeDb(
+  overrides: Partial<Record<string, unknown>> = {},
+  kitchen: Partial<Record<string, unknown>> = {},
+) {
+  const calls: { findManyWhere?: unknown; created?: unknown; updates: unknown[] } = { updates: [] };
+  let row: Record<string, unknown> = {};
   const db = {
     uploadBatch: {
       findMany: async (args: { where: unknown }) => {
@@ -84,16 +87,20 @@ function fakeDb(overrides: Partial<Record<string, unknown>> = {}) {
       },
       count: async () => 0,
       findUnique: async () => null,
-      create: async (args: { data: unknown }) => {
+      findFirst: async () => null,
+      create: async (args: { data: Record<string, unknown> }) => {
         calls.created = args.data;
-        return { id: 9n, ...(args.data as object) };
+        row = { id: 9n, publicId: 'pub-1', status: 'PROCESSING', rowCount: 0, ...args.data };
+        return row;
       },
-      update: async (args: { data: unknown }) => {
-        calls.updated = args.data;
-        return { id: 9n, status: 'DITERIMA' };
+      update: async (args: { data: Record<string, unknown> }) => {
+        calls.updates.push(args.data);
+        row = { ...row, ...args.data };
+        return row;
       },
       ...overrides,
     },
+    kitchen: { findUnique: async () => ({ id: 3n }), ...kitchen },
     auditLog: { create: async () => ({}) },
   } as unknown as Db;
 
@@ -134,30 +141,31 @@ describe('listUploadBatches (SCRUM-7)', () => {
   });
 });
 
-describe('createUploadBatch (SCRUM-5/6)', () => {
-  const body = { kitchenId: 3n, notes: null };
+describe('createUploadBatch (SCRUM-22/37)', () => {
+  const body = { kitchenId: 3n, domain: 'MENU', sourceSystem: 'INTERNAL', period: '2026-08', notes: null };
 
   /** The file multer would have put on the request. */
-  const withFile = async (buffer?: Buffer, dryRun = false) => ({
-    user: userWith('DATA_ADMIN', 3n),
-    valid: { body, query: { dryRun } },
-    file: {
-      buffer: buffer ?? (await validWorkbook()),
-      originalname: 'menu-agustus.xlsx',
-    } as Express.Multer.File,
-  });
+  const withFile = async (buffer?: Buffer, dryRun = false) => {
+    const bytes = buffer ?? (await validWorkbook());
+    return {
+      user: userWith('DATA_ADMIN', 3n),
+      valid: { body, query: { dryRun } },
+      file: { buffer: bytes, originalname: 'menu-agustus.xlsx', size: bytes.length } as Express.Multer.File,
+    };
+  };
 
   /** Records what would have been written to S3 without touching the network. */
-  function fakePut() {
+  function fakePut(fail = false) {
     const puts: { key: string; bytes: number }[] = [];
     const put = async (key: string, bytes: Buffer) => {
+      if (fail) throw new Error('s3 down');
       puts.push({ key, bytes: bytes.length });
       return key;
     };
     return { put, puts };
   }
 
-  test('a clean workbook is imported with its rows in the same write', async () => {
+  test('opens a PROCESSING batch with full metadata and never publishes it', async () => {
     const { db, calls } = fakeDb();
     const { put, puts } = fakePut();
 
@@ -165,22 +173,73 @@ describe('createUploadBatch (SCRUM-5/6)', () => {
 
     assert.equal(out.status, 201);
     const created = calls.created as Record<string, unknown>;
-    // SCRUM-5 AC3: a workbook that parsed is accepted outright, not left
-    // sitting in PROCESSING for someone to click through.
-    assert.equal(created.status, 'DITERIMA');
+    assert.equal(created.status, undefined, 'starts at the column default, PROCESSING');
     assert.equal(created.uploaderId, 1n);
+    assert.equal(created.domain, 'MENU');
+    assert.equal(created.period, '2026-08');
     assert.equal(created.fileName, 'menu-agustus.xlsx');
-    assert.equal(created.rowCount, 1);
+    assert.match(String(created.fileHash), /^[a-f0-9]{64}$/);
+    assert.equal(typeof created.fileSize, 'number');
+    // Staging only: nothing canonical rides along any more.
+    assert.equal('menuPlans' in created, false);
 
-    // SCRUM-6 AC2: the rows ride along on the parent create, which is what
-    // makes the import all-or-nothing.
-    const nested = created.menuPlans as { createMany: { data: { kitchenId: bigint }[] } };
-    assert.equal(nested.createMany.data.length, 1);
-    assert.equal(nested.createMany.data[0]?.kitchenId, 3n);
+    // Until the parser registry lands (SCRUM-24) the batch cannot reach READY.
+    const final = calls.updates.at(-1) as Record<string, unknown>;
+    assert.equal(final.status, 'NEEDS_MAPPING_UPDATE');
+    assert.equal(final.errorCode, 'PROFILE_NOT_DETECTED');
 
-    // The object is stored under the hash, so the same bytes never sprawl.
-    assert.equal(puts.length, 1);
-    assert.match(puts[0]!.key, /^upload-batches\/[a-f0-9]{64}\.xlsx$/);
+    // The key is the batch's public id, never the user's file name.
+    assert.deepEqual(puts.map((p) => p.key), ['upload-batches/pub-1.xlsx']);
+    assert.equal(final.storageKey, 'upload-batches/pub-1.xlsx');
+    assert.equal(out.body?.warning, undefined);
+  });
+
+  test('the same file again is a new batch plus a duplicate warning, not a 409', async () => {
+    const { db, calls } = fakeDb({ findFirst: async () => ({ publicId: 'pub-old' }) });
+    const { put } = fakePut();
+
+    const out = await run(createUploadBatch(db, put), await withFile());
+
+    assert.equal(out.status, 201);
+    assert.ok(calls.created, 'a batch was still created');
+    const warning = out.body?.warning as { code: string; duplicateOf: string; message: string };
+    assert.equal(warning.code, 'DUPLICATE_FILE');
+    assert.equal(warning.duplicateOf, 'pub-old');
+    assert.match(warning.message, /File identik sudah pernah diupload \(batch pub-old\)/);
+  });
+
+  test('a storage failure leaves the batch FAILED, not stuck in PROCESSING', async () => {
+    const { db, calls } = fakeDb();
+    const { put } = fakePut(true);
+
+    await assert.rejects(run(createUploadBatch(db, put), await withFile()), /s3 down/);
+    const final = calls.updates.at(-1) as Record<string, unknown>;
+    assert.equal(final.status, 'FAILED');
+    assert.equal(final.errorCode, 'STORAGE_FAILED');
+  });
+
+  test('a non-zip file renamed to .xlsx is rejected before anything is written', async () => {
+    const { db, calls } = fakeDb();
+    const { put, puts } = fakePut();
+
+    const out = await run(createUploadBatch(db, put), await withFile(Buffer.from('not a workbook')));
+
+    assert.equal(out.status, 400);
+    assert.equal(calls.created, undefined);
+    assert.equal(puts.length, 0);
+  });
+
+  test('an unknown kitchen id is a 400, not a 500 from the FK', async () => {
+    const { db, calls } = fakeDb({}, { findUnique: async () => null });
+    const { put } = fakePut();
+
+    const out = await run(createUploadBatch(db, put), {
+      ...(await withFile()),
+      user: userWith('SUPER_ADMIN'),
+    });
+
+    assert.equal(out.status, 400);
+    assert.equal(calls.created, undefined);
   });
 
   test('dryRun reports columns and row count without writing anything', async () => {
@@ -192,64 +251,12 @@ describe('createUploadBatch (SCRUM-5/6)', () => {
     assert.equal(out.status, 200);
     assert.equal(out.body?.rowCount, 1);
     assert.ok((out.body?.columns as string[]).includes('Jumlah PM'));
-    // SCRUM-6 AC1: a preview is a read. Nothing reached Postgres or S3.
     assert.equal(calls.created, undefined);
     assert.equal(puts.length, 0);
-  });
-
-  test('an unparseable workbook is recorded as DITOLAK rather than only 4xx', async () => {
-    const { db, calls } = fakeDb();
-    const { put, puts } = fakePut();
-
-    const out = await run(
-      createUploadBatch(db, put),
-      await withFile(Buffer.from('not a workbook')),
-    );
-
-    assert.equal(out.status, 422);
-    // SCRUM-5 AC3 wants the rejection in the history, so the batch row exists.
-    const created = calls.created as Record<string, unknown>;
-    assert.equal(created.status, 'DITOLAK');
-    assert.equal(created.rowCount, 0);
-    assert.match(String(created.notes), /not a readable \.xlsx workbook/);
-    // A file we could not read is not a file worth keeping.
-    assert.equal(puts.length, 0);
-  });
-
-  test('a file already on record answers 409 with the existing batch', async () => {
-    const existing = { id: 7n, fileName: 'menu-agustus.xlsx', status: 'DITERIMA' };
-    const { db, calls } = fakeDb({ findUnique: async () => existing });
-    const { put } = fakePut();
-
-    const out = await run(createUploadBatch(db, put), await withFile());
-
-    assert.equal(out.status, 409);
-    const details = out.body?.details as { field: string; batch: { id: string } };
-    assert.equal(details.field, 'fileHash');
-    // SCRUM-6 AC3: the client must be able to tell "same file" from "failed".
-    assert.equal(details.batch.id, '7');
-    assert.equal(calls.created, undefined);
-  });
-
-  test('the race between two identical uploads still answers 409', async () => {
-    const { db } = fakeDb({
-      create: async () => {
-        throw new Prisma.PrismaClientKnownRequestError('dup', {
-          code: 'P2002',
-          clientVersion: 'test',
-        });
-      },
-    });
-    const { put } = fakePut();
-
-    const out = await run(createUploadBatch(db, put), await withFile());
-
-    assert.equal(out.status, 409);
-    assert.equal(out.body?.error, 'conflict');
   });
 
   test('a DATA_ADMIN cannot upload for another dapur', async () => {
-    const { db } = fakeDb();
+    const { db, calls } = fakeDb();
     const { put } = fakePut();
     const req = await withFile();
 
@@ -259,40 +266,56 @@ describe('createUploadBatch (SCRUM-5/6)', () => {
     });
 
     assert.equal(out.status, 403);
+    assert.equal(out.body?.error, 'forbidden_kitchen');
+    assert.equal(calls.created, undefined);
   });
 });
 
-describe('updateUploadBatch (SCRUM-5)', () => {
+describe('updateUploadBatch (SCRUM-22)', () => {
   test('404 when the batch does not exist', async () => {
     const { db } = fakeDb();
     const out = await run(updateUploadBatch(db), {
       user: userWith('SUPER_ADMIN'),
-      valid: { params: { id: 9n }, body: { status: 'DITERIMA' } },
+      valid: { params: { id: 9n }, body: { status: 'READY' } },
     });
 
     assert.equal(out.status, 404);
   });
 
-  test('a DATA_ADMIN cannot review another dapur\u2019s batch', async () => {
-    const { db } = fakeDb({ findUnique: async () => ({ id: 9n, kitchenId: 4n, status: 'PROCESSING' }) });
+  test('cannot review another dapur’s batch', async () => {
+    const { db } = fakeDb({ findUnique: async () => ({ id: 9n, kitchenId: 4n, status: 'NEEDS_REVIEW' }) });
     const out = await run(updateUploadBatch(db), {
       user: userWith('DATA_ADMIN', 3n),
-      valid: { params: { id: 9n }, body: { status: 'DITERIMA' } },
+      valid: { params: { id: 9n }, body: { status: 'READY' } },
     });
 
     assert.equal(out.status, 403);
   });
 
-  test('records the verification outcome', async () => {
+  test('an illegal transition is refused with 409 and nothing is written', async () => {
     const { db, calls } = fakeDb({
-      findUnique: async () => ({ id: 9n, kitchenId: 3n, status: 'PROCESSING' }),
+      findUnique: async () => ({ id: 9n, kitchenId: 3n, status: 'FAILED' }),
     });
     const out = await run(updateUploadBatch(db), {
-      user: userWith('DATA_ADMIN', 3n),
-      valid: { params: { id: 9n }, body: { status: 'DITOLAK', notes: 'kolom BDD kosong' } },
+      user: userWith('SUPER_ADMIN'),
+      valid: { params: { id: 9n }, body: { status: 'READY' } },
+    });
+
+    assert.equal(out.status, 409);
+    assert.equal(out.body?.error, 'invalid_transition');
+    assert.equal(calls.updates.length, 0);
+  });
+
+  test('records a legal review outcome', async () => {
+    const { db, calls } = fakeDb({
+      findUnique: async () => ({ id: 9n, kitchenId: 3n, status: 'NEEDS_REVIEW' }),
+    });
+    const out = await run(updateUploadBatch(db), {
+      user: userWith('SUPER_ADMIN'),
+      valid: { params: { id: 9n }, body: { status: 'FAILED', notes: 'kolom BDD kosong' } },
     });
 
     assert.equal(out.status, 200);
-    assert.deepEqual(calls.updated, { status: 'DITOLAK', notes: 'kolom BDD kosong' });
+    assert.deepEqual(calls.updates, [{ status: 'FAILED', notes: 'kolom BDD kosong' }]);
   });
 });
