@@ -30,7 +30,7 @@ export const listUploadBatches = (db: Db = prisma): RequestHandler => async (req
   const q = req.valid!.query as z.infer<typeof uploadBatchListQuery>;
   const scope = kitchenScope(req.user!, q.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 
@@ -65,7 +65,7 @@ export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, r
   // which kitchen it belongs to. A cross-tenant read still returns 403.
   const scope = kitchenScope(req.user!, row.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
   sendJson(res, row);
@@ -102,7 +102,7 @@ export const createUploadBatch =
     const { dryRun } = req.valid!.query as z.infer<typeof uploadBatchCreateQuery>;
     const scope = kitchenScope(req.user!, body.kitchenId);
     if (!scope.ok) {
-      sendError(res, 'FORBIDDEN');
+      sendError(res, 'FORBIDDEN_KITCHEN');
       return;
     }
 
@@ -217,7 +217,7 @@ export const updateUploadBatch = (db: Db = prisma): RequestHandler => async (req
   }
   const scope = kitchenScope(req.user!, current.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 

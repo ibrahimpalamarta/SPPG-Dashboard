@@ -13,6 +13,40 @@ export const AUTH0_ROLE_NAMES: Record<string, Role> = {
   public: 'PUBLIC',
 };
 
+export const PERMISSIONS = [
+  'upload:create',
+  'upload:view',
+  'batch:review',
+  'batch:publish',
+  'mapping:view',
+  'reference:view',
+  'reference:edit',
+  'member:invite',
+  'dashboard:view',
+] as const;
+export type Permission = (typeof PERMISSIONS)[number];
+
+/**
+ * SCRUM-20. Routes check a permission, not a role, so adding one of the PRD's
+ * other roles is one enum value plus one entry here.
+ *
+ *   SUPER_ADMIN = Project Manager MBG (semua dapur, undang anggota, publish,
+ *                 ubah Data Reference)
+ *   DATA_ADMIN  = Data Admin / PIC dapur (upload untuk dapurnya sendiri)
+ *
+ * CMS_ADMIN and PUBLIC hold none: the CMS routes still gate on requireRole.
+ */
+export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
+  SUPER_ADMIN: PERMISSIONS,
+  DATA_ADMIN: ['upload:create', 'upload:view', 'mapping:view', 'reference:view', 'dashboard:view'],
+  INTERNAL: ['upload:view', 'mapping:view', 'reference:view', 'dashboard:view'],
+  CMS_ADMIN: [],
+  PUBLIC: [],
+};
+
+export const hasPermission = (role: Role, perm: Permission): boolean =>
+  ROLE_PERMISSIONS[role].includes(perm);
+
 /**
  * Only used to collapse multiple role claims down to one, so it needs a total
  * order even where the roles are not really comparable.

@@ -1,15 +1,15 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
-import type { User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import type { Db } from '../../db.js';
 import type { Role } from '../../auth/roles.js';
+import type { AppUser } from '../../auth/user-sync.js';
 import { createUploadBatch, listUploadBatches, updateUploadBatch } from './upload-batch.js';
 
-const userWith = (role: Role, scopeId: bigint | null = null): User =>
-  ({ id: 1n, role, scopeId } as User);
+const userWith = (role: Role, kitchenId: bigint | null = null): AppUser =>
+  ({ id: 1n, role, kitchenScopes: kitchenId === null ? [] : [{ kitchenId }] }) as AppUser;
 
 /** One importable row, built in memory so the suite needs no fixture file. */
 async function validWorkbook(): Promise<Buffer> {
@@ -109,7 +109,7 @@ describe('listUploadBatches (SCRUM-7)', () => {
     });
 
     assert.equal(out.status, 200);
-    assert.deepEqual((calls.findManyWhere as { kitchenId?: bigint }).kitchenId, 3n);
+    assert.deepEqual((calls.findManyWhere as { kitchenId?: unknown }).kitchenId, { in: [3n] });
   });
 
   test('a DATA_ADMIN cannot widen the filter to another dapur', async () => {
@@ -120,7 +120,7 @@ describe('listUploadBatches (SCRUM-7)', () => {
     });
 
     assert.equal(out.status, 403);
-    assert.equal(out.body?.error, 'forbidden');
+    assert.equal(out.body?.error, 'forbidden_kitchen');
   });
 
   test('a SUPER_ADMIN is not kitchen-filtered', async () => {

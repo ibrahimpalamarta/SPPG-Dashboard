@@ -1,13 +1,13 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
-import type { User } from '@prisma/client';
 import type { Db } from '../../db.js';
 import type { Role } from '../../auth/roles.js';
+import type { AppUser } from '../../auth/user-sync.js';
 import { listMenuPlans } from './menu-plan.js';
 
-const userWith = (role: Role, scopeId: bigint | null = null): User =>
-  ({ id: 1n, role, scopeId }) as User;
+const userWith = (role: Role, kitchenId: bigint | null = null): AppUser =>
+  ({ id: 1n, role, kitchenScopes: kitchenId === null ? [] : [{ kitchenId }] }) as AppUser;
 
 const ROW = {
   id: 1n,
@@ -60,7 +60,7 @@ describe('listMenuPlans (SCRUM-2)', () => {
       user: userWith('DATA_ADMIN', 3n),
       valid: { query: { page: 1, pageSize: 25 } },
     });
-    assert.equal(calls.where?.kitchenId, 3n);
+    assert.deepEqual(calls.where?.kitchenId, { in: [3n] });
   });
 
   test('a DATA_ADMIN asking for another dapur gets 403', async () => {

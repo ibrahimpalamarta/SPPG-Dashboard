@@ -14,21 +14,24 @@ export const userListQuery = pageQuery.extend({
  * findOrCreateUser overwrites them on the next login. Only the authorization
  * columns this API actually enforces against are settable.
  *
- * `scopeId: null` clears the scope; the controller rejects a null scope on a
- * DATA_ADMIN, which would otherwise mean "sees nothing".
+ * `kitchenIds` replaces the whole set; `[]` clears it (all kitchens for a
+ * non-DATA_ADMIN). The controller rejects an empty set on a DATA_ADMIN, which
+ * would otherwise mean "sees nothing".
  */
 export const userUpdate = z
   .object({
     role: z.nativeEnum(Role).optional(),
     status: z.nativeEnum(ActiveStatus).optional(),
-    scopeId: z
-      .union([
+    kitchenIds: z
+      .array(
         z
           .string()
           .regex(/^\d+$/, 'must be a positive integer id')
           .transform((v) => BigInt(v)),
-        z.null(),
-      ])
+      )
+      .max(50)
+      // Duplicates would trip the composite PK as a 500.
+      .transform((ids) => [...new Set(ids)])
       .optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'nothing to update', path: ['role'] });

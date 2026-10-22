@@ -45,24 +45,24 @@ Catatan desain:
 - **JWKS di-cache di memori.** `createRemoteJWKSet` hanya fetch ulang kalau
   muncul `kid` yang belum dikenal, dan dibatasi cooldown — jadi tidak ada
   request ke Auth0 di jalur panas, dan tidak bisa dipancing fetch berulang.
-- **Otorisasi baca `users.role` dari Postgres, bukan claim mentah.** Claim
-  dipakai untuk *menyinkronkan* kolom itu saat login. Efeknya: role yang dicabut
-  berlaku pada login berikutnya, dan payload token tidak pernah jadi sumber
-  kebenaran untuk keputusan akses.
-- **`scope_id` tidak pernah bisa diisi dari token.** Kolom itu hanya diubah
-  Super Admin; `findOrCreateUser` sengaja tidak menyentuhnya.
+- **Otorisasi baca `users.role` dari Postgres, bukan claim mentah.** Sejak
+  SCRUM-20 Postgres pemilik role: claim Auth0 hanya dipakai *sekali*, saat akun
+  pertama kali dibuat. Setelah itu role diubah lewat `PATCH /api/admin/users/:id`
+  (tercatat di audit log) — mencabut role di Auth0 **tidak** lagi berefek.
+- **Scope dapur (`user_kitchen_scopes`) tidak pernah bisa diisi dari token.**
+  Hanya diubah lewat admin API; `findOrCreateUser` sengaja tidak menyentuhnya.
 - **Pesan 401 sengaja seragam.** Expired, salah signature, dan salah audience
   menghasilkan respons yang identik. Alasan penolakan tinggal di server.
 
 ### Role
 
-Lima role, didefinisikan di Auth0 (Roles & Permissions) dan disalin ke enum
-`Role` di Postgres:
+Lima role di enum `Role`. Nama role Auth0 hanya menentukan role awal saat akun
+pertama kali login:
 
 | Auth0 role name | Enum | Akses |
 |---|---|---|
-| `super_admin` | `SUPER_ADMIN` | Penuh — kelola akun & role, master data, audit, seluruh data operasional |
-| `data_admin` | `DATA_ADMIN` | Data entry, discope ke satu SPPG Dapur lewat `users.scope_id`; melihat kolom biaya |
+| `super_admin` | `SUPER_ADMIN` | **PM MBG.** Penuh — kelola akun & role, master data, audit, seluruh data operasional |
+| `data_admin` | `DATA_ADMIN` | Data Admin dapur: upload, discope ke satu atau beberapa dapur lewat `user_kitchen_scopes`; melihat kolom biaya |
 | `cms_admin` | `CMS_ADMIN` | Konten publik (pengumuman, dokumen, galeri) saja — **tidak** melihat biaya |
 | `internal` | `INTERNAL` | Read-only seluruh dapur, termasuk kolom biaya |
 | `public` | `PUBLIC` | Paling terbatas; default untuk token tanpa role yang dikenal |
@@ -70,6 +70,10 @@ Lima role, didefinisikan di Auth0 (Roles & Permissions) dan disalin ke enum
 Claim yang tidak dikenal, salah bentuk, atau tidak ada → `PUBLIC`. Tidak pernah
 gagal ke arah yang permisif. Kalau satu user punya beberapa role, yang tertinggi
 menang.
+
+Route baru memeriksa **permission**, bukan role: `requirePermission('upload:create')`.
+Pemetaan role → permission ada di `ROLE_PERMISSIONS` (`src/auth/roles.ts`);
+menambah role berarti satu nilai enum + satu entri di peta itu.
 
 ### Memasang guard di endpoint
 
@@ -93,12 +97,13 @@ mengubahnya.
 
 Untuk route yang discope per SPPG Dapur, jangan pakai `kitchenId` dari client
 begitu saja — lewatkan ke `kitchenScope(req.user, requested)` di
-`src/lib/scope.ts`. Helper itu membungkus `resolveScopeId` dan menolak (403)
-kalau seorang Data Admin meminta dapur di luar `scope_id`-nya:
+`src/lib/scope.ts`. Helper itu membungkus `resolveKitchenIds` dan menolak (403
+`forbidden_kitchen`, "Anda tidak memiliki akses ke kitchen ini.") kalau
+pemanggil meminta dapur di luar scope-nya:
 
 ```ts
 const scope = kitchenScope(req.user!, q.kitchenId);
-if (!scope.ok) return sendError(res, 'FORBIDDEN');
+if (!scope.ok) return sendError(res, 'FORBIDDEN_KITCHEN');
 const where = { ...kitchenWhere(scope), /* filter lain */ };
 ```
 
@@ -114,8 +119,8 @@ menangkapnya sendiri), dan `sendJson` supaya BigInt/Decimal tidak menggagalkan
 Setiap endpoint yang mengubah data menulis satu baris — itu syarat eksplisit
 SCRUM-1 dan SCRUM-14 ("all actions logged"). Action-nya dinamai
 `<tabel>.<peristiwa>`, mis. `kitchen.created`, `upload_batch.reviewed`,
-`cms_announcements.status_changed`. Di luar itu ada `user.provisioned`,
-`user.role_synced`, dan event seed dari fase 1.
+`cms_announcements.status_changed`. Di luar itu ada `user.provisioned`
+(dan `user.role_synced` historis, sebelum SCRUM-20) serta event seed dari fase 1.
 
 Kegagalan tulis audit tidak pernah menggagalkan request yang memicunya. Jangan
 pernah taruh token, password, atau body request mentah di `metadata` — isi nama

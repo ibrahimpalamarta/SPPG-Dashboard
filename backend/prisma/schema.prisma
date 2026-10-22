@@ -121,13 +121,12 @@ model User {
   status      ActiveStatus @default(ACTIVE)
   lastLoginAt DateTime?    @map("last_login")
 
-  /// Scopes a DATA_ADMIN to a single SPPG Dapur. Nullable: hanya role
-  /// DATA_ADMIN yang di-scope, role lain melihat seluruh dapur.
-  scopeId BigInt?  @map("scope_id")
-  scope   Kitchen? @relation(fields: [scopeId], references: [id], onDelete: Restrict)
-
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Dapur yang boleh diakses (SCRUM-20). DATA_ADMIN wajib punya minimal satu;
+  /// role lain tanpa baris di sini melihat seluruh dapur.
+  kitchenScopes UserKitchenScope[]
 
   auditLogs        AuditLog[]
   galleryImages    GalleryImage[]
@@ -136,8 +135,23 @@ model User {
   cmsDocuments     CmsDocument[]
 
   @@index([role])
-  @@index([scopeId])
   @@map("users")
+}
+
+/// User <-> dapur (SCRUM-20). Menggantikan `users.scope_id` supaya satu akun
+/// bisa memegang lebih dari satu dapur.
+model UserKitchenScope {
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([userId, kitchenId])
+  @@index([kitchenId])
+  @@map("user_kitchen_scopes")
 }
 
 /// Who did what, to which entity, when (SCRUM-1, SCRUM-14 "all actions logged").
@@ -174,6 +188,10 @@ model Kitchen {
 
   name String @unique
 
+  /// Kode singkat dapur (SKN, LWG, DNM, PCK, SML) untuk nama berkas dan
+  /// `source_record_id`. Nullable: Turen belum punya kode resmi.
+  code String? @unique
+
   /// Wilayah administratif. Nullable - TODO(catatan): master dapur belum ada
   /// sebagai berkas. "SPPG Data points" 9.1 menandai tabel ini "build new"
   /// dan menyebut nama dapur "today only implied by sheet name", jadi wilayah,
@@ -197,7 +215,7 @@ model Kitchen {
   menuNutritions MenuNutrition[]
   dailyKitchens  DailyKitchen[]
   menuCosts      MenuCost[]
-  scopedUsers    User[]
+  userScopes     UserKitchenScope[]
 
   @@index([status])
   @@map("kitchens")

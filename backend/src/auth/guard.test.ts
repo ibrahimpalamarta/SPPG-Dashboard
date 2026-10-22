@@ -1,12 +1,12 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
-import type { User } from '@prisma/client';
-import { requireRole, resolveScopeId, attachUser } from './guard.js';
+import { requireRole, requirePermission, resolveKitchenIds, attachUser } from './guard.js';
 import type { Role } from './roles.js';
+import type { AppUser } from './user-sync.js';
 import type { Db } from '../db.js';
 
-const userWith = (role: Role, scopeId: bigint | null = null): User => ({
+const userWith = (role: Role, ...kitchenIds: bigint[]): AppUser => ({
   id: 1n,
   auth0Sub: 'auth0|abc123',
   email: 'a@example.com',
@@ -14,7 +14,7 @@ const userWith = (role: Role, scopeId: bigint | null = null): User => ({
   role,
   status: 'ACTIVE',
   lastLoginAt: null,
-  scopeId,
+  kitchenScopes: kitchenIds.map((kitchenId) => ({ kitchenId })),
   createdAt: new Date(),
   updatedAt: new Date(),
 });
@@ -78,16 +78,40 @@ describe('requireRole', () => {
   });
 });
 
-describe('resolveScopeId', () => {
-  test('SUPER_ADMIN is unscoped', () => {
-    assert.equal(resolveScopeId(userWith('SUPER_ADMIN', 7n)), null);
+describe('requirePermission (SCRUM-20)', () => {
+  test('PM MBG (SUPER_ADMIN) may invite members', () => {
+    assert.equal(run(requirePermission('member:invite'), { user: userWith('SUPER_ADMIN') }).nexted, true);
   });
 
-  test('DATA_ADMIN is pinned to its own scope', () => {
-    assert.equal(resolveScopeId(userWith('DATA_ADMIN', 7n)), 7n);
+  test('DATA_ADMIN may upload but not invite or publish', () => {
+    const admin = { user: userWith('DATA_ADMIN', 3n) };
+    assert.equal(run(requirePermission('upload:create'), admin).nexted, true);
+    assert.equal(run(requirePermission('member:invite'), admin).status, 403);
+    assert.equal(run(requirePermission('batch:publish'), admin).status, 403);
+  });
+
+  test('INTERNAL cannot upload', () => {
+    assert.equal(run(requirePermission('upload:create'), { user: userWith('INTERNAL') }).status, 403);
+  });
+
+  test('returns 401 when no user was attached', () => {
+    assert.equal(run(requirePermission('upload:view'), {}).status, 401);
   });
 });
 
+describe('resolveKitchenIds', () => {
+  test('SUPER_ADMIN is unscoped even with rows', () => {
+    assert.equal(resolveKitchenIds(userWith('SUPER_ADMIN', 7n)), null);
+  });
+
+  test('DATA_ADMIN is pinned to its own kitchens', () => {
+    assert.deepEqual(resolveKitchenIds(userWith('DATA_ADMIN', 7n, 8n)), [7n, 8n]);
+  });
+
+  test('DATA_ADMIN with no rows gets an empty set, not everything', () => {
+    assert.deepEqual(resolveKitchenIds(userWith('DATA_ADMIN')), []);
+  });
+});
 describe('attachUser', () => {
   const db = {
     user: {
