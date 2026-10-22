@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import { ActiveStatus, KitchenType } from '@prisma/client';
 import { pageQuery } from '../lib/pagination.js';
+import { ROLLOUT_STATUSES } from '../lib/kitchen-rollout.js';
 
 export const kitchenListQuery = pageQuery.extend({
   status: z.nativeEnum(ActiveStatus).optional(),
   type: z.nativeEnum(KitchenType).optional(),
   search: z.string().min(1).max(120).optional(),
+  rolloutStatus: z.enum(ROLLOUT_STATUSES).optional(),
 });
 
 /**
