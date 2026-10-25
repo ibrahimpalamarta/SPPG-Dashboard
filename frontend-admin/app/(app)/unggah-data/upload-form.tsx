@@ -35,12 +35,16 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   const [kitchen, setKitchen] = useState(kitchenId ?? kitchens[0].id);
   const [domain, setDomain] = useState("CASHFLOW");
   const [file, setFile] = useState<File | null>(null);
-  const current = result?.ok ? 3 : step;
+  // "Unggah ulang" goes back to the file step without dropping kitchen/domain.
+  const [retry, setRetry] = useState(false);
+  const current = result?.ok && !retry ? 3 : step;
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} onSubmit={() => setRetry(false)} className="space-y-5">
       <input type="hidden" name="kitchenId" value={kitchen} />
       <input type="hidden" name="domain" value={domain} />
+      {/* SCRUM-124: re-uploading a quarantined file closes it as "Diganti". */}
+      {retry && result?.ok && result.status === "NEEDS_MAPPING_UPDATE" && <input type="hidden" name="replaces" value={result.batchId} />}
 
       <Card className="space-y-6 p-6">
         <ol className="flex items-center gap-4 text-sm">
@@ -104,15 +108,12 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
 
         <div hidden={current !== 2} className="space-y-4">
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold text-slate-800">File (.xlsx, maks. 10 MB)</span>
-            <input type="file" name="file" accept=".xlsx" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium" />
+            <span className="font-semibold text-slate-800">File (.xlsx atau .csv, maks. 10 MB)</span>
+            <input type="file" name="file" accept=".xlsx,.csv" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium" />
           </label>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-slate-500">File dipilih</dt>
             <dd className="text-slate-800">{file ? `${file.name} (${formatSize(file.size)})` : "—"}</dd>
-            <dt className="text-slate-500">Profil terdeteksi</dt>
-            {/* diisi di SCRUM-39: mapping profile detection. */}
-            <dd className="text-slate-500">Belum terdeteksi</dd>
           </dl>
           {result && !result.ok && (
             <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -130,15 +131,48 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
           </div>
         </div>
 
-        {result?.ok && (
+        {result?.ok && current === 3 && (
           <section aria-live="polite" className="space-y-3 text-sm">
             <div className="flex flex-wrap items-center gap-3">
-              <StatusBadge status={result.status} />
+              <StatusBadge status={result.status} errorCode={result.errorCode} />
               <span className="font-mono text-xs text-slate-500">Batch {result.batchId}</span>
               <span className="text-slate-600">{result.rowCount} baris</span>
             </div>
             {result.warning && <p className="rounded-md bg-amber-50 p-3 text-amber-800">{result.warning}</p>}
             {result.errorSummary && <p className="text-slate-700">{result.errorSummary}</p>}
+            <p className="text-slate-600">
+              Profil terdeteksi: <span className="font-medium text-slate-800">{result.mapping ? `${result.mapping.profileId} v${result.mapping.version}` : "Belum terdeteksi"}</span>
+            </p>
+            {result.mapping && (
+              <p className="text-slate-600">
+                {result.mapping.records} record dipetakan
+                {Object.keys(result.mapping.issueCounts).length > 0 &&
+                  ` · perlu dicek: ${Object.entries(result.mapping.issueCounts)
+                    .map(([code, n]) => `${n} ${code}`)
+                    .join(", ")}`}
+              </p>
+            )}
+            {result.columnDiff.some((d) => d.missing.length || d.unexpected.length) && (
+              <table className="w-full max-w-2xl text-left">
+                <caption className="mb-2 text-left font-semibold text-slate-800">Perbedaan kolom dengan format yang dikenal</caption>
+                <thead className="border-b border-slate-200 text-slate-500">
+                  <tr>
+                    <th className="py-2 pr-4 font-medium">Sheet</th>
+                    <th className="py-2 pr-4 font-medium">Kolom tidak ditemukan</th>
+                    <th className="py-2 font-medium">Kolom tidak dikenal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {result.columnDiff.map((d) => (
+                    <tr key={d.sheet}>
+                      <td className="py-2 pr-4 font-medium text-slate-800">{d.sheet}</td>
+                      <td className="py-2 pr-4 text-red-700">{d.missing.join(", ") || "—"}</td>
+                      <td className="py-2 text-slate-600">{d.unexpected.join(", ") || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
             {result.sheets.length > 0 && (
               <ul className="list-inside list-disc text-slate-600">
                 {result.sheets.map((s) => (
@@ -148,9 +182,16 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
                 ))}
               </ul>
             )}
-            <Link href="/mapping-validasi" className="inline-block font-medium text-emerald-700 hover:underline">
-              Ke Mapping &amp; Validasi
-            </Link>
+            <div className="flex flex-wrap items-center gap-4">
+              {result.status !== "NEEDS_REVIEW" && (
+                <button type="button" onClick={() => { setRetry(true); setStep(2); }} className={primaryButton}>
+                  Unggah Ulang File
+                </button>
+              )}
+              <Link href="/mapping-validasi" className="inline-block font-medium text-emerald-700 hover:underline">
+                Ke Mapping &amp; Validasi
+              </Link>
+            </div>
           </section>
         )}
       </Card>

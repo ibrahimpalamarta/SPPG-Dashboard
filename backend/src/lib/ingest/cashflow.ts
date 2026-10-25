@@ -11,6 +11,9 @@ import { loose, stageRows, type DomainParser } from './staging.js';
  *   Rincian_Belanja  — item lines, linked by txn_id
  *   Insentif_Penggajian — per-person pay detail, 1:1 with a Transaksi_Kas row
  * plus Struktur / Kamus_Data / Validasi / Ref_* (documentation and lookups).
+ * The Sukun baseline export (CASHFLOW_SUKUN, Transaksi_Kas) is flatter: one
+ * row per item line with `txn_id` and the transaction `total` repeated on
+ * every line (fixtures/sukun-cashflow.csv). Both are staged unchanged.
  *
  * Which sheets are data is decided by their header, not their name: any
  * sheet with a `txn_id` column. That also takes Donomulyo's single

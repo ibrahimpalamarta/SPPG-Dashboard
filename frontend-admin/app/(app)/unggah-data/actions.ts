@@ -3,12 +3,18 @@
 import { apiFetch } from "@/lib/api";
 
 export type UploadedSheet = { name: string; headerRow: number | null; rowCount: number };
+export type ColumnDiff = { sheet: string; missing: string[]; unexpected: string[] };
+export type MappingSummary = { profileId: string; version: string; records: number; issueCounts: Record<string, number> };
 
 export type UploadResult =
   | {
       ok: true;
       batchId: string;
       status: string;
+      errorCode: string | null;
+      mappingProfileId: string | null;
+      columnDiff: ColumnDiff[];
+      mapping: MappingSummary | null;
       rowCount: number;
       errorSummary: string | null;
       sheets: UploadedSheet[];
@@ -23,7 +29,7 @@ export type UploadResult =
  */
 export async function uploadFile(_prev: UploadResult | null, form: FormData): Promise<UploadResult> {
   const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Pilih file .xlsx terlebih dahulu." };
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Pilih file .xlsx atau .csv terlebih dahulu." };
   if (!form.get("period")) form.delete("period");
 
   const res = await apiFetch("/upload-batches", { method: "POST", body: form });
@@ -38,6 +44,10 @@ export async function uploadFile(_prev: UploadResult | null, form: FormData): Pr
     ok: true,
     batchId: body.publicId,
     status: body.status,
+    errorCode: body.errorCode,
+    mappingProfileId: body.mappingProfileId,
+    columnDiff: body.columnDiff ?? [],
+    mapping: body.mapping,
     rowCount: body.rowCount,
     errorSummary: body.errorSummary,
     sheets: body.sheets,

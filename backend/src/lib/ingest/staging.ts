@@ -98,7 +98,8 @@ export function stageRows(sheets: RawSheet[], ctx: ParseContext, rule?: SheetRul
         kitchenId: ctx.kitchenCode,
         sourceSystem: ctx.sourceSystem,
         sourceFileName: ctx.sourceFileName,
-        // diisi di SCRUM-130/39: read from the template's metadata cell or the profile.
+        // Set by the pipeline once a profile is detected (SCRUM-39); the template's own
+        // version cell is SCRUM-130 (B-TPLVER).
         templateVersion: null,
         mappingProfileId: null,
         loadedAt: ctx.loadedAt,

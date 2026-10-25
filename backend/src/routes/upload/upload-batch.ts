@@ -32,7 +32,7 @@ uploadBatchRouter.get('/:id', validate({ params: idParam }), wrap(getUploadBatch
 uploadBatchRouter.post(
   '/',
   requirePermission('upload:create'),
-  singleFile('file', ['.xlsx']),
+  singleFile('file', ['.xlsx', '.csv']),
   validate({ body: uploadBatchCreate, query: uploadBatchCreateQuery }),
   wrap(createUploadBatch()),
 );

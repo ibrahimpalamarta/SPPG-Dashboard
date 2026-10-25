@@ -8,6 +8,7 @@ type Batch = {
   fileName: string;
   domain: string;
   status: string;
+  errorCode: string | null;
   uploadDate: string;
   kitchen: { code: string | null; name: string };
   uploader: { fullName: string | null; email: string | null } | null;
@@ -59,7 +60,7 @@ export async function UploadHistory() {
                 <td className="px-4 py-3 text-slate-700">{b.uploader?.fullName ?? b.uploader?.email ?? "—"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-500">{when(b.uploadDate)}</td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={b.status} />
+                  <StatusBadge status={b.status} errorCode={b.errorCode} />
                 </td>
               </tr>
             ))}

@@ -7,6 +7,7 @@ import type { Role } from '../../auth/roles.js';
 import type { AppUser } from '../../auth/user.js';
 import { createUploadBatch, listUploadBatches, updateUploadBatch } from './upload-batch.js';
 import { InMemoryStagingRepository } from '../../lib/ingest/staging.js';
+import { fixture } from '../../lib/ingest/fixtures.js';
 
 const userWith = (role: Role, kitchenId: bigint | null = null): AppUser =>
   ({ id: 1n, role, kitchenScopes: kitchenId === null ? [] : [{ kitchenId }] }) as AppUser;
@@ -17,8 +18,8 @@ async function validWorkbook(): Promise<Buffer> {
   const sheet = wb.addWorksheet('Menu');
   sheet.addRow([
     'Tanggal',
-    'Jenis Menu',
-    'Kelompok Porsi',
+    'Menu Type',
+    'Porsi',
     'Menu',
     'Bahan',
     'Berat Bersih',
@@ -78,7 +79,7 @@ function fakeDb(
   overrides: Partial<Record<string, unknown>> = {},
   kitchen: Partial<Record<string, unknown>> = {},
 ) {
-  const calls: { findManyWhere?: unknown; created?: unknown; updates: unknown[] } = { updates: [] };
+  const calls: { findManyWhere?: unknown; created?: unknown; updates: unknown[]; audits: string[] } = { updates: [], audits: [] };
   let row: Record<string, unknown> = {};
   const db = {
     uploadBatch: {
@@ -102,7 +103,12 @@ function fakeDb(
       ...overrides,
     },
     kitchen: { findUnique: async () => ({ id: 3n }), ...kitchen },
-    auditLog: { create: async () => ({}) },
+    auditLog: {
+      create: async (args: { data: { action: string } }) => {
+        calls.audits.push(args.data.action);
+        return {};
+      },
+    },
   } as unknown as Db;
 
   return { db, calls };
@@ -184,7 +190,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     // Staging only: nothing canonical rides along any more.
     assert.equal('menuPlans' in created, false);
 
-    // Until the parser registry lands (SCRUM-24) the batch cannot reach READY.
+    // Kitchen 3 has no code and so no profile (SCRUM-39): quarantined, never READY.
     const final = calls.updates.at(-1) as Record<string, unknown>;
     assert.equal(final.status, 'NEEDS_MAPPING_UPDATE');
     assert.equal(final.errorCode, 'PROFILE_NOT_DETECTED');
@@ -193,6 +199,22 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.deepEqual(puts.map((p) => p.key), ['upload-batches/pub-1.xlsx']);
     assert.equal(final.storageKey, 'upload-batches/pub-1.xlsx');
     assert.equal(out.body?.warning, undefined);
+  });
+
+  test('a CSV export is stored as .csv and staged like a workbook (SCRUM-24)', async () => {
+    const { db, calls } = fakeDb();
+    const puts: { key: string; type: string }[] = [];
+    const put = async (key: string, _b: Buffer, type: string) => (puts.push({ key, type }), key);
+    const staging = new InMemoryStagingRepository();
+    const bytes = fixture('sukun-menu.csv');
+    const req = { ...(await withFile(bytes)), file: { buffer: bytes, originalname: 'MENU - 12.csv', size: bytes.length } as Express.Multer.File };
+
+    const out = await run(createUploadBatch(db, put, staging), req);
+
+    assert.equal(out.status, 201);
+    assert.deepEqual(puts, [{ key: 'upload-batches/pub-1.csv', type: 'text/csv' }]);
+    assert.equal((calls.updates.at(-1) as Record<string, unknown>).rowCount, 22);
+    assert.equal((await staging.getBatch('pub-1'))?.rows.length, 22);
   });
 
   test('the same file again is a new batch plus a duplicate warning, not a 409', async () => {
@@ -290,9 +312,62 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
 
     assert.equal(out.status, 200);
     assert.equal(out.body?.rowCount, 1);
-    assert.ok((out.body?.columns as string[]).includes('Jumlah PM'));
+    assert.ok(Object.values((out.body?.sheets as { headers: Record<string, string> }[])[0].headers).includes('Jumlah PM'));
     assert.equal(calls.created, undefined);
     assert.equal(puts.length, 0);
+  });
+
+  /** A Sukun CSV upload, so the SKN profiles apply. */
+  const sukun = (bytes: Buffer, domain: string, extra: Record<string, unknown> = {}) => ({
+    user: userWith('DATA_ADMIN', 3n),
+    valid: { body: { ...body, domain, ...extra }, query: { dryRun: false } },
+    file: { buffer: bytes, originalname: 'CASHFLOW_SUKUN - Transaksi_Kas.csv', size: bytes.length } as Express.Multer.File,
+  });
+  const skn = { findUnique: async () => ({ id: 3n, code: 'SKN' }) };
+
+  test('a recognised Sukun file is NEEDS_REVIEW with its profile recorded and audited (SCRUM-39)', async () => {
+    const { db, calls } = fakeDb({}, skn);
+    const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW'));
+
+    const final = calls.updates.at(-1) as Record<string, unknown>;
+    assert.equal(final.status, 'NEEDS_REVIEW');
+    assert.equal(final.mappingProfileId, 'MAP-SKN-CF-001');
+    assert.equal(final.templateVersion, '1');
+    assert.equal(final.errorCode, undefined);
+    assert.deepEqual(calls.audits, ['upload_batch.created', 'upload_batch.profile_detected']);
+    assert.equal((out.body?.mapping as { records: number }).records, 15);
+    assert.deepEqual(out.body?.columnDiff, []);
+  });
+
+  test('a file missing a profile column is quarantined with the diff (SCRUM-94)', async () => {
+    const csv = fixture('sukun-cashflow.csv').toString('utf8').replace('jumlah_baris', 'jml');
+    const { db, calls } = fakeDb({}, skn);
+    const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(Buffer.from(csv), 'CASHFLOW'));
+
+    const final = calls.updates.at(-1) as Record<string, unknown>;
+    assert.equal(final.status, 'NEEDS_MAPPING_UPDATE');
+    assert.equal(final.errorCode, 'PROFILE_NOT_DETECTED');
+    assert.match(String(final.errorSummary), /Kolom tidak ditemukan: jumlah_baris\./);
+    assert.deepEqual(out.body?.columnDiff, [{ sheet: 'Transaksi_Kas', missing: ['jumlah_baris'], unexpected: ['jml'] }]);
+    assert.equal(out.body?.mapping, null);
+  });
+
+  test('a re-upload closes the quarantined batch it replaces as REPLACED (SCRUM-124)', async () => {
+    const old = { id: 7n, publicId: '11111111-1111-4111-8111-111111111111', kitchenId: 3n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' };
+    const { db, calls } = fakeDb({ findUnique: async () => old }, skn);
+    await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: old.publicId }));
+
+    assert.deepEqual(calls.updates.at(-1), { status: 'FAILED', errorCode: 'REPLACED', errorSummary: 'Diganti oleh batch pub-1.' });
+    assert.ok(calls.audits.includes('upload_batch.replaced'));
+  });
+
+  test('replaces must name an open batch of the same kitchen and domain', async () => {
+    for (const old of [null, { id: 7n, kitchenId: 4n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'MENU', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'CASHFLOW', status: 'PUBLISHED' }]) {
+      const { db, calls } = fakeDb({ findUnique: async () => old }, skn);
+      const out = await run(createUploadBatch(db, fakePut().put), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: '11111111-1111-4111-8111-111111111111' }));
+      assert.equal(out.status, 400, JSON.stringify(old, (_k, v) => (typeof v === 'bigint' ? String(v) : v)));
+      assert.equal(calls.created, undefined);
+    }
   });
 
   test('a DATA_ADMIN cannot upload for another dapur', async () => {
