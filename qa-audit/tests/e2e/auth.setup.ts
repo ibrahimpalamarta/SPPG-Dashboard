@@ -10,6 +10,8 @@ for (const role of ROLES) {
     const account = accounts[role];
     if (!account) throw new Error(`no seeded account for ${role}; run the env stage first`);
     await page.goto('login');
+    // The role card only frames the form; the session's role comes from the account.
+    await page.getByRole('button', { name: /^Lanjutkan sebagai/ }).click();
     await page.getByLabel('Email').fill(account.email);
     await page.getByRole('textbox', { name: 'Kata sandi' }).fill(account.password);
     await page.getByRole('button', { name: 'Masuk', exact: true }).click();
