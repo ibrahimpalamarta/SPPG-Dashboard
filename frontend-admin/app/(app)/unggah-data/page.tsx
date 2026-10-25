@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requirePage } from "@/lib/guard";
 import { selectedKitchen } from "@/lib/me";
 import { EmptyState } from "@/components/ui/empty-state";
+import { UploadHistory } from "@/components/unggah/upload-history";
 import { UploadForm } from "./upload-form";
 
 export const metadata: Metadata = { title: "Unggah Data · SPPG Internal" };
@@ -11,7 +12,7 @@ export default async function Page() {
   const kitchen = await selectedKitchen(me);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-5">
       <div>
         <h1 className="text-lg font-semibold text-slate-800">Unggah Data</h1>
         <p className="mt-1 text-sm text-slate-500">
@@ -29,6 +30,7 @@ export default async function Page() {
       ) : (
         <UploadForm kitchens={me.kitchens} kitchenId={kitchen?.id} />
       )}
+      <UploadHistory />
     </div>
   );
 }
