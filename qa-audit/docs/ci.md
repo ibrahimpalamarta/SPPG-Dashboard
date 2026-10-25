@@ -1,7 +1,7 @@
 # Workflow CI
 
 Semua tahap ada di satu workflow reusable, [`qa-audit.yml`](../../.github/workflows/qa-audit.yml).
-Tiap trigger punya wrapper tipis; setup (Node 22, Python + Semgrep 1.180.0, gitleaks 8.30.1,
+Tiap trigger punya wrapper tipis; setup (Node 24, Python + Semgrep 1.180.0, gitleaks 8.30.1,
 `npm ci` tiga folder, Chromium) ada di composite action
 [`qa-setup`](../../.github/actions/qa-setup/action.yml).
 
@@ -22,6 +22,12 @@ Cron GitHub memakai UTC dan hanya jalan dari default branch (`main`).
 | `enforce` | `true` | `false` → `ENFORCE=0` |
 | `security-full` | `false` | gitleaks seluruh riwayat + Semgrep `p/default` |
 | `retention-days` | `30` | mingguan memakai 90 |
+
+## Step 0. CI build
+Menggantikan check `backend`, `frontend (*)`, `terraform` dari `ci.yml` di PR (QD-29): `npm run build && npm test`
+di `backend`, `npm ci && npm run build` di `frontend-public`, `terraform fmt -check` + `validate` tiga folder `infra/`.
+frontend-admin sudah dibangun di tahap 3. Tidak ikut fail-fast; hasilnya `OUTCOME_CI`, gagal → Blocker `ci-failed`,
+verdict `fail`. Detail error ada di log step itu. `ci.yml` kini hanya jalan pada push ke `develop`.
 
 ## Kenapa semua step `continue-on-error`
 Supaya **hanya** step "6. Report & gate" yang menentukan warna check. `steps.<id>.outcome` tetap
