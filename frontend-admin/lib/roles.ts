@@ -22,7 +22,7 @@ export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
   SUPER_ADMIN: "Project Manager MBG",
-  DATA_ADMIN: "Data Admin Dapur",
+  DATA_ADMIN: "Data Operasional",
   INTERNAL: "Internal (lihat saja)",
   CMS_ADMIN: "Admin CMS",
   PUBLIC: "Publik",

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireRole } from '../../auth/guard.js';
+import { requirePermission } from '../../auth/guard.js';
 import { validate } from '../../middleware/validate.js';
 import { wrap } from '../../lib/wrap.js';
 import { idParam } from '../../schemas/common.js';
@@ -16,16 +16,17 @@ export const kitchenRouter = Router();
 kitchenRouter.get('/', validate({ query: kitchenListQuery }), wrap(listKitchens()));
 kitchenRouter.get('/:id', validate({ params: idParam }), wrap(getKitchen()));
 
-// SCRUM-15: the kitchen master is Super Admin territory.
+// SCRUM-20/123: Data Reference is read-only for Data Operasional; only PM MBG
+// (reference:edit) changes it.
 kitchenRouter.post(
   '/',
-  requireRole('SUPER_ADMIN'),
+  requirePermission('reference:edit'),
   validate({ body: kitchenCreate }),
   wrap(createKitchen()),
 );
 kitchenRouter.patch(
   '/:id',
-  requireRole('SUPER_ADMIN'),
+  requirePermission('reference:edit'),
   validate({ params: idParam, body: kitchenUpdate }),
   wrap(updateKitchen()),
 );
