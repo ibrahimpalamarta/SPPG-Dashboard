@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/empty-state";
+import { logout } from "@/app/login/actions";
 
 /** Rendered by forbidden() in requirePage() — HTTP 403. */
 export default function Forbidden() {
@@ -11,10 +12,9 @@ export default function Forbidden() {
           <Link href="/" className="font-medium text-emerald-700 hover:underline">
             Kembali ke dashboard
           </Link>
-          {/* /auth/* is served by the Auth0 proxy, not an app route. */}
-          <a href={`${process.env.NEXT_PUBLIC_BASE_PATH}/auth/logout`} className="font-medium text-emerald-700 hover:underline">
-            Masuk dengan akun lain
-          </a>
+          <form action={logout}>
+            <button className="font-medium text-emerald-700 hover:underline">Masuk dengan akun lain</button>
+          </form>
         </p>
       </EmptyState>
     </main>

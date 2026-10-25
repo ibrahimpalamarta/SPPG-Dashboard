@@ -9,7 +9,7 @@ import { KITCHEN_COOKIE } from "@/lib/nav";
 export function AppHeader({ items, kitchens, kitchenId }: { items: readonly NavItem[]; kitchens: Kitchen[]; kitchenId?: string }) {
   const pathname = usePathname();
   const router = useRouter();
-  const title = items.find((n) => n.href === pathname)?.label;
+  const title = items.find((n) => n.href === pathname)?.label ?? (pathname === "/keamanan" ? "Keamanan akun" : undefined);
 
   function selectKitchen(id: string) {
     // Read back server-side by selectedKitchen(), which re-checks it against

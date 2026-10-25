@@ -1,23 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { auth0 } from "@/lib/auth0";
+import { SESSION_COOKIE } from "@/lib/session";
+
+/** Reachable without a session. Everything else needs the cookie. */
+const PUBLIC = ["/login", "/reset-password", "/sesi-berakhir"];
 
 /**
- * Mounts /auth/* and sends anyone without a session to Auth0. This is only the
- * "are you logged in" gate; what a role may see is decided per page from
- * /api/me (lib/guard.ts) and, for data, by the backend on every request.
+ * Only the "is there a session cookie" gate. Whether that session is still
+ * alive is the backend's call, made on the first API request of each page
+ * (lib/api.ts sends a dead one to /sesi-berakhir); what a role may see is
+ * decided per page from /api/me (lib/guard.ts) and, for data, by the backend
+ * on every request.
  */
-export async function proxy(request: NextRequest) {
-  const authResponse = await auth0.middleware(request);
-  if (request.nextUrl.pathname.startsWith("/auth")) return authResponse;
+export function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  if (PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return NextResponse.next();
 
-  if (!(await auth0.getSession(request))) {
+  if (!request.cookies.has(SESSION_COOKIE)) {
     const login = request.nextUrl.clone();
-    login.pathname = "/auth/login";
-    // returnTo is resolved against APP_BASE_URL (origin only), so it carries the base path.
-    login.search = `?returnTo=${encodeURIComponent(request.nextUrl.basePath + request.nextUrl.pathname + request.nextUrl.search)}`;
+    login.pathname = "/login";
+    // Only pages are worth returning to; the login form re-validates this value.
+    login.search = pathname === "/" ? "" : `?returnTo=${encodeURIComponent(pathname + search)}`;
     return NextResponse.redirect(login);
   }
-  return authResponse;
+  return NextResponse.next();
 }
 
 export const config = {
