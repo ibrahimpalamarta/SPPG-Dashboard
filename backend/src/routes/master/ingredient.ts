@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireRole } from '../../auth/guard.js';
+import { requirePermission } from '../../auth/guard.js';
 import { validate } from '../../middleware/validate.js';
 import { wrap } from '../../lib/wrap.js';
 import { idParam } from '../../schemas/common.js';
@@ -20,15 +20,17 @@ export const ingredientRouter = Router();
 ingredientRouter.get('/', validate({ query: ingredientListQuery }), wrap(listIngredients()));
 ingredientRouter.get('/:id', validate({ params: idParam }), wrap(getIngredient()));
 
+// SCRUM-20/123: Data Reference is read-only for Data Operasional; only PM MBG
+// (reference:edit) changes it.
 ingredientRouter.post(
   '/',
-  requireRole('SUPER_ADMIN', 'DATA_ADMIN'),
+  requirePermission('reference:edit'),
   validate({ body: ingredientCreate }),
   wrap(createIngredient()),
 );
 ingredientRouter.patch(
   '/:id',
-  requireRole('SUPER_ADMIN', 'DATA_ADMIN'),
+  requirePermission('reference:edit'),
   validate({ params: idParam, body: ingredientUpdate }),
   wrap(updateIngredient()),
 );
