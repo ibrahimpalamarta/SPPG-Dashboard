@@ -1,0 +1,35 @@
+name: qa-audit setup
+description: Node 22, Semgrep, gitleaks, npm dependencies (qa-audit, backend, frontend-admin) and Chromium.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: |
+          qa-audit/package-lock.json
+          backend/package-lock.json
+          frontend-admin/package-lock.json
+
+    # Semgrep ships through pip; pinned, bump deliberately (docs/ci.md).
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - shell: bash
+      run: pip install --quiet --disable-pip-version-check semgrep==1.180.0
+
+    - shell: bash
+      env:
+        GITLEAKS_VERSION: 8.30.1
+      run: curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | sudo tar -xz -C /usr/local/bin gitleaks
+
+    - shell: bash
+      run: |
+        for dir in qa-audit backend frontend-admin; do
+          (cd "$dir" && npm ci --no-audit --no-fund)
+        done
+
+    - shell: bash
+      working-directory: qa-audit
+      run: npx playwright install --with-deps chromium
