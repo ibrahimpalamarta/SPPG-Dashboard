@@ -97,6 +97,27 @@ describe('gate', () => {
     expect(collect(() => abs, ['semgrep.sarif'], gate, true).findings[0]!.location).toBe('backend/src/c.ts:7');
   });
 
+  it('[QA-GATE] knip: temuan jadi Warning (tidak memblok), output rusak jadi infra', () => {
+    const doc = { files: ['lib/a.ts'], issues: [{ file: 'lib/b.ts', exports: [{ name: 'foo', line: 3 }], dependencies: [{ name: 'left-pad' }] }] };
+    const { findings } = collect(() => ({ output: `warning di stderr\n${JSON.stringify(doc)}` }), ['knip-frontend-admin.json'], gate, true);
+    expect(findings.map((f) => [f.rule, f.severity, f.location])).toEqual([
+      ['knip-files', 'Warning', 'frontend-admin/lib/a.ts'],
+      ['knip-exports', 'Warning', 'frontend-admin/lib/b.ts:3'],
+      ['knip-dependencies', 'Warning', 'frontend-admin/lib/b.ts:0'],
+    ]);
+    expect(run({ findings }).verdict).toBe('pass');
+    const broken = collect(() => ({ output: 'npm error could not determine executable' }), ['knip-frontend-admin.json'], gate, true);
+    expect(run({ findings: broken.findings }).verdict).toBe('infra-error');
+  });
+
+  it('[QA-GATE] rule useEffect selalu Warning walau level plugin warning, rule ESLint lain mengikuti peta level', () => {
+    const msg = (ruleId: string) => ({ ruleId, severity: 1, message: 'm', line: 5 });
+    const doc = [{ filePath: join(REPO, 'frontend-admin', 'app', 'a.tsx'), messages: [msg('react-you-might-not-need-an-effect/no-derived-state'), msg('@typescript-eslint/no-unused-vars')] }];
+    const { findings } = collect(() => doc, ['eslint-frontend-admin.json'], gate, false);
+    expect(findings.map((f) => f.severity)).toEqual(['Warning', 'Info']);
+    expect(run({ findings }).verdict).toBe('pass');
+  });
+
   it('[QA-GATE] komentar PR: Blocker keamanan di tabel utama, Warning dan tahap terlipat', () => {
     const e = run({
       findings: [

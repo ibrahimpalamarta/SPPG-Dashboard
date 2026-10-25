@@ -4,6 +4,8 @@
     "tsc": "Blocker",
     "eslint": { "error": "Warning", "warning": "Info" },
     "eslintA11yInactive": "Warning",
+    "eslintEffect": "Warning",
+    "knip": "Warning",
     "semgrep": { "error": "Blocker", "warning": "Warning", "note": "Info", "security": "Blocker" },
     "gitleaks": "Blocker",
     "vitest": { "failed": "Blocker" },

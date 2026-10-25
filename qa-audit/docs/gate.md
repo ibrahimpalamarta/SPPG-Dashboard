@@ -6,9 +6,9 @@ Mengubahnya wajib disertai entri di [decision-log.md](decision-log.md).
 ## Severity
 | Blocker (check merah, merge diblok) | Warning (dilaporkan) | Info |
 |---|---|---|
-| Error tipe (tsc) | Semgrep WARNING | Saran lint (ESLint warning) |
-| Secret (gitleaks) | ESLint error (QD-15) | Tool tidak terpasang di laptop |
-| Semgrep ERROR | Test flaky (lolos setelah 1 retry) | Test fixme menunggu keputusan |
+| Error tipe (tsc), termasuk `noUnused*` | Semgrep WARNING non-keamanan | Saran lint (ESLint warning) |
+| Secret (gitleaks) | ESLint error (QD-15), semua rule useEffect, temuan knip (QD-33) | Tool tidak terpasang di laptop |
+| Semgrep ERROR atau rule ber-tag `security` (QD-31) | Test flaky (lolos setelah 1 retry) | Test fixme menunggu keputusan |
 | Test Vitest gagal | Test Playwright gagal di luar smoke/rbac/pii | Perubahan kecil skor (fase 3) |
 | Test smoke/rbac/pii gagal, login setup gagal | Diff visual > ambang (fase 3) | |
 | axe critical/serious (fase 2) | Lighthouse < ambang (fase 3) | |
