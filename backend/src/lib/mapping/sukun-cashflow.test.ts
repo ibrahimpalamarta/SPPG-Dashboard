@@ -1,0 +1,54 @@
+import test, { describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { fixture, staged, withRows } from '../ingest/fixtures.js';
+import { PROFILES } from './profiles.js';
+import type { CashflowTxn } from './sukun-cashflow.js';
+
+const profile = PROFILES.find((p) => p.id === 'MAP-SKN-CF-001')!;
+
+describe('MAP-SKN-CF-001 adapter (SCRUM-27/55)', () => {
+  test('groups the flat baseline back into transactions and keeps the source totals', async () => {
+    const { mapping } = await staged(fixture('sukun-cashflow.csv'), 'CASHFLOW');
+    assert.ok(mapping);
+    assert.equal(mapping.records, 15);
+    // Σ `total` of each transaction once, as in the source.
+    assert.deepEqual(mapping.totals, { KELUAR: 169058236, MASUK: 2000000 });
+    assert.deepEqual(mapping.issueCounts, { MISSING_AMOUNT: 5, NO_TXN_ID: 3 });
+  });
+
+  test('Rupiah with thousand dots, decimal-comma qty, folded type/direction/unit', async () => {
+    const { batch, mapping } = await staged(
+      withRows('sukun-cashflow.csv', [
+        '1,TXN-X1,05/03/2026,belanja,keluar,Bahan Baku,Uraian,Ayam,Supplier A,"7,75",KG,Rp40.000,Rp310.000,Rp327.000,high,TERKONFIRMASI,',
+        '2,TXN-X1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Garam,Supplier A,1,pcs,17000,Rp17.000,Rp327.000,high,TERKONFIRMASI,',
+      ]),
+      'CASHFLOW',
+    );
+    const [txn] = profile.apply(batch.sheets, batch.rows, profile).records as CashflowTxn[];
+    assert.ok(txn);
+    assert.equal(txn.txn_date, '2026-03-05');
+    assert.equal(txn.txn_type, 'BELANJA');
+    assert.equal(txn.direction, 'KELUAR');
+    assert.equal(txn.txn_total, 327000);
+    assert.deepEqual(
+      txn.lines.map((l) => [l.qty, l.unit, l.unit_price, l.line_amount]),
+      [
+        [7.75, 'kg', 40000, 310000],
+        [1, 'pcs', 17000, 17000],
+      ],
+    );
+    assert.deepEqual(mapping?.issues, []);
+  });
+
+  test('lines that do not add up, or disagree on the total, are reported, not fixed', async () => {
+    const { mapping } = await staged(
+      withRows('sukun-cashflow.csv', [
+        '1,TXN-X2,05/03/2026,BELANJA,KELUAR,Bahan Baku,U,Ayam,S,1,kg,Rp40.000,Rp40.000,Rp50.000,high,TERKONFIRMASI,',
+        '2,TXN-X2,05/03/2026,BELANJA,KELUAR,Bahan Baku,U,Garam,S,1,kg,Rp5.000,Rp5.000,Rp45.000,high,TERKONFIRMASI,',
+      ]),
+      'CASHFLOW',
+    );
+    assert.deepEqual(mapping?.issueCounts, { TOTAL_INCONSISTENT: 1, LINES_NOT_TOTAL: 1 });
+    assert.match(mapping!.issues[1]!.message, /TXN-X2: jumlah baris Rp45\.000 ≠ total Rp50\.000/);
+  });
+});

@@ -1,21 +1,21 @@
 import type { RequestHandler } from 'express';
 import { createHash } from 'node:crypto';
 import type { z } from 'zod';
-import { Prisma, UploadDomain, UploadStatus } from '@prisma/client';
+import { Prisma, UploadStatus } from '@prisma/client';
 import { prisma, type Db } from '../../db.js';
 import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
 import { kitchenScope, kitchenWhere } from '../../lib/scope.js';
-import { parseMenuWorkbook } from '../../lib/menu-workbook.js';
-import { XLSX_MIME, putObject, type PutObject } from '../../lib/s3.js';
+import { CSV_MIME, XLSX_MIME, putObject, type PutObject } from '../../lib/s3.js';
 import { dateFilter } from '../../schemas/common.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
 import { canTransition } from '../../lib/upload-status.js';
-import { WorkbookError, assertXlsxContainer } from '../../lib/ingest/workbook.js';
-import { parseToStaging } from '../../lib/ingest/pipeline.js';
-import { stagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
+import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
+import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
+import type { ColumnDiff } from '../../lib/mapping/detect.js';
+import { InMemoryStagingRepository, stagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
 import type {
   uploadBatchCreate,
   uploadBatchCreateQuery,
@@ -85,10 +85,14 @@ const PREVIEW_ROWS = 50;
  * name (SCRUM-22 security note): one object per attempt, nothing user-supplied
  * in the path.
  */
-export const uploadKey = (publicId: string): string => `upload-batches/${publicId}.xlsx`;
+export const uploadKey = (publicId: string, fileName = ''): string =>
+  `upload-batches/${publicId}${isCsv(fileName) ? '.csv' : '.xlsx'}`;
 
-/** PRD §9 copy for a file no mapping profile recognises. */
-const NOT_RECOGNISED = 'Format file belum dikenali untuk kitchen/source ini. File belum dipublish.';
+/** PRD §9 copy for a file no mapping profile recognises, plus what is missing (SCRUM-94). */
+const notRecognised = (diff: ColumnDiff[]) => {
+  const missing = [...new Set(diff.flatMap((d) => d.missing))];
+  return `Format file belum dikenali untuk kitchen/source ini. File belum dipublish.${missing.length ? ` Kolom tidak ditemukan: ${missing.join(', ')}.` : ''}`;
+};
 
 /**
  * SCRUM-22/37 + SCRUM-24. Takes the workbook (multipart, field `file`), opens
@@ -98,11 +102,15 @@ const NOT_RECOGNISED = 'Format file belum dikenali untuk kitchen/source ini. Fil
  *   - every attempt is its own batch, failed ones included; an identical
  *     earlier file for the same kitchen + domain only adds a `warning`
  *     (duplicates are stopped at publish, not at upload)
- *   - a file that is not an .xlsx container (renamed, password-protected) is
+ *   - a file that is not the container its extension promises (renamed or
+ *     password-protected .xlsx, binary .csv) is
  *     FAILED and never stored; a corrupt or empty workbook is FAILED with no
  *     staged rows left behind
- *   - a parsed file ends NEEDS_MAPPING_UPDATE until profile detection
- *     (SCRUM-39) exists — never READY, so it can never publish
+ *   - a parsed file is NEEDS_REVIEW when a mapping profile recognises it
+ *     (SCRUM-39), else NEEDS_MAPPING_UPDATE with the column diff — never
+ *     READY, so nothing publishes without a reviewer
+ *   - `replaces` closes the quarantined batch it re-uploads: FAILED +
+ *     REPLACED ("Diganti", SCRUM-124) once the new file has parsed
  *   - a storage failure marks the batch FAILED instead of leaving it PROCESSING
  *
  * ponytail: synchronous within the request, like the rest of the repo; the
@@ -124,28 +132,30 @@ export const createUploadBatch =
     const { buffer, originalname, size } = req.file!;
     const fileHash = createHash('sha256').update(buffer).digest('hex');
 
-    // SCRUM-6 AC1: parse and report, nothing written. Menu only until the
-    // staging parsers (SCRUM-24/36) replace this preview.
+    const context = (uploadBatchId: string, kitchenCode: string) => ({
+      uploadBatchId,
+      kitchenCode,
+      domain: body.domain,
+      sourceSystem: body.sourceSystem,
+      sourceFileName: originalname,
+      fileHash,
+      loadedAt: new Date(),
+    });
+
+    // SCRUM-6 AC1: parse and report, nothing written. Same parser as a real
+    // upload (SCRUM-36), into a throwaway repository.
     if (dryRun) {
-      try {
-        assertXlsxContainer(buffer);
-      } catch (err) {
-        if (!(err instanceof WorkbookError)) throw err;
-        sendError(res, 'VALIDATION_ERROR', { fields: { file: [err.message] } });
+      const parsed = await parseToStaging(buffer, context('dry-run', String(body.kitchenId)), new InMemoryStagingRepository());
+      if (!parsed.ok) {
+        sendError(res, 'VALIDATION_ERROR', { fields: { file: [parsed.errorSummary] } });
         return;
       }
-      if (body.domain !== UploadDomain.MENU) {
-        sendError(res, 'VALIDATION_ERROR', { fields: { dryRun: ['only available for MENU'] } });
-        return;
-      }
-      const { columns, rows, errors } = await parseMenuWorkbook(buffer);
       sendJson(res, {
         fileName: originalname,
         fileHash,
-        columns,
-        rowCount: rows.length,
-        errors,
-        rows: rows.slice(0, PREVIEW_ROWS),
+        sheets: parsed.batch.sheets,
+        rowCount: parsed.batch.rows.length,
+        rows: parsed.batch.rows.slice(0, PREVIEW_ROWS),
       });
       return;
     }
@@ -153,6 +163,15 @@ export const createUploadBatch =
     const kitchen = await db.kitchen.findUnique({ where: { id: body.kitchenId } });
     if (!kitchen) {
       sendError(res, 'VALIDATION_ERROR', { fields: { kitchenId: ['no kitchen with that id'] } });
+      return;
+    }
+
+    const replaced = body.replaces ? await db.uploadBatch.findUnique({ where: { publicId: body.replaces } }) : null;
+    if (
+      body.replaces &&
+      (!replaced || replaced.kitchenId !== body.kitchenId || replaced.domain !== body.domain || !canTransition(replaced.status, UploadStatus.FAILED))
+    ) {
+      sendError(res, 'VALIDATION_ERROR', { fields: { replaces: ['not an open batch of this kitchen and domain'] } });
       return;
     }
 
@@ -192,18 +211,20 @@ export const createUploadBatch =
       });
 
     let sheets: unknown[] = [];
+    let columnDiff: ColumnDiff[] = [];
+    let mapping: MappingSummary | null = null;
     const ingest = async () => {
       try {
-        assertXlsxContainer(buffer);
+        assertReadable(buffer, originalname);
       } catch (err) {
         if (!(err instanceof WorkbookError)) throw err;
         // Not stored: a renamed or encrypted file has no business in the bucket.
         return finish({ status: UploadStatus.FAILED, errorCode: err.code, errorSummary: err.message });
       }
 
-      const storageKey = uploadKey(batch.publicId);
+      const storageKey = uploadKey(batch.publicId, originalname);
       try {
-        await put(storageKey, buffer, XLSX_MIME);
+        await put(storageKey, buffer, isCsv(originalname) ? CSV_MIME : XLSX_MIME);
       } catch (err) {
         await finish({
           status: UploadStatus.FAILED,
@@ -214,33 +235,32 @@ export const createUploadBatch =
         throw err;
       }
 
-      const parsed = await parseToStaging(
-        buffer,
-        {
-          uploadBatchId: batch.publicId,
-          // Turen has no code yet (B-TUREN); its numeric id is just as stable.
-          kitchenCode: kitchen.code ?? String(kitchen.id),
-          domain: body.domain,
-          sourceSystem: body.sourceSystem,
-          sourceFileName: originalname,
-          fileHash,
-          loadedAt: new Date(),
-        },
-        staging,
-      );
+      // Turen has no code yet (B-TUREN); its numeric id is just as stable.
+      const parsed = await parseToStaging(buffer, context(batch.publicId, kitchen.code ?? String(kitchen.id)), staging);
       if (!parsed.ok) {
         return finish({ storageKey, status: UploadStatus.FAILED, errorCode: parsed.errorCode, errorSummary: parsed.errorSummary });
       }
 
       sheets = parsed.batch.sheets;
+      const rowCount = parsed.batch.rows.length;
+      const { detection } = parsed;
+      if (!detection.ok) {
+        columnDiff = detection.diff;
+        return finish({
+          storageKey,
+          rowCount,
+          status: UploadStatus.NEEDS_MAPPING_UPDATE,
+          errorCode: detection.errorCode,
+          errorSummary: notRecognised(detection.diff),
+        });
+      }
+      mapping = parsed.mapping;
       return finish({
         storageKey,
-        rowCount: parsed.batch.rows.length,
-        // diisi di SCRUM-39: profile detection decides between NEEDS_REVIEW
-        // and NEEDS_MAPPING_UPDATE.
-        status: UploadStatus.NEEDS_MAPPING_UPDATE,
-        errorCode: 'PROFILE_NOT_DETECTED',
-        errorSummary: NOT_RECOGNISED,
+        rowCount,
+        status: UploadStatus.NEEDS_REVIEW,
+        mappingProfileId: detection.profile.id,
+        templateVersion: detection.profile.version,
       });
     };
     const row = await ingest();
@@ -255,8 +275,32 @@ export const createUploadBatch =
         kitchenId: String(row.kitchenId),
         domain: row.domain,
         status: row.status,
+        ...(replaced && { replaces: replaced.publicId }),
       },
     });
+    if (row.mappingProfileId) {
+      await writeAuditLog(db, {
+        userId: req.user!.id,
+        action: 'upload_batch.profile_detected',
+        entity: 'upload_batches',
+        entityId: row.id,
+        metadata: { mappingProfileId: row.mappingProfileId, templateVersion: row.templateVersion },
+      });
+    }
+    // A re-upload that did not even parse leaves the old batch where it was.
+    if (replaced && row.status !== UploadStatus.FAILED) {
+      await db.uploadBatch.update({
+        where: { id: replaced.id },
+        data: { status: UploadStatus.FAILED, errorCode: 'REPLACED', errorSummary: `Diganti oleh batch ${row.publicId}.` },
+      });
+      await writeAuditLog(db, {
+        userId: req.user!.id,
+        action: 'upload_batch.replaced',
+        entity: 'upload_batches',
+        entityId: replaced.id,
+        metadata: { from: replaced.status, to: UploadStatus.FAILED, replacedBy: row.publicId },
+      });
+    }
     trackEvent(row.status === UploadStatus.FAILED ? 'upload_failed' : 'upload_completed', {
       ...done,
       rows: row.rowCount,
@@ -265,13 +309,15 @@ export const createUploadBatch =
       error_code: row.errorCode,
     });
 
-    // `sheets` (names, header row, headers, row counts) is not persisted yet
-    // (B-SCHEMA); it rides on the response so the upload page can show it.
+    // `sheets`, `columnDiff` and `mapping` are not persisted yet (B-SCHEMA,
+    // B-MAPOUT); they ride on the response so the upload page can show them.
     sendJson(
       res,
       {
         ...row,
         sheets,
+        columnDiff,
+        mapping,
         ...(duplicate && {
           warning: {
             code: 'DUPLICATE_FILE',
