@@ -8,7 +8,7 @@
  */
 import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { QA, RAW, REPO, REPORTS, writeJson } from './lib.js';
 
@@ -51,21 +51,32 @@ const ids = (title: string) => [...title.matchAll(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]
 // beyond looking up the severity a tool's own level maps to.
 // ---------------------------------------------------------------------------
 
-type Sarif = { runs?: { results?: { ruleId?: string; level?: string; message?: { text?: string }; locations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number } } }[] }[] }[] };
+type SarifRule = { id: string; defaultConfiguration?: { level?: string }; properties?: { tags?: string[] } };
+type Sarif = {
+  runs?: {
+    tool?: { driver?: { rules?: SarifRule[] } };
+    results?: { ruleId?: string; level?: string; message?: { text?: string }; locations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number } } }[] }[];
+  }[];
+};
 
-function sarif(tool: string, doc: Sarif, severityOf: (level: string) => Severity): Finding[] {
-  return (doc.runs ?? []).flatMap((r) =>
-    (r.results ?? []).map((x) => {
+function sarif(tool: string, doc: Sarif, severityOf: (level: string, tags: string[]) => Severity): Finding[] {
+  return (doc.runs ?? []).flatMap((r) => {
+    const rules = new Map((r.tool?.driver?.rules ?? []).map((x) => [x.id, x]));
+    return (r.results ?? []).map((x) => {
       const loc = x.locations?.[0]?.physicalLocation;
+      const uri = loc?.artifactLocation?.uri;
+      const rule = rules.get(x.ruleId ?? '');
       return {
-        severity: severityOf(x.level ?? 'warning'),
+        // SARIF: a result without its own level inherits the rule's (Semgrep never sets it per result).
+        severity: severityOf(x.level ?? rule?.defaultConfiguration?.level ?? 'warning', rule?.properties?.tags ?? []),
         tool,
         rule: x.ruleId ?? 'unknown',
-        location: loc?.artifactLocation?.uri ? `${loc.artifactLocation.uri}:${loc.region?.startLine ?? 0}` : undefined,
+        // Semgrep writes absolute runner paths; repo-relative keeps waivers and the comment portable.
+        location: uri ? `${(isAbsolute(uri) ? relative(REPO, uri) : uri).replaceAll('\\', '/')}:${loc?.region?.startLine ?? 0}` : undefined,
         message: x.message?.text ?? '',
       };
-    }),
-  );
+    });
+  });
 }
 
 type PwSpec = { title: string; tags?: string[]; tests: { projectName: string; status: string; annotations?: { type: string }[] }[] };
@@ -110,7 +121,13 @@ export function collect(read: (name: string) => unknown, files: string[], gate: 
     findings.push({ severity: g.eslintA11yInactive, tool: 'eslint', rule: 'jsx-a11y-inactive', message: 'Tidak ada rule jsx-a11y aktif di config ESLint frontend-admin.' });
   }
 
-  if (files.includes('semgrep.sarif')) findings.push(...sarif('semgrep', read('semgrep.sarif') as Sarif, (l) => g.semgrep[l] ?? 'Warning'));
+  // A rule tagged `security` is at least g.semgrep.security, whatever its level (QD-31).
+  const semgrepSeverity = (l: string, tags: string[]): Severity => {
+    const byLevel = g.semgrep[l] ?? 'Warning';
+    const security = tags.includes('security') ? g.semgrep.security : undefined;
+    return security && RANK[security] < RANK[byLevel] ? security : byLevel;
+  };
+  if (files.includes('semgrep.sarif')) findings.push(...sarif('semgrep', read('semgrep.sarif') as Sarif, semgrepSeverity));
   if (files.includes('gitleaks.sarif')) findings.push(...sarif('gitleaks', read('gitleaks.sarif') as Sarif, () => g.gitleaks));
 
   // A tool that did not run is Info on a laptop, but in CI it means the
