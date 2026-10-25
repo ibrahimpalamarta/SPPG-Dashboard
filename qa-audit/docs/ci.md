@@ -43,7 +43,8 @@ environment yang gagal menjadi `infra-error`, bukan kegagalan produk. Test non-s
 - Susunan komentar (QD-32): verdict + alasan, tabel Blocker, lalu lipatan Warning, Tahap, dan Analisis AI.
   Rule Semgrep ber-tag `security` selalu Blocker (QD-31).
 - Step `AI review` (QD-30, hanya saran): bila ada Blocker/Warning, temuan + diff PR dikirim ke
-  `AI_MODEL`, jawabannya ditambahkan sebagai "Analisis AI" di komentar PR, `scorecard.html`, dan
+  `AI_MODEL`, jawabannya ditambahkan sebagai "Analisis AI" di komentar PR (penjelasan temuan tool dan review
+  efisiensi diff, dua panggilan paralel; review efisiensi juga jalan saat tidak ada temuan, QD-33), `scorecard.html`, dan
   `reports/ai-review.md`. Tidak pernah mengubah verdict; tanpa `AI_API_KEY` (mis. PR dari fork) dilewati.
 
 ## Secret dan variable

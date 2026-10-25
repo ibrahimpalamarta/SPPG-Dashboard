@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPrompt, MAX_DIFF, type Verdict } from '../../scripts/ai-review.js';
+import { buildEfficiencyPrompt, buildPrompt, MAX_DIFF, type Verdict } from '../../scripts/ai-review.js';
 import type { Finding } from '../../scripts/merge-report.js';
 
 const v = (findings: Finding[]): Verdict => ({ verdict: 'fail', stages: { code: 'failure' }, findings, pending: [], requirements: [] });
@@ -17,6 +17,19 @@ describe('ai-review prompt', () => {
 
   it('[QA-AI] Info dan temuan waived tidak dikirim; tanpa Blocker/Warning tidak ada panggilan', () => {
     expect(buildPrompt(v([{ ...tsc, severity: 'Info' }, { ...tsc, waived: 'x' }]), '')).toBeNull();
+  });
+
+  it('[QA-AI] review efisiensi jalan tanpa temuan tool, tapi diff file gitleaks tetap dibuang', () => {
+    const code = diff('backend/src/x.ts', 'const a = 1');
+    expect(buildEfficiencyPrompt(v([]), code)).toContain('const a = 1');
+    const p = buildEfficiencyPrompt(v([leak]), diff('backend/.env.example', 'AKIAREALSECRETVALUE') + code)!;
+    expect(p).not.toContain('AKIAREALSECRETVALUE');
+    expect(p).toContain('const a = 1');
+  });
+
+  it('[QA-AI] review efisiensi dilewati bila diff kosong atau hanya file gitleaks', () => {
+    expect(buildEfficiencyPrompt(v([]), '  \n')).toBeNull();
+    expect(buildEfficiencyPrompt(v([leak]), diff('backend/.env.example', 'x'))).toBeNull();
   });
 
   it('[QA-AI] diff dipotong di batas', () => {
