@@ -18,9 +18,9 @@
 | O-04 | Upload E2E butuh S3. Environment QA memakai bucket palsu; perlu S3 lokal (mis. emulator) atau mode storage lokal di backend | backend + QA | Menentukan cakupan AC-UP-01 di fase 2 |
 | O-05 | Root `README.md`/`CLAUDE.md` masih menyebut Auth0 dan frontend "Segera Hadir" | maintainer | Di luar scope qa-audit |
 | O-06 | Kontrak `data-testid` belum disepakati | front-end | [data-testid.md](data-testid.md) |
-| O-07 | Node CI 22; ikut naik ke 24 bersama `chore/upgrade-node` | maintainer | ubah `qa-setup` |
+| O-07 | `develop` sudah Node 24 (#26, `engines >=24`). qa-audit masih 22 seperti #27; naikkan `qa-setup`, `engines`, `@types/node` setelah #27 di-rebase. Vitest 5 lalu bisa dipakai | QA | setelah #27 |
 | O-08 | Role PRD (Management, Finance, Kepala Kitchen, Data Steward) belum ada di enum kode (B-ROLE) | product + backend | Peta sementara QD-03 |
-| O-09 | Durasi workflow PR 5 run berturut belum dicatat | QA | DoD |
+| O-09 | Workflow PR belum pernah jalan di CI: PR #27 dan #28 konflik dengan `develop` (`frontend-admin/package.json` + lockfile, dari #26), dan GitHub tidak menjalankan workflow `pull_request` untuk PR yang konflik. Durasi 5 run berturut belum dicatat | #27 → QA | DoD |
 | O-10 | Ambang Lighthouse/visual dikalibrasi setelah 2 minggu nightly | QA | fase 3 |
 | O-11 | OD-02, OD-03, OD-04 open | Finance / COO / Nutrition | test fixme |
 
