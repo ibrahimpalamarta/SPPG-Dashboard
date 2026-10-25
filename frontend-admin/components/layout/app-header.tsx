@@ -31,7 +31,7 @@ export function AppHeader({ items }: { items: readonly NavItem[] }) {
 
       <label className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20">
         <Search className="size-4 shrink-0" aria-hidden="true" />
-        <input type="search" placeholder="Cari file atau data..." aria-label="Cari file atau data" className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400" />
+        <input type="search" disabled title="Segera hadir" placeholder="Cari file atau data..." aria-label="Cari file atau data" className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400" />
         <kbd className="hidden rounded-md border border-slate-200 px-1.5 py-0.5 text-xs text-slate-400 sm:block">⌘K</kbd>
       </label>
 
@@ -39,7 +39,7 @@ export function AppHeader({ items }: { items: readonly NavItem[] }) {
         <Link href="/keamanan" aria-label="Pengaturan akun" className={iconButton}>
           <Settings className="size-5" aria-hidden="true" />
         </Link>
-        <button type="button" aria-label="Notifikasi" className={iconButton}>
+        <button type="button" disabled title="Segera hadir" aria-label="Notifikasi" className={`${iconButton} disabled:cursor-not-allowed disabled:opacity-60`}>
           <Bell className="size-5" aria-hidden="true" />
         </button>
         <Link href="/unggah-data" className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800">

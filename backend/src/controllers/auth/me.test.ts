@@ -60,7 +60,7 @@ describe('GET /api/me (SCRUM-20)', () => {
   test('returns only the shell fields — no status, lockout counters or timestamps', async () => {
     const { body } = await run(userWith('DATA_ADMIN', 2n));
     assert.deepEqual(Object.keys(body).sort(), ['email', 'fullName', 'id', 'kitchens', 'mfaEnabled', 'mfaEnrollmentRequired', 'permissions', 'role']);
-    assert.deepEqual(body.kitchens, [{ id: '2', code: 'SKN', name: 'Sukun' }]);
+    assert.deepEqual(body.kitchens, [{ id: '2', code: 'SKN', name: 'Sukun', rolloutStatus: 'PILOT_PHASE_1' }]);
   });
 
   test('narrows the kitchen list to the scope of a scoped role', async () => {
