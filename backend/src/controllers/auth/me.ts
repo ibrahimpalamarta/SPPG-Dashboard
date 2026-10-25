@@ -3,6 +3,7 @@ import { prisma, type Db } from '../../db.js';
 import { sendJson } from '../../lib/serialize.js';
 import { resolveKitchenIds } from '../../auth/guard.js';
 import { env } from '../../config/env.js';
+import { withRollout } from '../../lib/kitchen-rollout.js';
 
 /**
  * SCRUM-20/21: everything the app shell needs to draw itself — which menus to
@@ -12,11 +13,13 @@ import { env } from '../../config/env.js';
 export const getMe = (db: Db = prisma): RequestHandler => async (req, res) => {
   const u = req.user!;
   const ids = resolveKitchenIds(u);
-  const kitchens = await db.kitchen.findMany({
+  const rows = await db.kitchen.findMany({
     where: ids === null ? {} : { id: { in: ids } },
     select: { id: true, code: true, name: true },
     orderBy: { name: 'asc' },
   });
+  // Stage only (SCRUM-132): the shell labels the pilot dapur from it. bucket stays on /api/kitchens.
+  const kitchens = rows.map((k) => ({ ...k, rolloutStatus: withRollout(k).rolloutStatus }));
 
   sendJson(res, {
     id: u.id,

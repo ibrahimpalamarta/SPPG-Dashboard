@@ -1,10 +1,8 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { apiGet } from "@/lib/api";
-import { KITCHEN_COOKIE } from "@/lib/nav";
 import type { Permission, Role } from "@/lib/roles";
 
-export type Kitchen = { id: string; code: string | null; name: string };
+export type Kitchen = { id: string; code: string | null; name: string; rolloutStatus?: "PILOT_PHASE_1" | "PHASE_1_COMPARISON" | "PHASE_2A" | "PHASE_2B" | null };
 
 export type Me = {
   id: string;
@@ -23,12 +21,3 @@ export type Me = {
  * the shell draws.
  */
 export const getMe = cache(() => apiGet<Me>("/me"));
-
-/**
- * The kitchen picked in the header, if it is still inside the user's scope —
- * a stale or tampered cookie falls back to the first kitchen in scope.
- */
-export async function selectedKitchen(me: Me): Promise<Kitchen | undefined> {
-  const id = (await cookies()).get(KITCHEN_COOKIE)?.value;
-  return me.kitchens.find((k) => k.id === id) ?? me.kitchens[0];
-}

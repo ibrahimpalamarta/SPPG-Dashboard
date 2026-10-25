@@ -6,10 +6,10 @@ import { storageState, type RoleKey } from './roles.js';
 const VIEW = ['Overview', 'Unggah Data', 'Mapping & Validasi', 'Finance & Cost', 'Data Health', 'Data Reference'];
 const ADMIN_ONLY = ['Anggota', 'Peran & Izin'];
 
-const CASES: { role: RoleKey; menu: string[]; hidden: string[]; kitchens: 'all' | string[] }[] = [
+const CASES: { role: RoleKey; menu: string[]; hidden: string[]; kitchens: 'all' | string }[] = [
   { role: 'management', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'all' },
   { role: 'finance', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'all' },
-  { role: 'kepala-kitchen-skn', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: ['SKN · Sukun'] },
+  { role: 'kepala-kitchen-skn', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'Pilot Sukun' },
   { role: 'data-steward', menu: [...VIEW, 'Manual / Quick Entry', 'Inbox'], hidden: ADMIN_ONLY, kitchens: 'all' },
 ];
 
@@ -23,9 +23,10 @@ for (const c of CASES) {
       for (const label of c.menu) await expect(nav.getByRole('link', { name: label })).toBeVisible();
       for (const label of c.hidden) await expect(nav.getByRole('link', { name: label })).toHaveCount(0);
 
-      const kitchens = page.getByLabel('Dapur').locator('option');
+      // The sidebar lists the dapur in the caller's scope (the pilot one is prefixed "Pilot").
+      const kitchens = page.getByLabel('Navigasi utama').locator('p[title]');
       if (c.kitchens === 'all') {
-        for (const k of ['SKN · Sukun', 'LWG · Lawang']) await expect(kitchens.filter({ hasText: k })).toHaveCount(1);
+        for (const k of ['Pilot Sukun', 'Lawang']) await expect(kitchens).toContainText(k);
       } else await expect(kitchens).toHaveText(c.kitchens);
     });
 
