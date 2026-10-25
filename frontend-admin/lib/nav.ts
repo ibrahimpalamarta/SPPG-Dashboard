@@ -26,6 +26,3 @@ export const NAV = [
 ] as const satisfies readonly { href: string; label: string; icon: string; permission: Permission }[];
 
 export type NavHref = (typeof NAV)[number]["href"];
-
-/** Set by the kitchen selector in the header, read by selectedKitchen(). */
-export const KITCHEN_COOKIE = "kitchen";

@@ -28,7 +28,7 @@ export function NavLinks({ items }: { items: readonly NavItem[] }) {
 }
 
 export function AppSidebar({ items, user, kitchens }: { items: readonly NavItem[]; user: { name: string; email: string | null; role: Role }; kitchens: Kitchen[] }) {
-  const kitchenLabel = kitchens.length === 0 ? "Tanpa dapur" : kitchens.map((k) => (k.code === "SKN" ? `Pilot ${k.name}` : k.name)).join(", "); // ponytail: /api/me has no rolloutStatus; expose it there instead of matching SKN here
+  const kitchenLabel = kitchens.length === 0 ? "Tanpa dapur" : kitchens.map((k) => (k.rolloutStatus === "PILOT_PHASE_1" ? `Pilot ${k.name}` : k.name)).join(", ");
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-slate-200 bg-white lg:flex lg:flex-col" aria-label="Navigasi utama">
       <div className="flex h-full flex-col px-4 py-5">
