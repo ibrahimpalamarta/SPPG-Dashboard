@@ -25,6 +25,8 @@ export type Gate = {
     tsc: Severity;
     eslint: SeverityMap;
     eslintA11yInactive: Severity;
+    eslintEffect: Severity;
+    knip: Severity;
     semgrep: SeverityMap;
     gitleaks: Severity;
     vitest: { failed: Severity };
@@ -41,7 +43,7 @@ export type Gate = {
 
 export const STAGES = { ci: 'CI build', code: 'Code audit', logic: 'Logic test', env: 'Environment', e2e: 'Feature E2E', ui: 'UI/UX', report: 'Laporan & gate' } as const;
 export type Stage = keyof typeof STAGES;
-const TOOL_STAGE: Record<string, Stage> = { ci: 'ci', tsc: 'code', eslint: 'code', semgrep: 'code', gitleaks: 'code', vitest: 'logic', playwright: 'e2e' };
+const TOOL_STAGE: Record<string, Stage> = { ci: 'ci', tsc: 'code', eslint: 'code', knip: 'code', semgrep: 'code', gitleaks: 'code', vitest: 'logic', playwright: 'e2e' };
 const RANK: Record<Severity, number> = { Blocker: 0, Warning: 1, Info: 2 };
 
 const ids = (title: string) => [...title.matchAll(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\]/g)].map((m) => m[1]!);
@@ -90,6 +92,46 @@ function* pwTests(suites: PwSuite[] = [], path: string[] = []): Generator<{ titl
   }
 }
 
+const EFFECT_RULE_PREFIX = 'react-you-might-not-need-an-effect/';
+
+type KnipDoc = { files?: string[]; issues?: ({ file: string } & Record<string, unknown>)[] };
+const KNIP_LABEL: Record<string, string> = {
+  files: 'File tidak dipakai',
+  exports: 'Export tidak dipakai',
+  types: 'Type tidak dipakai',
+  duplicates: 'Export duplikat',
+  dependencies: 'Dependency tidak dipakai',
+  devDependencies: 'devDependency tidak dipakai',
+  unlisted: 'Dipakai tapi tidak ada di package.json',
+  unresolved: 'Import tidak ter-resolve',
+  binaries: 'Binary tidak terdaftar',
+};
+
+/** knip prints its JSON after any warnings, so take the outermost braces. */
+export function parseKnip(output: string): KnipDoc | null {
+  const start = output.indexOf('{');
+  const end = output.lastIndexOf('}');
+  if (start < 0 || end < start) return null;
+  try {
+    return JSON.parse(output.slice(start, end + 1)) as KnipDoc;
+  } catch {
+    return null;
+  }
+}
+
+export function knipFindings(doc: KnipDoc, severity: Severity, dir: string): Finding[] {
+  const found: Finding[] = (doc.files ?? []).map((f) => ({ severity, tool: 'knip', rule: 'knip-files', location: `${dir}/${f}`, message: KNIP_LABEL.files! }));
+  for (const issue of doc.issues ?? []) {
+    for (const [kind, items] of Object.entries(issue)) {
+      if (!Array.isArray(items)) continue;
+      for (const item of items as { name?: string; line?: number }[]) {
+        found.push({ severity, tool: 'knip', rule: `knip-${kind}`, location: `${dir}/${issue.file}:${item.line ?? 0}`, message: `${KNIP_LABEL[kind] ?? kind}: ${item.name ?? ''}` });
+      }
+    }
+  }
+  return found;
+}
+
 export function collect(read: (name: string) => unknown, files: string[], gate: Gate, ci: boolean): { findings: Finding[]; tests: TestCase[] } {
   const g = gate.severity;
   const findings: Finding[] = [];
@@ -108,7 +150,8 @@ export function collect(read: (name: string) => unknown, files: string[], gate: 
     for (const file of read('eslint-frontend-admin.json') as { filePath: string; messages: { ruleId: string | null; severity: number; message: string; line?: number }[] }[]) {
       for (const m of file.messages) {
         findings.push({
-          severity: g.eslint[m.severity === 2 ? 'error' : 'warning'] ?? 'Info',
+          // AI-style effects are a nudge, never a gate: Warning whatever level the plugin reports (QD-33).
+          severity: m.ruleId?.startsWith(EFFECT_RULE_PREFIX) ? g.eslintEffect : (g.eslint[m.severity === 2 ? 'error' : 'warning'] ?? 'Info'),
           tool: 'eslint',
           rule: m.ruleId ?? 'parse',
           location: `${relative(REPO, file.filePath).replaceAll('\\', '/')}:${m.line ?? 0}`,
@@ -116,6 +159,11 @@ export function collect(read: (name: string) => unknown, files: string[], gate: 
         });
       }
     }
+  }
+  if (files.includes('knip-frontend-admin.json')) {
+    const knip = parseKnip((read('knip-frontend-admin.json') as { output: string }).output);
+    if (knip) findings.push(...knipFindings(knip, g.knip, 'frontend-admin'));
+    else findings.push({ severity: ci ? g.toolMissingInCI : 'Warning', tool: 'infra', rule: 'knip-unparsable', message: 'Output knip bukan JSON.' });
   }
   if (files.includes('eslint-a11y-rules.json') && (read('eslint-a11y-rules.json') as { rules: string[] }).rules.length === 0) {
     findings.push({ severity: g.eslintA11yInactive, tool: 'eslint', rule: 'jsx-a11y-inactive', message: 'Tidak ada rule jsx-a11y aktif di config ESLint frontend-admin.' });
