@@ -109,7 +109,4 @@ module "compute" {
   assets_bucket_arn         = module.storage.bucket_arn
   assets_bucket_name        = module.storage.bucket_name
   acm_certificate_arn       = var.acm_certificate_arn
-  auth0_domain              = var.auth0_domain
-  auth0_audience            = var.auth0_audience
-  auth0_roles_claim         = var.auth0_roles_claim
 }
