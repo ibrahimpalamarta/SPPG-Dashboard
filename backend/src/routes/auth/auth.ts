@@ -9,6 +9,7 @@ import { wrap } from '../../lib/wrap.js';
 import { idParam } from '../../schemas/common.js';
 import {
   changePasswordBody,
+  invitationParam,
   loginBody,
   mfaDisableBody,
   mfaEnableBody,
@@ -17,6 +18,7 @@ import {
 } from '../../schemas/auth.js';
 import {
   changePassword,
+  getInvitation,
   login,
   logout,
   mfaDisable,
@@ -38,7 +40,7 @@ const credentialLimiter = rateLimit({
 });
 
 /**
- * Mounted before the authenticated API in app.ts. The first three routes are
+ * Mounted before the authenticated API in app.ts. The first four routes are
  * the ones that run without a session; everything after `requireAuth` needs
  * one, and the MFA/logout routes accept a not-yet-enrolled session so a role
  * that must use MFA can enrol.
@@ -48,6 +50,7 @@ export const authRouter = Router();
 authRouter.post('/login', credentialLimiter, validate({ body: loginBody }), wrap(login()));
 authRouter.post('/mfa/verify', credentialLimiter, validate({ body: mfaVerifyBody }), wrap(verifyMfa()));
 authRouter.post('/reset-password', credentialLimiter, validate({ body: resetPasswordBody }), wrap(resetPassword()));
+authRouter.get('/invitations/:token', credentialLimiter, validate({ params: invitationParam }), wrap(getInvitation()));
 
 authRouter.use(requireAuth(prisma, { allowUnenrolled: true }));
 

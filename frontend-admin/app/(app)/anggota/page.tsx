@@ -1,14 +1,22 @@
 import type { Metadata } from "next";
 import { apiGet } from "@/lib/api";
+import { Badge, type Tone } from "@/components/ui/badge";
 import { requirePage } from "@/lib/guard";
 import { ROLE_LABELS } from "@/lib/roles";
 import type { Kitchen } from "@/lib/me";
-import { issueReset, resetMfa, revokeSessions } from "./actions";
+import { cancelInvite, issueReset, resetMfa, revokeSessions } from "./actions";
 import { ActionButton, CreateUserForm, EditUserForm, type UserRow } from "./user-controls";
 
 export const metadata: Metadata = { title: "Anggota · SPPG Internal" };
 
 const card = "space-y-3 rounded-xl border border-slate-200 bg-white p-5";
+
+const STATUS: Record<UserRow["memberStatus"], [string, Tone]> = {
+  PENDING: ["Menunggu aktivasi", "amber"],
+  ACTIVE: ["Aktif", "green"],
+  EXPIRED: ["Kedaluwarsa", "red"],
+  INACTIVE: ["Nonaktif", "slate"],
+};
 
 const lastLogin = (iso: string | null) => (iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "Belum pernah");
 
@@ -26,7 +34,7 @@ export default async function Page() {
 
       {canManage ? (
         <section className={card}>
-          <h2 className="text-sm font-semibold text-slate-700">Akun baru</h2>
+          <h2 className="text-sm font-semibold text-slate-700">Undang anggota</h2>
           <CreateUserForm kitchens={kitchens} />
         </section>
       ) : (
@@ -54,7 +62,7 @@ export default async function Page() {
                 <td className="px-4 py-2">{ROLE_LABELS[u.role]}</td>
                 <td className="px-4 py-2">{u.kitchenScopes.map((s) => s.kitchen.code ?? s.kitchen.name).join(", ") || "—"}</td>
                 <td className="px-4 py-2">
-                  {u.status === "ACTIVE" ? "Aktif" : "Nonaktif"}
+                  <Badge tone={STATUS[u.memberStatus][1]}>{STATUS[u.memberStatus][0]}</Badge>
                   {u.mfaEnabled && <span className="block text-xs text-emerald-700">MFA aktif</span>}
                 </td>
                 <td className="px-4 py-2">{lastLogin(u.lastLoginAt)}</td>
@@ -67,7 +75,14 @@ export default async function Page() {
                       <div className="mt-3 space-y-4">
                         <EditUserForm user={u} kitchens={kitchens} self={u.id === me.id} />
                         <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                          <ActionButton action={issueReset.bind(null, u.id)} label="Buat tautan atur password" />
+                          {u.memberStatus === "PENDING" || u.memberStatus === "EXPIRED" ? (
+                            <>
+                              <ActionButton action={issueReset.bind(null, u.id, true)} label="Kirim ulang undangan" />
+                              <ActionButton action={cancelInvite.bind(null, u.id)} label="Batalkan undangan" confirm="Batalkan undangan ini? Tautan aktivasi langsung tidak berlaku." />
+                            </>
+                          ) : (
+                            <ActionButton action={issueReset.bind(null, u.id, false)} label="Buat tautan atur password" />
+                          )}
                           <ActionButton action={revokeSessions.bind(null, u.id)} label="Cabut semua sesi" confirm="Keluarkan akun ini dari semua perangkat?" />
                           {u.mfaEnabled && <ActionButton action={resetMfa.bind(null, u.id)} label="Reset MFA" confirm="Reset verifikasi dua langkah akun ini?" />}
                         </div>

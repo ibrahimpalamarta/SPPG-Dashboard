@@ -12,6 +12,7 @@ export type UserRow = {
   fullName: string | null;
   role: (typeof ROLES)[number];
   status: "ACTIVE" | "INACTIVE";
+  memberStatus: "ACTIVE" | "PENDING" | "EXPIRED" | "INACTIVE";
   mfaEnabled: boolean;
   lastLoginAt: string | null;
   kitchenScopes: { kitchen: Kitchen }[];
@@ -74,7 +75,7 @@ export function CreateUserForm({ kitchens }: { kitchens: Kitchen[] }) {
       <KitchenChecks kitchens={kitchens} selected={[]} />
       <Result state={state} />
       <button type="submit" disabled={pending} className={primaryButton}>
-        Buat akun
+        Kirim undangan
       </button>
     </form>
   );

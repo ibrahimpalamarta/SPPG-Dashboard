@@ -29,6 +29,15 @@ export const ERRORS = {
     status: 409,
     body: { error: 'invalid_transition', message: 'Status batch tidak bisa diubah ke status tersebut.' },
   },
+  // SCRUM-121: member administration.
+  LAST_SUPER_ADMIN: {
+    status: 409,
+    body: { error: 'last_super_admin', message: 'Project Manager MBG terakhir tidak bisa dinonaktifkan atau diturunkan perannya.' },
+  },
+  NOT_AN_INVITATION: {
+    status: 409,
+    body: { error: 'not_an_invitation', message: 'Akun ini tidak sedang menunggu aktivasi.' },
+  },
   UNPROCESSABLE: {
     status: 422,
     body: { error: 'unprocessable', message: 'File was read but its contents were rejected' },
