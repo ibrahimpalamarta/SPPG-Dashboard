@@ -3,17 +3,28 @@ import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
 import type { Db } from '../../db.js';
 import type { Role } from '../../auth/roles.js';
-import type { AppUser } from '../../auth/user-sync.js';
+import type { AppUser } from '../../auth/user.js';
 import { getMe } from './me.js';
+
+const PERMS: Record<Role, AppUser['permissions']> = {
+  SUPER_ADMIN: ['upload:create', 'batch:review'],
+  DATA_ADMIN: ['upload:create', 'mapping:propose'],
+  CMS_ADMIN: [],
+  INTERNAL: [],
+  PUBLIC: [],
+};
 
 const userWith = (role: Role, ...kitchenIds: bigint[]): AppUser => ({
   id: 7n,
-  auth0Sub: 'auth0|secret-subject',
   email: 'pic@example.com',
   fullName: 'PIC Sukun',
   role,
   status: 'ACTIVE',
   lastLoginAt: new Date(),
+  failedLoginCount: 2,
+  lockedUntil: null,
+  mfaEnabled: true,
+  permissions: PERMS[role],
   kitchenScopes: kitchenIds.map((kitchenId) => ({ kitchenId })),
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -46,9 +57,9 @@ async function run(user: AppUser) {
 }
 
 describe('GET /api/me (SCRUM-20)', () => {
-  test('returns only the shell fields — no auth0 subject, status or timestamps', async () => {
+  test('returns only the shell fields — no status, lockout counters or timestamps', async () => {
     const { body } = await run(userWith('DATA_ADMIN', 2n));
-    assert.deepEqual(Object.keys(body).sort(), ['email', 'fullName', 'id', 'kitchens', 'permissions', 'role']);
+    assert.deepEqual(Object.keys(body).sort(), ['email', 'fullName', 'id', 'kitchens', 'mfaEnabled', 'mfaEnrollmentRequired', 'permissions', 'role']);
     assert.deepEqual(body.kitchens, [{ id: '2', code: 'SKN', name: 'Sukun' }]);
   });
 
@@ -62,7 +73,7 @@ describe('GET /api/me (SCRUM-20)', () => {
     assert.deepEqual(where, { id: { in: [] } });
   });
 
-  test('exposes the role permission list, including mapping:propose for DATA_ADMIN', async () => {
+  test('exposes the permissions loaded for the request, including mapping:propose for DATA_ADMIN', async () => {
     const { body } = await run(userWith('DATA_ADMIN', 2n));
     assert.ok((body.permissions as string[]).includes('mapping:propose'));
     assert.ok(!(body.permissions as string[]).includes('batch:review'));

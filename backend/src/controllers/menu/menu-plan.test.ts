@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
 import type { Db } from '../../db.js';
 import type { Role } from '../../auth/roles.js';
-import type { AppUser } from '../../auth/user-sync.js';
+import type { AppUser } from '../../auth/user.js';
 import { listMenuPlans } from './menu-plan.js';
 
 const userWith = (role: Role, kitchenId: bigint | null = null): AppUser =>

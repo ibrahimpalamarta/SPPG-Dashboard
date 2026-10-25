@@ -1,7 +1,10 @@
 import type { RequestHandler } from 'express';
+import { env } from '../config/env.js';
 import { prisma, type Db } from '../db.js';
-import { findOrCreateUser, type AppUser } from './user-sync.js';
-import { hasPermission, type Permission, type Role } from './roles.js';
+import { resolveSession } from './session.js';
+import { permissionsFor } from './rbac-store.js';
+import type { AppUser } from './user.js';
+import type { Permission, Role } from './roles.js';
 import { sendError } from '../middleware/error-handler.js';
 
 declare global {
@@ -9,22 +12,43 @@ declare global {
   namespace Express {
     interface Request {
       user?: AppUser;
+      /** Id of the session this request authenticated with. */
+      sessionId?: bigint;
     }
   }
 }
 
 /**
- * Turns an authenticated token into `req.user`, provisioning the row on first
- * sight. Mount after requireAuth and before any requireRole/requirePermission.
+ * Authentication: proves the caller holds a live session and loads `req.user`.
+ * Says nothing about what they may do — that is requireRole/requirePermission.
+ *
+ * The token arrives as `Authorization: Bearer`, sent by the frontend's server
+ * side; browsers never hold it. Role and permissions come from Postgres on
+ * every request, so revoking a session, disabling an account or editing a role
+ * takes effect immediately rather than at some token expiry.
  */
-export function attachUser(db: Db = prisma): RequestHandler {
+export function requireAuth(db: Db = prisma, { allowUnenrolled = false } = {}): RequestHandler {
   return async (req, res, next) => {
-    if (!req.auth) {
-      sendError(res, 'INVALID_TOKEN');
+    const header = req.headers.authorization;
+    if (typeof header !== 'string' || !header.startsWith('Bearer ')) {
+      sendError(res, 'MISSING_TOKEN');
       return;
     }
     try {
-      req.user = await findOrCreateUser(req.auth, db);
+      const found = await resolveSession(header.slice(7).trim(), db);
+      if (!found) {
+        // Deliberately opaque: expired vs revoked vs disabled look identical.
+        sendError(res, 'INVALID_TOKEN');
+        return;
+      }
+      // A role that must use MFA gets a session at login (it needs one to enrol),
+      // but that session opens nothing except the enrolment routes.
+      if (!allowUnenrolled && env.MFA_REQUIRED_ROLES.includes(found.user.role) && !found.user.mfaEnabled) {
+        sendError(res, 'MFA_ENROLLMENT_REQUIRED');
+        return;
+      }
+      req.user = { ...found.user, permissions: await permissionsFor(found.user.role, db) };
+      req.sessionId = found.sessionId;
       next();
     } catch (err) {
       next(err);
@@ -36,9 +60,7 @@ export function attachUser(db: Db = prisma): RequestHandler {
  * Authorization. Separate from requireAuth on purpose: 401 means "who are
  * you?", 403 means "not you".
  *
- * Reads the role off `req.user` (Postgres), never off the raw token.
- *
- *   router.post('/pengeluaran', requireAuth(), attachUser(), requireRole('SUPER_ADMIN', 'DATA_ADMIN'), handler)
+ *   router.post('/pengeluaran', requireRole('SUPER_ADMIN', 'DATA_ADMIN'), handler)
  *
  * INTERNAL and PUBLIC are read-only simply by never appearing on a mutating
  * route's allow-list.
@@ -57,14 +79,14 @@ export function requireRole(...allowed: Role[]): RequestHandler {
   };
 }
 
-/** SCRUM-20: same as requireRole, against ROLE_PERMISSIONS instead of a list. */
+/** SCRUM-20: same as requireRole, against the role's permissions instead of a list. */
 export function requirePermission(perm: Permission): RequestHandler {
   return (req, res, next) => {
     if (!req.user) {
       sendError(res, 'INVALID_TOKEN');
       return;
     }
-    if (!hasPermission(req.user.role, perm)) {
+    if (!req.user.permissions.includes(perm)) {
       sendError(res, 'FORBIDDEN');
       return;
     }

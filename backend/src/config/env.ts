@@ -5,39 +5,6 @@ import { z } from 'zod';
  * Fails fast at boot with a readable list of what is missing — never with a
  * value dumped into the message.
  */
-/**
- * Bare tenant host. Accepts what people actually paste — a full issuer URL, or
- * the Management API audience `https://tenant/api/v2/` — because every consumer
- * builds its own `https://${domain}/...` and a scheme here doubles it up.
- */
-export const auth0Domain = z
-  .string()
-  .min(1)
-  .transform((v) => v.replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
-  .pipe(z.string().min(1));
-
-const CHAR_CLASSES = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
-
-/**
- * Auth0's default database-connection policy ("Good"): at least 3 of lowercase
- * / uppercase / digit / symbol. Length on its own does not satisfy it —
- * `supersecret123oke` is 17 characters and still only two classes.
- *
- * Checked here so a weak password fails instantly with an actionable message,
- * instead of coming back as a Management API 400 that reads like a length
- * complaint.
- *
- * ponytail: mirrors the *default* policy. Auth0 stays the authority — if the
- * tenant's policy is tightened, this only catches the common case early.
- */
-export const auth0Password = z
-  .string()
-  .min(12)
-  .refine((v) => CHAR_CLASSES.filter((re) => re.test(v)).length >= 3, {
-    message:
-      'must mix at least 3 of: lowercase, uppercase, digits, symbols (Auth0 default policy). Leave it blank to have a strong one generated instead.',
-  });
-
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(8080),
@@ -67,18 +34,48 @@ const schema = z.object({
    * target, and it is what stops an upload from becoming a memory lever. */
   UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
 
-  // Auth0 — none of these are secrets: the API only ever verifies tokens.
-  // The Management API credentials live in the seed script's own env, not here.
-  AUTH0_DOMAIN: auth0Domain,
-  AUTH0_AUDIENCE: z.string().min(1),
-  AUTH0_ROLES_CLAIM: z.string().min(1),
+  // Sessions (auth/session.ts). The idle timeout slides with use; the absolute
+  // cap does not, so a stolen cookie cannot be kept alive forever.
+  SESSION_IDLE_MINUTES: z.coerce.number().int().positive().default(8 * 60),
+  SESSION_ABSOLUTE_HOURS: z.coerce.number().int().positive().default(7 * 24),
+
+  // Brute-force protection: per-account lockout plus a per-IP limiter on the
+  // unauthenticated /api/auth routes.
+  LOGIN_MAX_FAILURES: z.coerce.number().int().positive().default(5),
+  LOGIN_LOCK_MINUTES: z.coerce.number().int().positive().default(15),
+  AUTH_ENDPOINT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60_000),
+  AUTH_ENDPOINT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+
+  // Lifetime of a set/reset-password link.
+  PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(60),
+
+  // 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts TOTP secrets
+  // at rest and signs the short-lived MFA challenge token. Rotating it
+  // invalidates every enrolled authenticator.
+  MFA_ENCRYPTION_KEY: z
+    .string()
+    .min(1)
+    .refine((v) => Buffer.from(v, 'base64').length === 32, {
+      message: 'must be 32 bytes, base64-encoded',
+    }),
+  // Roles that cannot get a session without MFA (comma-separated Role names).
+  MFA_REQUIRED_ROLES: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((r) => r.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.enum(['SUPER_ADMIN', 'DATA_ADMIN', 'CMS_ADMIN', 'INTERNAL', 'PUBLIC']))),
 
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60_000),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
 
   // The public dashboard is unauthenticated, so its limiter is separate: no
-  // token verification and no find-or-create write behind it, but also no
-  // caller identity to attribute abuse to.
+  // session lookup and no write behind it, but also no caller identity to
+  // attribute abuse to.
   PUBLIC_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   PUBLIC_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
 
@@ -132,6 +129,3 @@ if (env.NODE_ENV === 'production' && !env.DATABASE_URL_PUBLIC) {
     'Set DATABASE_URL_PUBLIC (role sppg_public). See scripts/grant-public-role.ts.',
   );
 }
-
-/** Auth0 issuer. Always https — Auth0 does not serve tokens over anything else. */
-export const AUTH0_ISSUER = `https://${env.AUTH0_DOMAIN}/`;

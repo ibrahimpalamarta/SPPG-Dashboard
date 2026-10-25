@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { kitchenScope, kitchenWhere, menuPlanWhere } from './scope.js';
 import type { Role } from '../auth/roles.js';
-import type { AppUser } from '../auth/user-sync.js';
+import type { AppUser } from '../auth/user.js';
 
 function userWith(role: Role, ...kitchenIds: bigint[]): AppUser {
   return { id: 1n, role, kitchenScopes: kitchenIds.map((kitchenId) => ({ kitchenId })) } as AppUser;

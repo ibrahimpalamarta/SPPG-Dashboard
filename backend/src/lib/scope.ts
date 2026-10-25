@@ -1,5 +1,5 @@
 import { resolveKitchenIds } from '../auth/guard.js';
-import type { AppUser } from '../auth/user-sync.js';
+import type { AppUser } from '../auth/user.js';
 
 /**
  * Multi-tenant filtering. The tenant is `Kitchen`; every scoped table carries
