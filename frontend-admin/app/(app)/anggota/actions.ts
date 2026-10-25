@@ -30,7 +30,7 @@ export async function createUser(_prev: UserActionState, form: FormData): Promis
     kitchenIds: ids(form),
   });
   if (!res.ok) return failure(res);
-  revalidatePath("/pengguna");
+  revalidatePath("/anggota");
   return { ok: true, message: "Akun dibuat. Kirim tautan ini ke pemilik akun (berlaku sekali, tidak ditampilkan lagi):", resetPath: resetPath(res.data.resetToken) };
 }
 
@@ -43,7 +43,7 @@ export async function saveUser(id: string, _prev: UserActionState, form: FormDat
     kitchenIds: ids(form),
   });
   if (!res.ok) return failure(res);
-  revalidatePath("/pengguna");
+  revalidatePath("/anggota");
   return { ok: true, message: "Tersimpan." };
 }
 
@@ -61,6 +61,6 @@ export async function revokeSessions(id: string): Promise<UserActionState> {
 export async function resetMfa(id: string): Promise<UserActionState> {
   const res = await apiSend(`/admin/users/${id}/mfa-reset`, "POST");
   if (!res.ok) return failure(res);
-  revalidatePath("/pengguna");
+  revalidatePath("/anggota");
   return { ok: true, message: "Verifikasi dua langkah direset." };
 }

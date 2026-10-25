@@ -16,7 +16,7 @@ di belakang login internal (SCRUM-21; mekanismenya di `backend/docs/AUTH.md`).
 
 Halaman auth: `/login` (+ langkah MFA), `/reset-password/<token>` (set/reset
 password dari link admin), `/keamanan` (ubah password, MFA, sesi aktif), serta
-administrasi `/pengguna` dan `/peran` yang menu-nya hanya muncul untuk izin
+administrasi `/anggota` dan `/peran` yang menu-nya hanya muncul untuk izin
 `users:read` / `settings:manage`.
 
 Variabel lingkungan: lihat `.env.example` (salin ke `.env.local`) — hanya

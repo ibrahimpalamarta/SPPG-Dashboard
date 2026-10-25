@@ -6,14 +6,14 @@ import type { Kitchen } from "@/lib/me";
 import { issueReset, resetMfa, revokeSessions } from "./actions";
 import { ActionButton, CreateUserForm, EditUserForm, type UserRow } from "./user-controls";
 
-export const metadata: Metadata = { title: "Pengguna · SPPG Internal" };
+export const metadata: Metadata = { title: "Anggota · SPPG Internal" };
 
 const card = "space-y-3 rounded-xl border border-slate-200 bg-white p-5";
 
 const lastLogin = (iso: string | null) => (iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "Belum pernah");
 
 export default async function Page() {
-  const me = await requirePage("/pengguna");
+  const me = await requirePage("/anggota");
   const canManage = me.permissions.includes("users:manage");
   const [{ data: users }, { data: kitchens }] = await Promise.all([
     apiGet<{ data: UserRow[] }>("/admin/users?pageSize=100"),
@@ -22,7 +22,7 @@ export default async function Page() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <h1 className="text-lg font-semibold text-slate-800">Pengguna</h1>
+      <h1 className="text-lg font-semibold text-slate-800">Anggota</h1>
 
       {canManage ? (
         <section className={card}>
@@ -30,14 +30,14 @@ export default async function Page() {
           <CreateUserForm kitchens={kitchens} />
         </section>
       ) : (
-        <p className="text-sm text-slate-500">Anda dapat melihat daftar pengguna, tetapi tidak dapat mengubahnya.</p>
+        <p className="text-sm text-slate-500">Anda dapat melihat daftar anggota, tetapi tidak dapat mengubahnya.</p>
       )}
 
       <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="text-xs text-slate-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Pengguna</th>
+              <th className="px-4 py-2 font-medium">Anggota</th>
               <th className="px-4 py-2 font-medium">Peran</th>
               <th className="px-4 py-2 font-medium">Dapur</th>
               <th className="px-4 py-2 font-medium">Status</th>
