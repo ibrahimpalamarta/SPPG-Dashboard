@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { REPO } from '../../scripts/lib.js';
 import { collect, evaluate, type Finding, type Gate, type Requirement, type TestCase } from '../../scripts/merge-report.js';
 
 const gate = JSON.parse(readFileSync('gate.json', 'utf8')) as Gate;
@@ -80,5 +82,26 @@ describe('gate', () => {
     const doc = { suites: [{ title: 'auth.setup.ts', file: 'auth.setup.ts', specs: [{ title: 'login finance', tags: [], tests: [{ projectName: 'setup', status: 'unexpected' }] }] }] };
     const { findings } = collect(() => doc, ['playwright.json'], gate, true);
     expect(findings[0]!.severity).toBe('Blocker');
+  });
+
+  it('[QA-GATE] semgrep: rule ber-tag security jadi Blocker walau level warning, path absolut dijadikan relatif', () => {
+    const rule = (id: string, tags: string[], level = 'warning') => ({ id, defaultConfiguration: { level }, properties: { tags } });
+    const result = (ruleId: string, uri: string) => ({ ruleId, message: { text: 'm' }, locations: [{ physicalLocation: { artifactLocation: { uri }, region: { startLine: 7 } } }] });
+    const doc = {
+      runs: [{ tool: { driver: { rules: [rule('sec', ['security']), rule('style', ['best-practice'])] } }, results: [result('sec', 'backend/src/a.ts'), result('style', 'backend/src/b.ts')] }],
+    };
+    const { findings } = collect(() => doc, ['semgrep.sarif'], gate, true);
+    expect(findings.map((f) => f.severity)).toEqual(['Blocker', 'Warning']);
+    expect(findings[0]!.location).toBe('backend/src/a.ts:7');
+    const abs = { runs: [{ results: [result('x', join(REPO, 'backend', 'src', 'c.ts'))] }] };
+    expect(collect(() => abs, ['semgrep.sarif'], gate, true).findings[0]!.location).toBe('backend/src/c.ts:7');
+  });
+
+  it('[QA-GATE] waiver raw-sql grant-public-role di gate.json masih berlaku, file lain tetap Blocker', () => {
+    const f = (location: string): Finding => ({ severity: 'Blocker', tool: 'semgrep', rule: 'qa-audit.semgrep.sppg-raw-sql-unsafe', location, message: 'raw sql' });
+    const v = evaluate({ gate, requirements: [], findings: [f('backend/scripts/grant-public-role.ts:38')], tests: [], outcomes: {}, today });
+    expect(v.verdict).toBe('pass');
+    const other = evaluate({ gate, requirements: [], findings: [f('backend/src/other.ts:1')], tests: [], outcomes: {}, today });
+    expect(other.verdict).toBe('fail');
   });
 });

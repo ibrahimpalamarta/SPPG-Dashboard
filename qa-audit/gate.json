@@ -4,7 +4,7 @@
     "tsc": "Blocker",
     "eslint": { "error": "Warning", "warning": "Info" },
     "eslintA11yInactive": "Warning",
-    "semgrep": { "error": "Blocker", "warning": "Warning", "note": "Info" },
+    "semgrep": { "error": "Blocker", "warning": "Warning", "note": "Info", "security": "Blocker" },
     "gitleaks": "Blocker",
     "vitest": { "failed": "Blocker" },
     "playwright": { "failed": "Warning", "flaky": "Warning" },
@@ -24,5 +24,12 @@
     "visualDiffRatio": 0.01
   },
   "unwaivable": ["gitleaks"],
-  "waivers": []
+  "waivers": [
+    {
+      "match": "semgrep:qa-audit.semgrep.sppg-raw-sql-unsafe:backend/scripts/grant-public-role.ts",
+      "reason": "DDL ALTER ROLE tidak bisa di-bind; SQL dibangun Postgres format() dengan %I/%L dari parameter ter-bind (QD-31)",
+      "owner": "ItsMauls",
+      "expires": "2027-04-30"
+    }
+  ]
 }
