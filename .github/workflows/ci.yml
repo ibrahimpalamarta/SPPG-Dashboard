@@ -62,6 +62,14 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ matrix.app }}/package-lock.json
 
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.app }}/.next/cache
+          key: nextjs-${{ matrix.app }}-${{ runner.os }}-${{ hashFiles(format('{0}/package-lock.json', matrix.app)) }}-${{ hashFiles(format('{0}/**/*.[jt]s', matrix.app), format('{0}/**/*.[jt]sx', matrix.app), format('!{0}/node_modules/**', matrix.app), format('!{0}/.next/**', matrix.app)) }}
+          restore-keys: |
+            nextjs-${{ matrix.app }}-${{ runner.os }}-${{ hashFiles(format('{0}/package-lock.json', matrix.app)) }}-
+
       # `next build` type-checks as part of building, so this is the type gate
       # too — same arrangement as the backend job. Neither app has tests yet.
       - name: Install and build
