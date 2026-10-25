@@ -1,6 +1,6 @@
 "use server";
 
-import { auth0 } from "@/lib/auth0";
+import { apiFetch } from "@/lib/api";
 
 export type UploadedSheet = { name: string; headerRow: number | null; rowCount: number };
 
@@ -26,12 +26,7 @@ export async function uploadFile(_prev: UploadResult | null, form: FormData): Pr
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Pilih file .xlsx terlebih dahulu." };
   if (!form.get("period")) form.delete("period");
 
-  const { token } = await auth0.getAccessToken();
-  const res = await fetch(`${process.env.API_BASE_URL}/api/upload-batches`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
+  const res = await apiFetch("/upload-batches", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {

@@ -1,19 +1,26 @@
 # SPPG Dashboard — Frontend Admin
 
 Next.js 16 (App Router) + TypeScript + Tailwind 4. Backoffice + Dashboard Internal
-di belakang Auth0 (SCRUM-21).
+di belakang login internal (SCRUM-21; mekanismenya di `backend/docs/AUTH.md`).
 
-- `proxy.ts` (Next 16: pengganti middleware) memasang rute `/auth/*` Auth0 dan
-  mengirim siapa pun tanpa sesi ke login.
+- `proxy.ts` (Next 16: pengganti middleware) mengirim siapa pun tanpa cookie sesi
+  ke `/login`. Cookie `sppg_session` (httpOnly) hanya memegang token sesi dari
+  backend; sesi yang sudah mati ditolak backend di request API pertama dan
+  diarahkan ke `/sesi-berakhir`. Browser tidak pernah memanggil backend langsung —
+  semua lewat server (`lib/api.ts`, server action).
 - `lib/nav.ts` = tujuh halaman PRD §5 + permission tiap halaman. Daftar ini dipakai
   sidebar (menu disembunyikan) **dan** `requirePage()` (deep-link → 403).
-- `lib/me.ts` memanggil `GET /api/me` dengan access token sesi. Backend tetap
+- `lib/me.ts` memanggil `GET /api/me` dengan token sesi. Backend tetap
   memeriksa permission + scope dapur di setiap request; frontend hanya menggambar.
 - Halaman tanpa fitur menampilkan `EmptyState` ("belum tersedia"), tidak pernah angka palsu.
 
-Variabel lingkungan: lihat `.env.example` (salin ke `.env.local`). Butuh aplikasi
-Auth0 tipe *Regular Web Application* dengan callback
-`<APP_BASE_URL>/admin/auth/callback` dan logout URL `<APP_BASE_URL>/admin`.
+Halaman auth: `/login` (+ langkah MFA), `/reset-password/<token>` (set/reset
+password dari link admin), `/keamanan` (ubah password, MFA, sesi aktif), serta
+administrasi `/pengguna` dan `/peran` yang menu-nya hanya muncul untuk izin
+`users:read` / `settings:manage`.
+
+Variabel lingkungan: lihat `.env.example` (salin ke `.env.local`) — hanya
+`API_BASE_URL`.
 
 ---
 

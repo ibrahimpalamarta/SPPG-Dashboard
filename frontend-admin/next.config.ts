@@ -14,8 +14,8 @@ const nextConfig: NextConfig = {
 
   basePath,
 
-  // The Auth0 SDK mounts /auth/* under this prefix, and plain <a> links to
-  // those routes need it too. Derived here so basePath stays the one source.
+  // Read by the session cookie path (lib/session.ts) and the reset links. Derived
+  // here so basePath stays the one source.
   env: { NEXT_PUBLIC_BASE_PATH: basePath },
 
   experimental: {

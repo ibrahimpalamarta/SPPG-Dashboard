@@ -1,21 +1,15 @@
 "use client";
 
-import { Activity, BookOpen, LayoutDashboard, LogOut, Map, PenLine, Upload, Wallet } from "lucide-react";
+import { Activity, BookOpen, LayoutDashboard, LogOut, Map, PenLine, ShieldCheck, Upload, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logout } from "@/app/login/actions";
 import type { NAV } from "@/lib/nav";
+import { ROLE_LABELS, type Role } from "@/lib/roles";
 
-const ICONS = { Activity, BookOpen, LayoutDashboard, Map, PenLine, Upload, Wallet };
+const ICONS = { Activity, BookOpen, LayoutDashboard, Map, PenLine, ShieldCheck, Upload, Users, Wallet };
 
 export type NavItem = (typeof NAV)[number];
-
-const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN: "Project Manager MBG",
-  DATA_ADMIN: "Data Admin Dapur",
-  INTERNAL: "Internal (lihat saja)",
-  CMS_ADMIN: "Admin CMS",
-  PUBLIC: "Publik",
-};
 
 export function NavLinks({ items }: { items: readonly NavItem[] }) {
   const pathname = usePathname();
@@ -32,7 +26,7 @@ export function NavLinks({ items }: { items: readonly NavItem[] }) {
   });
 }
 
-export function AppSidebar({ items, user }: { items: readonly NavItem[]; user: { name: string; email: string | null; role: string } }) {
+export function AppSidebar({ items, user }: { items: readonly NavItem[]; user: { name: string; email: string | null; role: Role } }) {
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-slate-200 bg-white lg:flex lg:flex-col" aria-label="Navigasi utama">
       <div className="flex h-full flex-col px-4 py-5">
@@ -51,12 +45,17 @@ export function AppSidebar({ items, user }: { items: readonly NavItem[]; user: {
         <div className="mt-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="truncate text-sm font-semibold text-slate-800">{user.name}</p>
           {user.email && <p className="truncate text-xs text-slate-500">{user.email}</p>}
-          <p className="mt-1 inline-block rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{ROLE_LABELS[user.role] ?? user.role}</p>
-          {/* A plain <a>: /auth/* is served by the Auth0 proxy, not an app route. */}
-          <a href={`${process.env.NEXT_PUBLIC_BASE_PATH}/auth/logout`} className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-800">
-            <LogOut className="size-3.5" aria-hidden="true" />
-            Keluar
-          </a>
+          <p className="mt-1 inline-block rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{ROLE_LABELS[user.role]}</p>
+          <Link href="/keamanan" className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-800">
+            <ShieldCheck className="size-3.5" aria-hidden="true" />
+            Keamanan akun
+          </Link>
+          <form action={logout}>
+            <button className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-800">
+              <LogOut className="size-3.5" aria-hidden="true" />
+              Keluar
+            </button>
+          </form>
         </div>
       </div>
     </aside>

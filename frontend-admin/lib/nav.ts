@@ -1,7 +1,7 @@
-import type { Permission } from "@/lib/me";
+import type { Permission } from "@/lib/roles";
 
 /**
- * PRD §5: the seven Phase 1 pages. One list drives both the sidebar (hide what
+ * PRD §5: the seven Phase 1 pages, plus account administration. One list drives both the sidebar (hide what
  * the role cannot open) and requirePage() (reject a deep link to it), so the
  * two can never disagree.
  *
@@ -17,6 +17,9 @@ export const NAV = [
   { href: "/referensi-data", label: "Data Reference", icon: "BookOpen", permission: "reference:view" },
   // Fallback terkontrol (PRD §4.2); the form itself is SCRUM-108.
   { href: "/input-manual", label: "Manual / Quick Entry", icon: "PenLine", permission: "upload:create" },
+  // Administrasi akun; hanya muncul bagi peran yang diberi izinnya.
+  { href: "/pengguna", label: "Pengguna", icon: "Users", permission: "users:read" },
+  { href: "/peran", label: "Peran & Izin", icon: "ShieldCheck", permission: "settings:manage" },
 ] as const satisfies readonly { href: string; label: string; icon: string; permission: Permission }[];
 
 export type NavHref = (typeof NAV)[number]["href"];
