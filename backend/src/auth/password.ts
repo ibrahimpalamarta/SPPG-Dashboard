@@ -4,7 +4,7 @@ import { z } from 'zod';
 const CHAR_CLASSES = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
 
 /**
- * Same policy Auth0's default database connection enforced ("Good"): at least
+ * The policy of the previous Auth0 default ("Good"), kept so existing habits hold: at least
  * 12 characters and 3 of lowercase / uppercase / digit / symbol. Length alone
  * is not enough — `supersecret123oke` is 17 characters and only two classes.
  * The upper bound keeps argon2 from hashing megabytes of attacker input.
