@@ -40,6 +40,9 @@ environment yang gagal menjadi `infra-error`, bukan kegagalan produk. Test non-s
   laporan Playwright + trace, raw, `env.log`). `.auth/` tidak ikut.
 - Satu komentar PR ber-marker `<!-- qa-audit -->`, diperbarui tiap run (bukan dibuat ulang).
   PR dari fork tidak punya izin tulis; step ini `continue-on-error`.
+- Step `AI review` (QD-30, hanya saran): bila ada Blocker/Warning, temuan + diff PR dikirim ke
+  `AI_MODEL`, jawabannya ditambahkan sebagai "Analisis AI" di komentar PR, `scorecard.html`, dan
+  `reports/ai-review.md`. Tidak pernah mengubah verdict; tanpa `AI_API_KEY` (mis. PR dari fork) dilewati.
 
 ## Secret dan variable
 | Nama | Jenis | Dipakai | Status |
@@ -48,6 +51,8 @@ environment yang gagal menjadi `infra-error`, bukan kegagalan produk. Test non-s
 | `QA_STAGING_URL` | variable | ZAP mingguan, fase 5 | fase 4 |
 | `QA_S3_BUCKET`, `QA_S3_ROLE_ARN`, `AWS_REGION` | variable | publikasi scorecard ke S3 privat | ditunda (QD-20) |
 | `JIRA_*` | secret | sinkronisasi Jira | fase 5 |
+| `AI_API_KEY` | secret | Analisis AI (QD-30); wrapper meneruskan lewat `secrets: inherit` | aktif |
+| `AI_BASE_URL`, `AI_MODEL` | variable | endpoint OpenAI-compatible + model, mis. `https://openrouter.ai/api/v1` | aktif |
 
 `GITHUB_TOKEN` cukup untuk komentar PR (`pull-requests: write`) dan, nanti, issue otomatis (`issues: write`).
 
