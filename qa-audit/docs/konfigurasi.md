@@ -17,6 +17,9 @@ Dibaca dari environment, atau `qa-audit/.env` (lihat [`.env.example`](../.env.ex
 | `RUN_VISUAL` | – | `1` = jalankan `@visual` di laptop (baseline tetap dari CI) |
 | `ENFORCE` | `1` | `0` = laporan saja, exit 0 |
 | `QA_TRIGGER`, `QA_STARTED_AT`, `OUTCOME_*` | – | Diisi CI / `audit.ts` |
+| `AI_API_KEY` | – | Kunci Analisis AI (`npm run ai-review`, QD-30). Kosong = dilewati |
+| `AI_BASE_URL` | `https://openrouter.ai/api/v1` | Endpoint OpenAI-compatible |
+| `AI_MODEL` | – | Model, wajib bila `AI_API_KEY` diisi |
 
 Port tetap: Postgres 15432, backend 18080, frontend-admin 13000 (`scripts/lib.ts`), sengaja beda
 dari port dev (5432/8080/3000) supaya bisa jalan berdampingan dengan dev server.
