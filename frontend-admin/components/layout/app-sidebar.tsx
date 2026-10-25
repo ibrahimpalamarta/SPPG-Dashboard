@@ -1,13 +1,13 @@
 "use client";
 
-import { Activity, BookOpen, LayoutDashboard, LogOut, Map, PenLine, ShieldCheck, Upload, Users, Wallet } from "lucide-react";
+import { Activity, BookOpen, Inbox, LayoutDashboard, LogOut, Map, PenLine, ShieldCheck, Upload, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/login/actions";
 import type { NAV } from "@/lib/nav";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 
-const ICONS = { Activity, BookOpen, LayoutDashboard, Map, PenLine, ShieldCheck, Upload, Users, Wallet };
+const ICONS = { Activity, BookOpen, Inbox, LayoutDashboard, Map, PenLine, ShieldCheck, Upload, Users, Wallet };
 
 export type NavItem = (typeof NAV)[number];
 

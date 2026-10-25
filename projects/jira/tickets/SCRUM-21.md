@@ -1,5 +1,5 @@
 # SCRUM-21: App shell & navigation
-Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-AUTH0-FE) | Terakhir diubah: 2026-10-23 14:00
+Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-DOCS) | Terakhir diubah: 2026-10-25
 
 ## Kondisi awal (hasil audit kode)
 - `frontend-admin` (Next 16.3, React 19, Tailwind 4, lucide-react). Mockup statis di working tree, belum di-commit: overview/finance/kelengkapan/unggah-data/login.
@@ -18,17 +18,18 @@ Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-AUTH0-FE) | Terakhir diubah:
 - [x] `app/error.tsx` (gagal memuat `/api/me` dll.)
 - [x] Hapus seluruh mock: `lib/mock/*`, komponen finance/kelengkapan/overview/unggah/ui/login, CSS animasi chart
 - [x] `.env.example` + README frontend
+- [x] Auth0 diganti login internal (email + password, MFA TOTP, cookie `sppg_session`) di PR #27; B-AUTH0-FE tertutup
+- [x] Halaman **Inbox** (`/inbox`, `upload:create`: Data Operasional + PM; isi tugas menyusul di SCRUM-117) dan **Anggota** (`/anggota`, `users:read`; menggantikan `/pengguna`) — feature/scrum-21-inbox-anggota
+- [x] Tidak ada board Antrian Batch
 
 ## Sisa pekerjaan
-- [ ] Verifikasi login nyata dengan aplikasi Auth0 *Regular Web Application* (B-AUTH0-FE)
-- [ ] Env Auth0 + `API_BASE_URL` di task definition ECS frontend-admin (infra, B-AUTH0-FE)
 - [ ] Sesuaikan dengan Clickable Prototype v0.2 bila tersedia (B-DOCS)
 
 ## Acceptance criteria
-- [x] 7 halaman bisa dinavigasi sesuai role (diverifikasi dengan sesi lokal + stub `/api/me`, lihat Test)
+- [x] Halaman Login, Overview, Upload, Mapping & Validasi, Finance, Kelengkapan Data, Data Reference, Manual Entry, Inbox, Anggota ada dan bisa dinavigasi sesuai role
 - [x] Deep-link ke halaman terlarang ditolak (HTTP 403)
 - [x] Menu terlarang disembunyikan; route ditolak di server (server component, bukan CSS)
-- [ ] Login Auth0 end-to-end (B-AUTH0-FE)
+- [x] Login internal end-to-end (PR #27)
 
 ## Test
 Tidak ada test runner di frontend. Diverifikasi manual pada `next start` (build produksi), memakai sesi buatan `@auth0/nextjs-auth0/testing` `generateSessionCookie` dan stub `/api/me` (skrip di scratchpad sesi, tidak di-commit):
@@ -40,10 +41,12 @@ Tidak ada test runner di frontend. Diverifikasi manual pada `next start` (build 
 6. `/admin/auth/login` dengan domain dummy → 500 (discovery gagal, bukti rute terpasang; butuh tenant nyata)
 - `npm run lint` ✔, `npm run knip` ✔, `tsc --noEmit` ✔, `npm run build` ✔
 
+- 25 Okt (Inbox/Anggota): `npm run lint` ✔, `npm run knip` ✔, `tsc --noEmit` ✔, `npm run build` ✔ (rute `/inbox`, `/anggota` terdaftar). E2E qa-audit `rbac.spec.ts` diperbarui: Inbox hanya terlihat oleh role yang bisa memasukkan data, deep-link `/anggota` → 403.
+
 Temuan saat test: `loading.tsx` di `(app)` membuat respons ter-stream lebih dulu sehingga `forbidden()` memberi 200, bukan 403. Berkas itu dihapus (D-11).
 
 ## Blocker / pertanyaan terbuka
-- B-AUTH0-FE, B-DOCS, B-NEXT-CVE (lihat blockers.md)
+- B-DOCS, B-NEXT-CVE (lihat blockers.md)
 
 ## Skema
 - Tidak ada.
