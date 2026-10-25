@@ -3,6 +3,9 @@ import { env } from '../config/env.js';
 
 const key = () => Buffer.from(env.MFA_ENCRYPTION_KEY, 'base64');
 
+/** Pinned so a truncated tag is rejected instead of weakening GCM forgery resistance. */
+const TAG_LENGTH = 16;
+
 /** Unguessable URL-safe token: 256 bits, so a hash of it needs no salt. */
 export const randomToken = (): string => randomBytes(32).toString('base64url');
 
@@ -12,7 +15,7 @@ export const sha256 = (value: string): string => createHash('sha256').update(val
 /** AES-256-GCM, packed as `iv.tag.ciphertext` (base64url). */
 export function encrypt(plain: string): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key(), iv);
+  const cipher = createCipheriv('aes-256-gcm', key(), iv, { authTagLength: TAG_LENGTH });
   const data = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   return [iv, cipher.getAuthTag(), data].map((b) => b.toString('base64url')).join('.');
 }
@@ -20,7 +23,7 @@ export function encrypt(plain: string): string {
 export function decrypt(packed: string): string {
   const [iv, tag, data] = packed.split('.').map((p) => Buffer.from(p, 'base64url'));
   if (!iv || !tag || !data) throw new Error('malformed ciphertext');
-  const decipher = createDecipheriv('aes-256-gcm', key(), iv);
+  const decipher = createDecipheriv('aes-256-gcm', key(), iv, { authTagLength: TAG_LENGTH });
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
 }
