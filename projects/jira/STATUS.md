@@ -6,7 +6,7 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | Tiket | Judul | Tahap | Status | Status Jira (per 22 Okt) | Branch/PR | Update terakhir | Catatan singkat |
 |---|---|---|---|---|---|---|---|
 | SCRUM-20 | RBAC 2 role | 1 | IN_PROGRESS (sebagian BLOCKED: B-ROLE) | In Review | `fix/scrum-20-reference-edit-guard` | 2026-10-25 | Semua AC terpenuhi; tulis Data Reference kini butuh `reference:edit`; tersisa konfirmasi role |
-| SCRUM-21 | App shell & navigation | 1 | IN_PROGRESS (sebagian BLOCKED: B-AUTH0-FE) | In Progress | `feature/scrum-21-app-shell` | 2026-10-23 | Shell + 7 halaman + guard 403 selesai & diverifikasi dengan sesi lokal; login Auth0 nyata menunggu aplikasi Auth0 + env infra |
+| SCRUM-21 | App shell & navigation | 1 | IN_PROGRESS (sebagian BLOCKED: B-DOCS) | In Review | `feature/scrum-21-inbox-anggota` | 2026-10-25 | 10 halaman tiket ada (termasuk Inbox, Anggota) + guard 403; login internal menggantikan Auth0 |
 | SCRUM-132 | [DATA-052] Dapur reference & rollout status | 3 (ditarik maju) | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-LWG, B-TUREN) | To Do | `feature/scrum-132-kitchen-reference` | 2026-10-23 | bucket/rollout via config + API + Data Reference read-only; kolom menunggu approval |
 | SCRUM-22 | Create upload batch & metadata | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-ASSIGN) | In Progress | `feature/scrum-22-upload-batch` | 2026-10-23 | Backend selesai; kolom di luar [PRD] menunggu approval |
 | SCRUM-37 | [DATA-001] Upload batch common metadata | 2 | IN_PROGRESS | To Do | `feature/scrum-22-upload-batch` | 2026-10-23 | Satu unit dengan SCRUM-22 |
