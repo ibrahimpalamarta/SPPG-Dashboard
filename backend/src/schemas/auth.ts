@@ -10,7 +10,9 @@ export const loginBody = z.object({ email, password: z.string().min(1).max(128) 
 
 export const mfaVerifyBody = z.object({ mfaToken: z.string().min(1).max(200), code });
 
-export const resetPasswordBody = z.object({ token: z.string().min(20).max(100), password: passwordPolicy });
+const resetToken = z.string().min(20).max(100);
+export const resetPasswordBody = z.object({ token: resetToken, password: passwordPolicy });
+export const invitationParam = z.object({ token: resetToken });
 
 export const changePasswordBody = z.object({
   currentPassword: z.string().min(1).max(128),

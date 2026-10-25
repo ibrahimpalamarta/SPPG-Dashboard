@@ -6,7 +6,7 @@ import type { Db } from '../../db.js';
 import { hashPassword } from '../../auth/password.js';
 import { newTotpSecret } from '../../auth/mfa.js';
 import { decrypt, sha256, signChallenge } from '../../lib/crypto.js';
-import { changePassword, login, logout, mfaDisable, mfaEnable, resetPassword, verifyMfa } from './auth.js';
+import { changePassword, getInvitation, login, logout, mfaDisable, mfaEnable, resetPassword, verifyMfa } from './auth.js';
 
 const PASSWORD = 'Correct-Horse-9';
 const NEW_PASSWORD = 'Another-Horse-42';
@@ -307,6 +307,17 @@ describe('resetPassword', () => {
     assert.equal((await call(login(f.db), withBody({ email: 'pic@example.com', password: NEW_PASSWORD }))).body?.status, 'ok');
   });
 
+  test('SCRUM-122: the first password activates the account and opens a session', async () => {
+    const f = await withToken();
+    f.users[0]!.passwordHash = null;
+    const out = await call(resetPassword(f.db), withBody({ token: TOKEN, password: NEW_PASSWORD }));
+
+    assert.equal(out.body?.status, 'ok');
+    assert.equal(typeof out.body?.token, 'string');
+    assert.equal(f.sessions.filter((s) => !s.revokedAt).length, 1);
+    assert.ok(f.audit.some((a) => a.action === 'user.activated'));
+  });
+
   test('clears a lockout so the owner can get back in', async () => {
     const f = await withToken();
     f.users[0]!.lockedUntil = new Date(Date.now() + 600_000);
@@ -346,5 +357,37 @@ describe('logout / changePassword', () => {
     } as Partial<Request>);
     assert.equal(out.status, 401);
     assert.equal(users[0]!.failedLoginCount, 1);
+  });
+});
+
+describe('SCRUM-122: getInvitation', () => {
+  const TOKEN = 'I'.repeat(43);
+  async function invited(patch: Row = {}) {
+    const f = await fakeDb();
+    f.users[0]!.passwordHash = null;
+    f.resets.push({ id: 1n, userId: 1n, tokenHash: sha256(TOKEN), expiresAt: new Date(Date.now() + 60_000), usedAt: null, ...patch });
+    return f;
+  }
+  const ask = (db: Db, token = TOKEN) => call(getInvitation(db), { valid: { params: { token } } });
+
+  test('an open invitation shows who it is for and the role, nothing else', async () => {
+    const out = await ask((await invited()).db);
+    assert.deepEqual(out.body, { email: 'pic@example.com', role: 'DATA_ADMIN' });
+  });
+
+  test('expired, used, cancelled, unknown, or a reset link of an active account are refused alike', async () => {
+    const withPassword = await invited();
+    withPassword.users[0]!.passwordHash = 'h';
+    const cancelled = await invited();
+    cancelled.users[0]!.status = 'INACTIVE';
+    const outs = [
+      await ask((await invited({ expiresAt: new Date(Date.now() - 1) })).db),
+      await ask((await invited({ usedAt: new Date() })).db),
+      await ask(cancelled.db),
+      await ask((await invited()).db, 'J'.repeat(43)),
+      await ask(withPassword.db),
+    ];
+    for (const o of outs) assert.equal(o.status, 400);
+    assert.equal(new Set(outs.map((o) => JSON.stringify(o.body))).size, 1);
   });
 });

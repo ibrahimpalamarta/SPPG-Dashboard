@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/session";
 
 /** Reachable without a session. Everything else needs the cookie. */
-const PUBLIC = ["/login", "/reset-password", "/sesi-berakhir"];
+const PUBLIC = ["/login", "/reset-password", "/aktivasi", "/sesi-berakhir"];
 
 /**
  * Only the "is there a session cookie" gate. Whether that session is still

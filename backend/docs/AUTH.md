@@ -67,6 +67,21 @@ password baru, semua link lain void, kunci akun dibuka, **semua sesi dicabut**.
 Pembuatan akun (`POST /api/admin/users`) memakai mekanisme yang sama sebagai
 undangan: akun lahir tanpa password.
 
+**Undangan undangan: akun lahir tanpa password. aktivasi (SCRUM-121/122)** — link undangan berlaku
+`INVITE_TTL_HOURS` (72). Status anggota diturunkan, tidak disimpan: `INACTIVE`
+→ Nonaktif; punya password → Aktif; tanpa password → Menunggu aktivasi selama
+link terakhirnya masih berlaku, selain itu Kedaluwarsa. `POST
+/api/admin/users/:id/password-reset` pada akun tanpa password = kirim ulang
+undangan (TTL undangan, audit `user.invite_resent`). `POST
+/api/admin/users/:id/invite-cancel` membatalkan undangan: semua link void, akun
+nonaktif. Halaman `/admin/aktivasi/<token>` memanggil `GET
+/api/auth/invitations/:token` (email, nama, role; link terpakai/kedaluwarsa/
+dibatalkan → `400 invalid_reset_token`), lalu `POST /api/auth/reset-password`;
+untuk password pertama endpoint itu menjawab seperti login (`{status:"ok",
+token}`) sehingga anggota langsung masuk ke Overview. PM MBG (SUPER_ADMIN
+berpassword) aktif terakhir tidak bisa dinonaktifkan/diturunkan
+(`409 last_super_admin`).
+
 **Ganti password** — `POST /api/auth/password` (butuh password lama; sesi lain
 dicabut).
 
@@ -123,7 +138,7 @@ ada dengan `password_hash` NULL (harus diundang ulang lewat link).
 
 `auth.login.success|failed`, `auth.logout`, `auth.password.reset|changed`,
 `auth.mfa.enabled|disabled|failed|recovery_code_used`, `session.revoked`,
-`user.created|updated|password_reset_issued|mfa_reset`,
+`user.created|updated|password_reset_issued|mfa_reset|invite_resent|invite_cancelled|activated`,
 `role.permissions_updated`. Metadata hanya berisi IP, alasan, dan nama field —
 **tidak pernah** password, token, atau kode. Tabel hanya bisa dibaca lewat API
 (`audit:read`); tidak ada endpoint tulis/hapus.
@@ -151,6 +166,7 @@ Jangan pernah mengandalkan menu/tombol frontend sebagai satu-satunya pembatas.
 | `LOGIN_MAX_FAILURES`, `LOGIN_LOCK_MINUTES` | 5 / 15 |
 | `AUTH_ENDPOINT_RATE_LIMIT_WINDOW_MS`, `_MAX` | limiter per-IP untuk login/MFA/reset (15 mnt / 20) |
 | `PASSWORD_RESET_TTL_MINUTES` | 60 |
+| `INVITE_TTL_HOURS` | 72 |
 | `TRUST_PROXY_HOPS` | 1 = hanya ALB. **2** bila frontend-admin menjangkau API lewat ALB juga (diset Terraform). Salah set → semua user berbagi satu limiter IP |
 
 Frontend-admin hanya butuh `API_BASE_URL` (server-side) dan `NEXT_PUBLIC_BASE_PATH`

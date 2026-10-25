@@ -11,6 +11,7 @@ import { checkTotp, consumeRecoveryCode, isTotpShaped, newRecoveryCodes, newTotp
 import { writeAuditLog } from '../../auth/audit.js';
 import type {
   changePasswordBody,
+  invitationParam,
   loginBody,
   mfaDisableBody,
   mfaEnableBody,
@@ -127,9 +128,30 @@ export const logout = (db: Db = prisma): RequestHandler => async (req, res) => {
 };
 
 /**
+ * SCRUM-122: what the activation page shows before the password is chosen.
+ * Only an open invitation answers: a used, expired or cancelled link, or one
+ * for an account that already has a password, gets the same refusal.
+ */
+export const getInvitation = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const { token } = req.valid!.params as z.infer<typeof invitationParam>;
+  const row = await db.passwordResetToken.findUnique({
+    where: { tokenHash: sha256(token) },
+    include: { user: { select: { email: true, fullName: true, role: true, status: true, passwordHash: true } } },
+  });
+  if (!row || row.usedAt || row.expiresAt <= new Date() || row.user.status !== 'ACTIVE' || row.user.passwordHash) {
+    sendError(res, 'INVALID_RESET_TOKEN');
+    return;
+  }
+  sendJson(res, { email: row.user.email, fullName: row.user.fullName, role: row.user.role });
+};
+
+/**
  * Consume a set/reset link. Single-use is enforced by the conditional UPDATE,
  * not by a read-then-write, so two parallel requests cannot both succeed.
  * Every session of the account dies with the old password.
+ *
+ * SCRUM-122: the first password of an invited account is its activation; that
+ * answers like a login (a fresh session) so the member lands in the app.
  */
 export const resetPassword = (db: Db = prisma): RequestHandler => async (req, res) => {
   const { token, password } = req.valid!.body as z.infer<typeof resetPasswordBody>;
@@ -137,13 +159,14 @@ export const resetPassword = (db: Db = prisma): RequestHandler => async (req, re
 
   const row = await db.passwordResetToken.findUnique({
     where: { tokenHash: sha256(token) },
-    include: { user: { select: { id: true, status: true } } },
+    include: { user: { select: { id: true, status: true, passwordHash: true } } },
   });
   if (!row || row.usedAt || row.expiresAt <= now || row.user.status !== 'ACTIVE') {
     sendError(res, 'INVALID_RESET_TOKEN');
     return;
   }
 
+  const activating = !row.user.passwordHash;
   const passwordHash = await hashPassword(password);
   const [claimed] = await db.$transaction([
     db.passwordResetToken.updateMany({ where: { id: row.id, usedAt: null }, data: { usedAt: now } }),
@@ -154,11 +177,16 @@ export const resetPassword = (db: Db = prisma): RequestHandler => async (req, re
     sendError(res, 'INVALID_RESET_TOKEN');
     return;
   }
-  await db.user.update({
+  const user = await db.user.update({
     where: { id: row.userId },
     data: { passwordHash, failedLoginCount: 0, lockedUntil: null },
   });
   await revokeUserSessions(row.userId, db);
+  if (activating) {
+    await audit(db, req, row.userId, 'user.activated');
+    sendJson(res, { status: 'ok', ...(await startSession(user, req, db)) });
+    return;
+  }
   await audit(db, req, row.userId, 'auth.password.reset');
   res.status(204).end();
 };
