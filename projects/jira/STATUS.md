@@ -1,6 +1,6 @@
 # STATUS — Tahap 1–3
 
-Diperbarui: 2026-10-25. Kolom `Status` diisi dari audit kode, bukan dari Jira.
+Diperbarui: 2026-10-26. Kolom `Status` diisi dari audit kode, bukan dari Jira.
 Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 
 | Tiket | Judul | Tahap | Status | Status Jira (per 22 Okt) | Branch/PR | Update terakhir | Catatan singkat |
@@ -22,17 +22,18 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | SCRUM-130 | [DATA-050] Template resmi | 2 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-125 | Tombol Download Template | 2 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-131 | [DATA-051] Tolak template header-only | 2 | IN_PROGRESS (sebagian BLOCKED: B-TPLVER) | To Do | `feature/tahap2-upload-parsers` | 2026-10-25 | Header-only → EMPTY_FILE tanpa staging, badge "Ditahan · file kosong" + Unggah Ulang; pengenalan "template valid" menunggu SCRUM-130 |
-| SCRUM-124 | Layar kolom berbeda | 2 (setelah registry) | TODO | To Do | — | 2026-10-23 | |
-| SCRUM-26 | Mapping Profile Registry | 3 | TODO | To Do | — | 2026-10-23 | |
-| SCRUM-39 | [DATA-005] Detect & apply profile | 3 | TODO | To Do | — | 2026-10-23 | |
-| SCRUM-94 | Schema mismatch handling | 3 | TODO | To Do | — | 2026-10-23 | |
-| SCRUM-55 | [DATA-022] Sukun Cashflow profile | 3 | TODO | To Do | — | 2026-10-23 | Sampel + Kamus_Data Sukun tersedia (template, lihat SCRUM-35) |
-| SCRUM-27 | Sukun Cashflow adapter | 3 | TODO | To Do | — | 2026-10-23 | Satu unit dengan SCRUM-55 |
+| SCRUM-124 | Layar kolom berbeda | 2 (setelah registry) | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Tabel perbedaan kolom + Unggah Ulang; batch lama FAILED/`REPLACED` (label "Diganti") sampai enum SUPERSEDED disetujui |
+| SCRUM-26 | Mapping Profile Registry | 3 | IN_PROGRESS (sebagian BLOCKED: B-REG, B-DD) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | `lib/mapping/profiles.ts` (default B-REG: config di repo); MAP-SKN-CF-001 + MAP-SKN-MENU-001 DRAFT |
+| SCRUM-39 | [DATA-005] Detect & apply profile | 3 | IN_PROGRESS (sebagian BLOCKED: B-TPLVER) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Kitchen+domain+source+header; 1 cocok → NEEDS_REVIEW + audit `upload_batch.profile_detected`; 0/ >1 → karantina |
+| SCRUM-94 | Schema mismatch handling | 3 | IN_PROGRESS | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Diff `missing`/`unexpected` per sheet di response + errorSummary menyebut kolom hilang |
+| SCRUM-55 | [DATA-022] Sukun Cashflow profile | 3 | IN_PROGRESS (sebagian BLOCKED: B-DD) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Rekonsiliasi baseline asli lokal: 1009 txn, Σ total = sumber (Rp3.707.460.322) |
+| SCRUM-27 | Sukun Cashflow adapter | 3 | IN_PROGRESS (sebagian BLOCKED: B-MAPOUT) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Grouping per txn_id, Rp/qty/tanggal; issue NO_TXN_ID, MISSING_AMOUNT, LINES_NOT_TOTAL, TOTAL_INCONSISTENT; hasil belum disimpan |
 | SCRUM-44 | [DATA-011] Sukun RAB profile | 3 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-28 | Sukun RAB adapter | 3 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-45 | [DATA-012] Sukun PO profile | 3 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-29 | Sukun PO adapter + stable IDs | 3 | TODO | To Do | — | 2026-10-23 | |
-| SCRUM-31 | Menu common adapter | 3 | TODO | To Do | — | 2026-10-23 | |
+| SCRUM-31 | Menu common adapter | 3 | IN_PROGRESS (sebagian BLOCKED: B-MAPOUT, B-DD) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | MAP-SKN-MENU-001 multi-sheet; hasil belum disimpan |
+| SCRUM-73 | [DATA-041] menu_recipe_line canonical transform | 3 | IN_PROGRESS (sebagian BLOCKED: B-MAPOUT, B-DD) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Segmen/menu type dirapikan, dedup `tanggal|segmen|menu|bahan`, issue DAY_MISMATCH/MISSING_VALUE; baseline asli: 4505 baris → 4476 line, 29 duplikat |
 | SCRUM-58 | [DATA-025] Profil Menu 5 kitchen | 3 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-30 | Sukun Payment adapter | 3 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-56 | [DATA-023] Lawang Cashflow profile | 3 | TODO | To Do | — | 2026-10-23 | B-SAMPLE-LWG |

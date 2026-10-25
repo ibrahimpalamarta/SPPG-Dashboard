@@ -3,6 +3,8 @@
 import { apiFetch } from "@/lib/api";
 
 export type UploadedSheet = { name: string; headerRow: number | null; rowCount: number };
+export type ColumnDiff = { sheet: string; missing: string[]; unexpected: string[] };
+export type MappingSummary = { profileId: string; version: string; records: number; issueCounts: Record<string, number> };
 
 export type UploadResult =
   | {
@@ -10,6 +12,9 @@ export type UploadResult =
       batchId: string;
       status: string;
       errorCode: string | null;
+      mappingProfileId: string | null;
+      columnDiff: ColumnDiff[];
+      mapping: MappingSummary | null;
       rowCount: number;
       errorSummary: string | null;
       sheets: UploadedSheet[];
@@ -40,6 +45,9 @@ export async function uploadFile(_prev: UploadResult | null, form: FormData): Pr
     batchId: body.publicId,
     status: body.status,
     errorCode: body.errorCode,
+    mappingProfileId: body.mappingProfileId,
+    columnDiff: body.columnDiff ?? [],
+    mapping: body.mapping,
     rowCount: body.rowCount,
     errorSummary: body.errorSummary,
     sheets: body.sheets,
