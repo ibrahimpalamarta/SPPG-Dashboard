@@ -8,7 +8,7 @@
  */
 import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { QA, RAW, REPO, REPORTS, writeJson } from './lib.js';
 
@@ -25,6 +25,8 @@ export type Gate = {
     tsc: Severity;
     eslint: SeverityMap;
     eslintA11yInactive: Severity;
+    eslintEffect: Severity;
+    knip: Severity;
     semgrep: SeverityMap;
     gitleaks: Severity;
     vitest: { failed: Severity };
@@ -41,7 +43,7 @@ export type Gate = {
 
 export const STAGES = { ci: 'CI build', code: 'Code audit', logic: 'Logic test', env: 'Environment', e2e: 'Feature E2E', ui: 'UI/UX', report: 'Laporan & gate' } as const;
 export type Stage = keyof typeof STAGES;
-const TOOL_STAGE: Record<string, Stage> = { ci: 'ci', tsc: 'code', eslint: 'code', semgrep: 'code', gitleaks: 'code', vitest: 'logic', playwright: 'e2e' };
+const TOOL_STAGE: Record<string, Stage> = { ci: 'ci', tsc: 'code', eslint: 'code', knip: 'code', semgrep: 'code', gitleaks: 'code', vitest: 'logic', playwright: 'e2e' };
 const RANK: Record<Severity, number> = { Blocker: 0, Warning: 1, Info: 2 };
 
 const ids = (title: string) => [...title.matchAll(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\]/g)].map((m) => m[1]!);
@@ -51,21 +53,32 @@ const ids = (title: string) => [...title.matchAll(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]
 // beyond looking up the severity a tool's own level maps to.
 // ---------------------------------------------------------------------------
 
-type Sarif = { runs?: { results?: { ruleId?: string; level?: string; message?: { text?: string }; locations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number } } }[] }[] }[] };
+type SarifRule = { id: string; defaultConfiguration?: { level?: string }; properties?: { tags?: string[] } };
+type Sarif = {
+  runs?: {
+    tool?: { driver?: { rules?: SarifRule[] } };
+    results?: { ruleId?: string; level?: string; message?: { text?: string }; locations?: { physicalLocation?: { artifactLocation?: { uri?: string }; region?: { startLine?: number } } }[] }[];
+  }[];
+};
 
-function sarif(tool: string, doc: Sarif, severityOf: (level: string) => Severity): Finding[] {
-  return (doc.runs ?? []).flatMap((r) =>
-    (r.results ?? []).map((x) => {
+function sarif(tool: string, doc: Sarif, severityOf: (level: string, tags: string[]) => Severity): Finding[] {
+  return (doc.runs ?? []).flatMap((r) => {
+    const rules = new Map((r.tool?.driver?.rules ?? []).map((x) => [x.id, x]));
+    return (r.results ?? []).map((x) => {
       const loc = x.locations?.[0]?.physicalLocation;
+      const uri = loc?.artifactLocation?.uri;
+      const rule = rules.get(x.ruleId ?? '');
       return {
-        severity: severityOf(x.level ?? 'warning'),
+        // SARIF: a result without its own level inherits the rule's (Semgrep never sets it per result).
+        severity: severityOf(x.level ?? rule?.defaultConfiguration?.level ?? 'warning', rule?.properties?.tags ?? []),
         tool,
         rule: x.ruleId ?? 'unknown',
-        location: loc?.artifactLocation?.uri ? `${loc.artifactLocation.uri}:${loc.region?.startLine ?? 0}` : undefined,
+        // Semgrep writes absolute runner paths; repo-relative keeps waivers and the comment portable.
+        location: uri ? `${(isAbsolute(uri) ? relative(REPO, uri) : uri).replaceAll('\\', '/')}:${loc?.region?.startLine ?? 0}` : undefined,
         message: x.message?.text ?? '',
       };
-    }),
-  );
+    });
+  });
 }
 
 type PwSpec = { title: string; tags?: string[]; tests: { projectName: string; status: string; annotations?: { type: string }[] }[] };
@@ -77,6 +90,46 @@ function* pwTests(suites: PwSuite[] = [], path: string[] = []): Generator<{ titl
     for (const spec of s.specs ?? []) for (const test of spec.tests) yield { title: [...here, spec.title].join(' › '), spec, test };
     yield* pwTests(s.suites, here);
   }
+}
+
+const EFFECT_RULE_PREFIX = 'react-you-might-not-need-an-effect/';
+
+type KnipDoc = { files?: string[]; issues?: ({ file: string } & Record<string, unknown>)[] };
+const KNIP_LABEL: Record<string, string> = {
+  files: 'File tidak dipakai',
+  exports: 'Export tidak dipakai',
+  types: 'Type tidak dipakai',
+  duplicates: 'Export duplikat',
+  dependencies: 'Dependency tidak dipakai',
+  devDependencies: 'devDependency tidak dipakai',
+  unlisted: 'Dipakai tapi tidak ada di package.json',
+  unresolved: 'Import tidak ter-resolve',
+  binaries: 'Binary tidak terdaftar',
+};
+
+/** knip prints its JSON after any warnings, so take the outermost braces. */
+export function parseKnip(output: string): KnipDoc | null {
+  const start = output.indexOf('{');
+  const end = output.lastIndexOf('}');
+  if (start < 0 || end < start) return null;
+  try {
+    return JSON.parse(output.slice(start, end + 1)) as KnipDoc;
+  } catch {
+    return null;
+  }
+}
+
+export function knipFindings(doc: KnipDoc, severity: Severity, dir: string): Finding[] {
+  const found: Finding[] = (doc.files ?? []).map((f) => ({ severity, tool: 'knip', rule: 'knip-files', location: `${dir}/${f}`, message: KNIP_LABEL.files! }));
+  for (const issue of doc.issues ?? []) {
+    for (const [kind, items] of Object.entries(issue)) {
+      if (!Array.isArray(items)) continue;
+      for (const item of items as { name?: string; line?: number }[]) {
+        found.push({ severity, tool: 'knip', rule: `knip-${kind}`, location: `${dir}/${issue.file}:${item.line ?? 0}`, message: `${KNIP_LABEL[kind] ?? kind}: ${item.name ?? ''}` });
+      }
+    }
+  }
+  return found;
 }
 
 export function collect(read: (name: string) => unknown, files: string[], gate: Gate, ci: boolean): { findings: Finding[]; tests: TestCase[] } {
@@ -97,7 +150,8 @@ export function collect(read: (name: string) => unknown, files: string[], gate: 
     for (const file of read('eslint-frontend-admin.json') as { filePath: string; messages: { ruleId: string | null; severity: number; message: string; line?: number }[] }[]) {
       for (const m of file.messages) {
         findings.push({
-          severity: g.eslint[m.severity === 2 ? 'error' : 'warning'] ?? 'Info',
+          // AI-style effects are a nudge, never a gate: Warning whatever level the plugin reports (QD-33).
+          severity: m.ruleId?.startsWith(EFFECT_RULE_PREFIX) ? g.eslintEffect : (g.eslint[m.severity === 2 ? 'error' : 'warning'] ?? 'Info'),
           tool: 'eslint',
           rule: m.ruleId ?? 'parse',
           location: `${relative(REPO, file.filePath).replaceAll('\\', '/')}:${m.line ?? 0}`,
@@ -106,11 +160,22 @@ export function collect(read: (name: string) => unknown, files: string[], gate: 
       }
     }
   }
+  if (files.includes('knip-frontend-admin.json')) {
+    const knip = parseKnip((read('knip-frontend-admin.json') as { output: string }).output);
+    if (knip) findings.push(...knipFindings(knip, g.knip, 'frontend-admin'));
+    else findings.push({ severity: ci ? g.toolMissingInCI : 'Warning', tool: 'infra', rule: 'knip-unparsable', message: 'Output knip bukan JSON.' });
+  }
   if (files.includes('eslint-a11y-rules.json') && (read('eslint-a11y-rules.json') as { rules: string[] }).rules.length === 0) {
     findings.push({ severity: g.eslintA11yInactive, tool: 'eslint', rule: 'jsx-a11y-inactive', message: 'Tidak ada rule jsx-a11y aktif di config ESLint frontend-admin.' });
   }
 
-  if (files.includes('semgrep.sarif')) findings.push(...sarif('semgrep', read('semgrep.sarif') as Sarif, (l) => g.semgrep[l] ?? 'Warning'));
+  // A rule tagged `security` is at least g.semgrep.security, whatever its level (QD-31).
+  const semgrepSeverity = (l: string, tags: string[]): Severity => {
+    const byLevel = g.semgrep[l] ?? 'Warning';
+    const security = tags.includes('security') ? g.semgrep.security : undefined;
+    return security && RANK[security] < RANK[byLevel] ? security : byLevel;
+  };
+  if (files.includes('semgrep.sarif')) findings.push(...sarif('semgrep', read('semgrep.sarif') as Sarif, semgrepSeverity));
   if (files.includes('gitleaks.sarif')) findings.push(...sarif('gitleaks', read('gitleaks.sarif') as Sarif, () => g.gitleaks));
 
   // A tool that did not run is Info on a laptop, but in CI it means the
@@ -269,22 +334,66 @@ function scorecard(v: Evaluation & { meta: Record<string, string>; stages: Recor
   )}</table></body></html>`;
 }
 
-function prComment(v: Evaluation & { meta: Record<string, string>; stages: Record<string, string> }): string {
-  const blockers = v.findings.filter((f) => f.severity === 'Blocker' && !f.waived);
+const VERDICT_ICON = { pass: '✅', fail: '❌', 'infra-error': '⚠️' } as const;
+const STAGE_ICON: Record<string, string> = { success: '✅', failure: '❌', skipped: '⏭️', cancelled: '⚪' };
+const SECURITY_TOOLS = ['semgrep', 'gitleaks'];
+
+/** Markdown table cell: first line only, no pipes, bounded. */
+const cell = (s: string, max = 140) => {
+  const line = s.split('\n')[0]!.replaceAll('|', '\\|').replaceAll('`', "'");
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line;
+};
+
+export function prComment(v: Evaluation & { meta: Record<string, string>; stages: Record<string, string> }): string {
+  const open = v.findings.filter((f) => !f.waived);
+  const blockers = open.filter((f) => f.severity === 'Blocker');
+  const warnings = open.filter((f) => f.severity === 'Warning');
+  const security = blockers.filter((f) => SECURITY_TOOLS.includes(f.tool)).length;
   const byStatus = new Map<string, number>();
   for (const r of v.requirements) byStatus.set(r.status, (byStatus.get(r.status) ?? 0) + 1);
+  const stageRows = Object.entries(STAGES).map(([k, label]) => `| ${label} | ${STAGE_ICON[v.stages[k] ?? ''] ?? '➖'} ${v.stages[k] ?? '-'} |`);
+  const passed = Object.keys(STAGES).filter((k) => v.stages[k] === 'success').length;
+  const headline =
+    v.verdict === 'pass'
+      ? 'Tidak ada Blocker. Aman di-merge.'
+      : v.verdict === 'infra-error'
+        ? 'Pipeline bermasalah (bukan kegagalan kode). Jalankan ulang; bila berulang, cek log step yang merah.'
+        : `${blockers.length} Blocker${security ? ` (${security} keamanan)` : ''} harus diperbaiki sebelum merge.`;
   return [
     '<!-- qa-audit -->',
-    `## qa-audit: ${LABEL[v.verdict]}`,
-    `Commit \`${v.meta.commit}\` · ${v.meta.duration}${v.meta.runUrl ? ` · [scorecard & artifact](${v.meta.runUrl})` : ''}`,
+    `## ${VERDICT_ICON[v.verdict]} qa-audit: ${LABEL[v.verdict]}`,
+    `> ${headline}`,
+    '',
+    `\`${v.meta.commit}\` · ${v.meta.duration}${v.meta.runUrl ? ` · [scorecard & artifact](${v.meta.runUrl})` : ''}`,
+    '',
+    blockers.length === 0
+      ? ''
+      : [
+          `### 🚫 Wajib diperbaiki (${blockers.length})`,
+          '| | Temuan | Lokasi |',
+          '|---|---|---|',
+          ...blockers.slice(0, 20).map((f) => `| ${SECURITY_TOOLS.includes(f.tool) ? '🔒' : '⛔'} | **${f.tool}** \`${f.rule}\`<br>${cell(f.message)} | ${f.location ? `\`${f.location}\`` : ''} |`),
+          blockers.length > 20 ? `\n… ${blockers.length - 20} lainnya di scorecard` : '',
+        ].join('\n'),
+    '',
+    warnings.length === 0
+      ? ''
+      : [
+          `<details><summary>⚠️ Warning (${warnings.length}), tidak memblok merge</summary>`,
+          '',
+          ...warnings.slice(0, 20).map((f) => `- **${f.tool}** \`${f.rule}\` ${f.location ? `\`${f.location}\` ` : ''}— ${cell(f.message)}`),
+          warnings.length > 20 ? `- … ${warnings.length - 20} lainnya di scorecard` : '',
+          '',
+          '</details>',
+        ].join('\n'),
+    '',
+    `<details><summary>Tahap: ${passed}/${Object.keys(STAGES).length} lulus</summary>`,
     '',
     '| Tahap | Status |',
     '|---|---|',
-    ...Object.entries(STAGES).map(([k, label]) => `| ${label} | ${v.stages[k] ?? '-'} |`),
+    ...stageRows,
     '',
-    blockers.length === 0 ? 'Tidak ada Blocker.' : `### Blocker (${blockers.length})`,
-    ...blockers.slice(0, 20).map((f) => `- **${f.tool}** \`${f.rule}\` ${f.location ? `\`${f.location}\` ` : ''}— ${f.message.split('\n')[0]}`),
-    blockers.length > 20 ? `- … ${blockers.length - 20} lainnya di scorecard` : '',
+    '</details>',
     '',
     `Requirement: ${[...byStatus].map(([s, n]) => `${s} ${n}`).join(' · ')}`,
     v.pending.length ? `Menunggu keputusan: ${v.pending.join(', ')}` : '',

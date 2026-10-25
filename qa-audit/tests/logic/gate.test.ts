@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { collect, evaluate, type Finding, type Gate, type Requirement, type TestCase } from '../../scripts/merge-report.js';
+import { REPO } from '../../scripts/lib.js';
+import { collect, evaluate, prComment, type Finding, type Gate, type Requirement, type TestCase } from '../../scripts/merge-report.js';
 
 const gate = JSON.parse(readFileSync('gate.json', 'utf8')) as Gate;
 const today = '2026-11-01';
@@ -80,5 +82,64 @@ describe('gate', () => {
     const doc = { suites: [{ title: 'auth.setup.ts', file: 'auth.setup.ts', specs: [{ title: 'login finance', tags: [], tests: [{ projectName: 'setup', status: 'unexpected' }] }] }] };
     const { findings } = collect(() => doc, ['playwright.json'], gate, true);
     expect(findings[0]!.severity).toBe('Blocker');
+  });
+
+  it('[QA-GATE] semgrep: rule ber-tag security jadi Blocker walau level warning, path absolut dijadikan relatif', () => {
+    const rule = (id: string, tags: string[], level = 'warning') => ({ id, defaultConfiguration: { level }, properties: { tags } });
+    const result = (ruleId: string, uri: string) => ({ ruleId, message: { text: 'm' }, locations: [{ physicalLocation: { artifactLocation: { uri }, region: { startLine: 7 } } }] });
+    const doc = {
+      runs: [{ tool: { driver: { rules: [rule('sec', ['security']), rule('style', ['best-practice'])] } }, results: [result('sec', 'backend/src/a.ts'), result('style', 'backend/src/b.ts')] }],
+    };
+    const { findings } = collect(() => doc, ['semgrep.sarif'], gate, true);
+    expect(findings.map((f) => f.severity)).toEqual(['Blocker', 'Warning']);
+    expect(findings[0]!.location).toBe('backend/src/a.ts:7');
+    const abs = { runs: [{ results: [result('x', join(REPO, 'backend', 'src', 'c.ts'))] }] };
+    expect(collect(() => abs, ['semgrep.sarif'], gate, true).findings[0]!.location).toBe('backend/src/c.ts:7');
+  });
+
+  it('[QA-GATE] knip: temuan jadi Warning (tidak memblok), output rusak jadi infra', () => {
+    const doc = { files: ['lib/a.ts'], issues: [{ file: 'lib/b.ts', exports: [{ name: 'foo', line: 3 }], dependencies: [{ name: 'left-pad' }] }] };
+    const { findings } = collect(() => ({ output: `warning di stderr\n${JSON.stringify(doc)}` }), ['knip-frontend-admin.json'], gate, true);
+    expect(findings.map((f) => [f.rule, f.severity, f.location])).toEqual([
+      ['knip-files', 'Warning', 'frontend-admin/lib/a.ts'],
+      ['knip-exports', 'Warning', 'frontend-admin/lib/b.ts:3'],
+      ['knip-dependencies', 'Warning', 'frontend-admin/lib/b.ts:0'],
+    ]);
+    expect(run({ findings }).verdict).toBe('pass');
+    const broken = collect(() => ({ output: 'npm error could not determine executable' }), ['knip-frontend-admin.json'], gate, true);
+    expect(run({ findings: broken.findings }).verdict).toBe('infra-error');
+  });
+
+  it('[QA-GATE] rule useEffect selalu Warning walau level plugin warning, rule ESLint lain mengikuti peta level', () => {
+    const msg = (ruleId: string) => ({ ruleId, severity: 1, message: 'm', line: 5 });
+    const doc = [{ filePath: join(REPO, 'frontend-admin', 'app', 'a.tsx'), messages: [msg('react-you-might-not-need-an-effect/no-derived-state'), msg('@typescript-eslint/no-unused-vars')] }];
+    const { findings } = collect(() => doc, ['eslint-frontend-admin.json'], gate, false);
+    expect(findings.map((f) => f.severity)).toEqual(['Warning', 'Info']);
+    expect(run({ findings }).verdict).toBe('pass');
+  });
+
+  it('[QA-GATE] komentar PR: Blocker keamanan di tabel utama, Warning dan tahap terlipat', () => {
+    const e = run({
+      findings: [
+        { severity: 'Blocker', tool: 'semgrep', rule: 'gcm-no-tag-length', location: 'backend/src/lib/crypto.ts:23', message: 'a | b\nbaris dua' },
+        { severity: 'Warning', tool: 'eslint', rule: 'x', location: 'a.ts:1', message: 'warn' },
+      ],
+    });
+    const md = prComment({ ...e, meta: { commit: 'abc', duration: '9 dtk', runUrl: '' }, stages: { ci: 'success', code: 'failure' } });
+    expect(md).toContain('## ❌ qa-audit: GAGAL');
+    expect(md).toContain('1 Blocker (1 keamanan) harus diperbaiki');
+    expect(md).toMatch(/\| 🔒 \| \*\*semgrep\*\* `gcm-no-tag-length`<br>a \\\| b \| `backend\/src\/lib\/crypto\.ts:23` \|/);
+    expect(md).toContain('<summary>⚠️ Warning (1)');
+    expect(md).toContain('<summary>Tahap: 1/7 lulus');
+    expect(md).not.toContain('baris dua');
+    expect(prComment({ ...run({}), meta: { commit: 'abc', duration: '1 dtk', runUrl: '' }, stages: {} })).toContain('Aman di-merge');
+  });
+
+  it('[QA-GATE] waiver raw-sql grant-public-role di gate.json masih berlaku, file lain tetap Blocker', () => {
+    const f = (location: string): Finding => ({ severity: 'Blocker', tool: 'semgrep', rule: 'qa-audit.semgrep.sppg-raw-sql-unsafe', location, message: 'raw sql' });
+    const v = evaluate({ gate, requirements: [], findings: [f('backend/scripts/grant-public-role.ts:38')], tests: [], outcomes: {}, today });
+    expect(v.verdict).toBe('pass');
+    const other = evaluate({ gate, requirements: [], findings: [f('backend/src/other.ts:1')], tests: [], outcomes: {}, today });
+    expect(other.verdict).toBe('fail');
   });
 });

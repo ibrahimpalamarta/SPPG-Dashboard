@@ -6,6 +6,7 @@
 | `tsc-<app>.json` | code-audit | `{ exitCode, output, prepareFailed? }`; `output` = tsc `--pretty false` |
 | `eslint-frontend-admin.json` | ESLint `-f json` | format bawaan ESLint |
 | `eslint-a11y-rules.json` | code-audit | `{ rules: string[] }` rule `jsx-a11y/*` yang aktif |
+| `knip-frontend-admin.json` | code-audit | `{ output }` = stdout `knip --reporter json` (`{ files, issues }`); exit 1 = ada temuan, 2+ ke `knip.error.json` |
 | `semgrep.sarif`, `gitleaks.sarif` | Semgrep / gitleaks | SARIF 2.1 |
 | `<tool>.skipped.json` | code-audit | `{ reason }` — tool tidak terpasang |
 | `<tool>.error.json` | code-audit | `{ exitCode, output }` — tool crash |

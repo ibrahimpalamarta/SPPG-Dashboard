@@ -33,6 +33,11 @@ const printed = run('npx', ['eslint', '--print-config', 'app/layout.tsx'], admin
 const rules = printed.code === 0 ? (JSON.parse(printed.out) as { rules?: Record<string, unknown> }).rules ?? {} : {};
 writeJson(join(RAW, 'eslint-a11y-rules.json'), { rules: Object.keys(rules).filter((r) => r.startsWith('jsx-a11y/')) });
 
+// knip: unused files, exports and dependencies. Exit 1 only means it found something; 2+ is a broken run.
+const knip = run('npx', ['knip', '--reporter', 'json'], admin);
+if (knip.code > 1) writeJson(join(RAW, 'knip.error.json'), { exitCode: knip.code, output: knip.out });
+else writeJson(join(RAW, 'knip-frontend-admin.json'), { output: knip.out });
+
 // Semgrep and gitleaks are optional on a laptop: a missing tool is recorded,
 // and merge-report treats that as Info locally and as an infra Blocker in CI.
 const full = process.env.QA_SECURITY_FULL === '1';

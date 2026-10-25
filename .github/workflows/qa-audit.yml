@@ -22,6 +22,10 @@ on:
       retention-days:
         type: number
         default: 30
+    secrets:
+      # Optional: empty skips the advisory AI review (QD-30).
+      AI_API_KEY:
+        required: false
 
 jobs:
   audit:
@@ -119,6 +123,18 @@ jobs:
           # Stage 5 (visual, Lighthouse) lands in phase 3.
           OUTCOME_UI: skipped
         run: npm run report
+
+      # Advisory only: appends "Analisis AI" to pr-comment.md and scorecard.html,
+      # never touches the verdict (QD-30).
+      - name: AI review
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ vars.AI_BASE_URL }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+          QA_GIT_RANGE: ${{ github.base_ref && format('origin/{0}..HEAD', github.base_ref) || 'origin/develop..HEAD' }}
+        run: npm run ai-review
 
       - name: Environment logs on failure
         if: ${{ always() && steps.env.outcome == 'failure' }}
