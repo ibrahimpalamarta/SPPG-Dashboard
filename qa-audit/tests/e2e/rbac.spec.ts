@@ -4,13 +4,13 @@ import { storageState, type RoleKey } from './roles.js';
 // PRD §3 roles on today's permission map (migration 20261025000000_internal_auth,
 // decision D-10): INTERNAL is view-only, DATA_ADMIN may also enter data.
 const VIEW = ['Overview', 'Unggah Data', 'Mapping & Validasi', 'Finance & Cost', 'Data Health', 'Data Reference'];
-const ADMIN_ONLY = ['Pengguna', 'Peran & Izin'];
+const ADMIN_ONLY = ['Anggota', 'Peran & Izin'];
 
 const CASES: { role: RoleKey; menu: string[]; hidden: string[]; kitchens: 'all' | string[] }[] = [
-  { role: 'management', menu: VIEW, hidden: ['Manual / Quick Entry', ...ADMIN_ONLY], kitchens: 'all' },
-  { role: 'finance', menu: VIEW, hidden: ['Manual / Quick Entry', ...ADMIN_ONLY], kitchens: 'all' },
-  { role: 'kepala-kitchen-skn', menu: VIEW, hidden: ['Manual / Quick Entry', ...ADMIN_ONLY], kitchens: ['SKN · Sukun'] },
-  { role: 'data-steward', menu: [...VIEW, 'Manual / Quick Entry'], hidden: ADMIN_ONLY, kitchens: 'all' },
+  { role: 'management', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'all' },
+  { role: 'finance', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'all' },
+  { role: 'kepala-kitchen-skn', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: ['SKN · Sukun'] },
+  { role: 'data-steward', menu: [...VIEW, 'Manual / Quick Entry', 'Inbox'], hidden: ADMIN_ONLY, kitchens: 'all' },
 ];
 
 for (const c of CASES) {
@@ -30,7 +30,7 @@ for (const c of CASES) {
     });
 
     test(`[P1-001][SCRUM-20] ${c.role} ditolak saat membuka halaman admin lewat URL @smoke @rbac`, async ({ page }) => {
-      const res = await page.goto('pengguna');
+      const res = await page.goto('anggota');
       expect(res?.status()).toBe(403);
       await expect(page.getByText('Akses ditolak')).toBeVisible();
     });
