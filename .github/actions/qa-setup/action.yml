@@ -30,6 +30,24 @@ runs:
           (cd "$dir" && npm ci --no-audit --no-fund)
         done
 
-    - shell: bash
+    - id: pw
+      shell: bash
+      working-directory: qa-audit
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+    # Key = OS + arch + Playwright version: a bump re-downloads the browser.
+    - id: pw-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.pw.outputs.version }}
+
+    # Browser binary only on a miss; OS libraries (apt) are not cached, so a hit still needs them.
+    - if: steps.pw-cache.outputs.cache-hit != 'true'
+      shell: bash
       working-directory: qa-audit
       run: npx playwright install --with-deps chromium
+    - if: steps.pw-cache.outputs.cache-hit == 'true'
+      shell: bash
+      working-directory: qa-audit
+      run: npx playwright install-deps chromium
