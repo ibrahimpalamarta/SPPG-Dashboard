@@ -43,6 +43,8 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
     <form action={action} onSubmit={() => setRetry(false)} className="space-y-5">
       <input type="hidden" name="kitchenId" value={kitchen} />
       <input type="hidden" name="domain" value={domain} />
+      {/* SCRUM-124: re-uploading a quarantined file closes it as "Diganti". */}
+      {retry && result?.ok && result.status === "NEEDS_MAPPING_UPDATE" && <input type="hidden" name="replaces" value={result.batchId} />}
 
       <Card className="space-y-6 p-6">
         <ol className="flex items-center gap-4 text-sm">
@@ -112,9 +114,6 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-slate-500">File dipilih</dt>
             <dd className="text-slate-800">{file ? `${file.name} (${formatSize(file.size)})` : "—"}</dd>
-            <dt className="text-slate-500">Profil terdeteksi</dt>
-            {/* diisi di SCRUM-39: mapping profile detection. */}
-            <dd className="text-slate-500">Belum terdeteksi</dd>
           </dl>
           {result && !result.ok && (
             <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -141,6 +140,39 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
             </div>
             {result.warning && <p className="rounded-md bg-amber-50 p-3 text-amber-800">{result.warning}</p>}
             {result.errorSummary && <p className="text-slate-700">{result.errorSummary}</p>}
+            <p className="text-slate-600">
+              Profil terdeteksi: <span className="font-medium text-slate-800">{result.mapping ? `${result.mapping.profileId} v${result.mapping.version}` : "Belum terdeteksi"}</span>
+            </p>
+            {result.mapping && (
+              <p className="text-slate-600">
+                {result.mapping.records} record dipetakan
+                {Object.keys(result.mapping.issueCounts).length > 0 &&
+                  ` · perlu dicek: ${Object.entries(result.mapping.issueCounts)
+                    .map(([code, n]) => `${n} ${code}`)
+                    .join(", ")}`}
+              </p>
+            )}
+            {result.columnDiff.some((d) => d.missing.length || d.unexpected.length) && (
+              <table className="w-full max-w-2xl text-left">
+                <caption className="mb-2 text-left font-semibold text-slate-800">Perbedaan kolom dengan format yang dikenal</caption>
+                <thead className="border-b border-slate-200 text-slate-500">
+                  <tr>
+                    <th className="py-2 pr-4 font-medium">Sheet</th>
+                    <th className="py-2 pr-4 font-medium">Kolom tidak ditemukan</th>
+                    <th className="py-2 font-medium">Kolom tidak dikenal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {result.columnDiff.map((d) => (
+                    <tr key={d.sheet}>
+                      <td className="py-2 pr-4 font-medium text-slate-800">{d.sheet}</td>
+                      <td className="py-2 pr-4 text-red-700">{d.missing.join(", ") || "—"}</td>
+                      <td className="py-2 text-slate-600">{d.unexpected.join(", ") || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
             {result.sheets.length > 0 && (
               <ul className="list-inside list-disc text-slate-600">
                 {result.sheets.map((s) => (

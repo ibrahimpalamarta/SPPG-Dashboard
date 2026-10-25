@@ -13,7 +13,8 @@ import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
 import { canTransition } from '../../lib/upload-status.js';
 import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
-import { parseToStaging } from '../../lib/ingest/pipeline.js';
+import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
+import type { ColumnDiff } from '../../lib/mapping/detect.js';
 import { InMemoryStagingRepository, stagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
 import type {
   uploadBatchCreate,
@@ -87,8 +88,11 @@ const PREVIEW_ROWS = 50;
 export const uploadKey = (publicId: string, fileName = ''): string =>
   `upload-batches/${publicId}${isCsv(fileName) ? '.csv' : '.xlsx'}`;
 
-/** PRD §9 copy for a file no mapping profile recognises. */
-const NOT_RECOGNISED = 'Format file belum dikenali untuk kitchen/source ini. File belum dipublish.';
+/** PRD §9 copy for a file no mapping profile recognises, plus what is missing (SCRUM-94). */
+const notRecognised = (diff: ColumnDiff[]) => {
+  const missing = [...new Set(diff.flatMap((d) => d.missing))];
+  return `Format file belum dikenali untuk kitchen/source ini. File belum dipublish.${missing.length ? ` Kolom tidak ditemukan: ${missing.join(', ')}.` : ''}`;
+};
 
 /**
  * SCRUM-22/37 + SCRUM-24. Takes the workbook (multipart, field `file`), opens
@@ -102,8 +106,11 @@ const NOT_RECOGNISED = 'Format file belum dikenali untuk kitchen/source ini. Fil
  *     password-protected .xlsx, binary .csv) is
  *     FAILED and never stored; a corrupt or empty workbook is FAILED with no
  *     staged rows left behind
- *   - a parsed file ends NEEDS_MAPPING_UPDATE until profile detection
- *     (SCRUM-39) exists — never READY, so it can never publish
+ *   - a parsed file is NEEDS_REVIEW when a mapping profile recognises it
+ *     (SCRUM-39), else NEEDS_MAPPING_UPDATE with the column diff — never
+ *     READY, so nothing publishes without a reviewer
+ *   - `replaces` closes the quarantined batch it re-uploads: FAILED +
+ *     REPLACED ("Diganti", SCRUM-124) once the new file has parsed
  *   - a storage failure marks the batch FAILED instead of leaving it PROCESSING
  *
  * ponytail: synchronous within the request, like the rest of the repo; the
@@ -159,6 +166,15 @@ export const createUploadBatch =
       return;
     }
 
+    const replaced = body.replaces ? await db.uploadBatch.findUnique({ where: { publicId: body.replaces } }) : null;
+    if (
+      body.replaces &&
+      (!replaced || replaced.kitchenId !== body.kitchenId || replaced.domain !== body.domain || !canTransition(replaced.status, UploadStatus.FAILED))
+    ) {
+      sendError(res, 'VALIDATION_ERROR', { fields: { replaces: ['not an open batch of this kitchen and domain'] } });
+      return;
+    }
+
     const duplicate = await db.uploadBatch.findFirst({
       where: { kitchenId: body.kitchenId, domain: body.domain, fileHash },
       orderBy: { uploadDate: 'desc' },
@@ -195,6 +211,8 @@ export const createUploadBatch =
       });
 
     let sheets: unknown[] = [];
+    let columnDiff: ColumnDiff[] = [];
+    let mapping: MappingSummary | null = null;
     const ingest = async () => {
       try {
         assertReadable(buffer, originalname);
@@ -224,14 +242,25 @@ export const createUploadBatch =
       }
 
       sheets = parsed.batch.sheets;
+      const rowCount = parsed.batch.rows.length;
+      const { detection } = parsed;
+      if (!detection.ok) {
+        columnDiff = detection.diff;
+        return finish({
+          storageKey,
+          rowCount,
+          status: UploadStatus.NEEDS_MAPPING_UPDATE,
+          errorCode: detection.errorCode,
+          errorSummary: notRecognised(detection.diff),
+        });
+      }
+      mapping = parsed.mapping;
       return finish({
         storageKey,
-        rowCount: parsed.batch.rows.length,
-        // diisi di SCRUM-39: profile detection decides between NEEDS_REVIEW
-        // and NEEDS_MAPPING_UPDATE.
-        status: UploadStatus.NEEDS_MAPPING_UPDATE,
-        errorCode: 'PROFILE_NOT_DETECTED',
-        errorSummary: NOT_RECOGNISED,
+        rowCount,
+        status: UploadStatus.NEEDS_REVIEW,
+        mappingProfileId: detection.profile.id,
+        templateVersion: detection.profile.version,
       });
     };
     const row = await ingest();
@@ -246,8 +275,32 @@ export const createUploadBatch =
         kitchenId: String(row.kitchenId),
         domain: row.domain,
         status: row.status,
+        ...(replaced && { replaces: replaced.publicId }),
       },
     });
+    if (row.mappingProfileId) {
+      await writeAuditLog(db, {
+        userId: req.user!.id,
+        action: 'upload_batch.profile_detected',
+        entity: 'upload_batches',
+        entityId: row.id,
+        metadata: { mappingProfileId: row.mappingProfileId, templateVersion: row.templateVersion },
+      });
+    }
+    // A re-upload that did not even parse leaves the old batch where it was.
+    if (replaced && row.status !== UploadStatus.FAILED) {
+      await db.uploadBatch.update({
+        where: { id: replaced.id },
+        data: { status: UploadStatus.FAILED, errorCode: 'REPLACED', errorSummary: `Diganti oleh batch ${row.publicId}.` },
+      });
+      await writeAuditLog(db, {
+        userId: req.user!.id,
+        action: 'upload_batch.replaced',
+        entity: 'upload_batches',
+        entityId: replaced.id,
+        metadata: { from: replaced.status, to: UploadStatus.FAILED, replacedBy: row.publicId },
+      });
+    }
     trackEvent(row.status === UploadStatus.FAILED ? 'upload_failed' : 'upload_completed', {
       ...done,
       rows: row.rowCount,
@@ -256,13 +309,15 @@ export const createUploadBatch =
       error_code: row.errorCode,
     });
 
-    // `sheets` (names, header row, headers, row counts) is not persisted yet
-    // (B-SCHEMA); it rides on the response so the upload page can show it.
+    // `sheets`, `columnDiff` and `mapping` are not persisted yet (B-SCHEMA,
+    // B-MAPOUT); they ride on the response so the upload page can show them.
     sendJson(
       res,
       {
         ...row,
         sheets,
+        columnDiff,
+        mapping,
         ...(duplicate && {
           warning: {
             code: 'DUPLICATE_FILE',
