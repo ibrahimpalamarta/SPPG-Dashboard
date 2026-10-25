@@ -21,6 +21,12 @@ describe('encrypt / decrypt', () => {
   });
 });
 
+test('a truncated auth tag is rejected', () => {
+  const [iv, tag, data] = encrypt('secret').split('.');
+  const short = Buffer.from(tag!, 'base64url').subarray(0, 4).toString('base64url');
+  assert.throws(() => decrypt([iv, short, data].join('.')));
+});
+
 describe('tokens', () => {
   test('are long, unique, and hash to a stable 64-char digest', () => {
     const [a, b] = [randomToken(), randomToken()];
