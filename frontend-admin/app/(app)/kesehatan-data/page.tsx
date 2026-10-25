@@ -16,7 +16,6 @@ export default async function KelengkapanPage() {
       <Card className="space-y-6 p-6 sm:p-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Kelengkapan Data</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500 sm:text-base">Cek data harian: mana yang sudah masuk, terlambat, atau belum lengkap. Data yang kosong tidak ditampilkan sebagai 0.</p>
         </div>
 
         <Card className="grid divide-y divide-slate-200 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
