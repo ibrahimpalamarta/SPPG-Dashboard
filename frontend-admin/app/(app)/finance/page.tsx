@@ -20,7 +20,6 @@ export default async function FinancePage() {
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Finance &amp; Cost</h1>
-            <p className="mt-2 text-sm text-slate-500 sm:text-base">Ringkasan uang dapur: belanja ke supplier, saldo, dan transfer EFI.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {filters.map((label) => (
