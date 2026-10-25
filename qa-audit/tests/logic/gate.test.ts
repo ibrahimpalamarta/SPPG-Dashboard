@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO } from '../../scripts/lib.js';
-import { collect, evaluate, type Finding, type Gate, type Requirement, type TestCase } from '../../scripts/merge-report.js';
+import { collect, evaluate, prComment, type Finding, type Gate, type Requirement, type TestCase } from '../../scripts/merge-report.js';
 
 const gate = JSON.parse(readFileSync('gate.json', 'utf8')) as Gate;
 const today = '2026-11-01';
@@ -95,6 +95,23 @@ describe('gate', () => {
     expect(findings[0]!.location).toBe('backend/src/a.ts:7');
     const abs = { runs: [{ results: [result('x', join(REPO, 'backend', 'src', 'c.ts'))] }] };
     expect(collect(() => abs, ['semgrep.sarif'], gate, true).findings[0]!.location).toBe('backend/src/c.ts:7');
+  });
+
+  it('[QA-GATE] komentar PR: Blocker keamanan di tabel utama, Warning dan tahap terlipat', () => {
+    const e = run({
+      findings: [
+        { severity: 'Blocker', tool: 'semgrep', rule: 'gcm-no-tag-length', location: 'backend/src/lib/crypto.ts:23', message: 'a | b\nbaris dua' },
+        { severity: 'Warning', tool: 'eslint', rule: 'x', location: 'a.ts:1', message: 'warn' },
+      ],
+    });
+    const md = prComment({ ...e, meta: { commit: 'abc', duration: '9 dtk', runUrl: '' }, stages: { ci: 'success', code: 'failure' } });
+    expect(md).toContain('## ❌ qa-audit: GAGAL');
+    expect(md).toContain('1 Blocker (1 keamanan) harus diperbaiki');
+    expect(md).toMatch(/\| 🔒 \| \*\*semgrep\*\* `gcm-no-tag-length`<br>a \\\| b \| `backend\/src\/lib\/crypto\.ts:23` \|/);
+    expect(md).toContain('<summary>⚠️ Warning (1)');
+    expect(md).toContain('<summary>Tahap: 1/7 lulus');
+    expect(md).not.toContain('baris dua');
+    expect(prComment({ ...run({}), meta: { commit: 'abc', duration: '1 dtk', runUrl: '' }, stages: {} })).toContain('Aman di-merge');
   });
 
   it('[QA-GATE] waiver raw-sql grant-public-role di gate.json masih berlaku, file lain tetap Blocker', () => {

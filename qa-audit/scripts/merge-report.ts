@@ -286,22 +286,66 @@ function scorecard(v: Evaluation & { meta: Record<string, string>; stages: Recor
   )}</table></body></html>`;
 }
 
-function prComment(v: Evaluation & { meta: Record<string, string>; stages: Record<string, string> }): string {
-  const blockers = v.findings.filter((f) => f.severity === 'Blocker' && !f.waived);
+const VERDICT_ICON = { pass: '✅', fail: '❌', 'infra-error': '⚠️' } as const;
+const STAGE_ICON: Record<string, string> = { success: '✅', failure: '❌', skipped: '⏭️', cancelled: '⚪' };
+const SECURITY_TOOLS = ['semgrep', 'gitleaks'];
+
+/** Markdown table cell: first line only, no pipes, bounded. */
+const cell = (s: string, max = 140) => {
+  const line = s.split('\n')[0]!.replaceAll('|', '\\|').replaceAll('`', "'");
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line;
+};
+
+export function prComment(v: Evaluation & { meta: Record<string, string>; stages: Record<string, string> }): string {
+  const open = v.findings.filter((f) => !f.waived);
+  const blockers = open.filter((f) => f.severity === 'Blocker');
+  const warnings = open.filter((f) => f.severity === 'Warning');
+  const security = blockers.filter((f) => SECURITY_TOOLS.includes(f.tool)).length;
   const byStatus = new Map<string, number>();
   for (const r of v.requirements) byStatus.set(r.status, (byStatus.get(r.status) ?? 0) + 1);
+  const stageRows = Object.entries(STAGES).map(([k, label]) => `| ${label} | ${STAGE_ICON[v.stages[k] ?? ''] ?? '➖'} ${v.stages[k] ?? '-'} |`);
+  const passed = Object.keys(STAGES).filter((k) => v.stages[k] === 'success').length;
+  const headline =
+    v.verdict === 'pass'
+      ? 'Tidak ada Blocker. Aman di-merge.'
+      : v.verdict === 'infra-error'
+        ? 'Pipeline bermasalah (bukan kegagalan kode). Jalankan ulang; bila berulang, cek log step yang merah.'
+        : `${blockers.length} Blocker${security ? ` (${security} keamanan)` : ''} harus diperbaiki sebelum merge.`;
   return [
     '<!-- qa-audit -->',
-    `## qa-audit: ${LABEL[v.verdict]}`,
-    `Commit \`${v.meta.commit}\` · ${v.meta.duration}${v.meta.runUrl ? ` · [scorecard & artifact](${v.meta.runUrl})` : ''}`,
+    `## ${VERDICT_ICON[v.verdict]} qa-audit: ${LABEL[v.verdict]}`,
+    `> ${headline}`,
+    '',
+    `\`${v.meta.commit}\` · ${v.meta.duration}${v.meta.runUrl ? ` · [scorecard & artifact](${v.meta.runUrl})` : ''}`,
+    '',
+    blockers.length === 0
+      ? ''
+      : [
+          `### 🚫 Wajib diperbaiki (${blockers.length})`,
+          '| | Temuan | Lokasi |',
+          '|---|---|---|',
+          ...blockers.slice(0, 20).map((f) => `| ${SECURITY_TOOLS.includes(f.tool) ? '🔒' : '⛔'} | **${f.tool}** \`${f.rule}\`<br>${cell(f.message)} | ${f.location ? `\`${f.location}\`` : ''} |`),
+          blockers.length > 20 ? `\n… ${blockers.length - 20} lainnya di scorecard` : '',
+        ].join('\n'),
+    '',
+    warnings.length === 0
+      ? ''
+      : [
+          `<details><summary>⚠️ Warning (${warnings.length}), tidak memblok merge</summary>`,
+          '',
+          ...warnings.slice(0, 20).map((f) => `- **${f.tool}** \`${f.rule}\` ${f.location ? `\`${f.location}\` ` : ''}— ${cell(f.message)}`),
+          warnings.length > 20 ? `- … ${warnings.length - 20} lainnya di scorecard` : '',
+          '',
+          '</details>',
+        ].join('\n'),
+    '',
+    `<details><summary>Tahap: ${passed}/${Object.keys(STAGES).length} lulus</summary>`,
     '',
     '| Tahap | Status |',
     '|---|---|',
-    ...Object.entries(STAGES).map(([k, label]) => `| ${label} | ${v.stages[k] ?? '-'} |`),
+    ...stageRows,
     '',
-    blockers.length === 0 ? 'Tidak ada Blocker.' : `### Blocker (${blockers.length})`,
-    ...blockers.slice(0, 20).map((f) => `- **${f.tool}** \`${f.rule}\` ${f.location ? `\`${f.location}\` ` : ''}— ${f.message.split('\n')[0]}`),
-    blockers.length > 20 ? `- … ${blockers.length - 20} lainnya di scorecard` : '',
+    '</details>',
     '',
     `Requirement: ${[...byStatus].map(([s, n]) => `${s} ${n}`).join(' · ')}`,
     v.pending.length ? `Menunggu keputusan: ${v.pending.join(', ')}` : '',

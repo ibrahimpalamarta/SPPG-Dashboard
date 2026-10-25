@@ -18,14 +18,16 @@ export type Verdict = { verdict: string; stages: Record<string, string>; finding
 
 export const MAX_FINDINGS = 50;
 export const MAX_DIFF = 60_000;
-const HEADING = '### Analisis AI (saran, bukan gate)';
-
 const SYSTEM = `Kamu reviewer QA untuk monorepo SPPG Dashboard (Express + Prisma backend, Next.js frontend).
 Input: temuan tool qa-audit (tsc, eslint, semgrep, gitleaks, vitest, playwright, ci) dan diff PR.
-Untuk tiap temuan (urut Blocker dulu): jelaskan penyebab yang paling mungkin, saran perbaikan konkret
-(file:baris, potongan kode singkat bila perlu), dan prioritas. Kelompokkan temuan yang akarnya sama.
-Jangan mengarang temuan yang tidak ada di input; bila diff tidak cukup untuk menyimpulkan, katakan itu.
-Jangan pernah menampilkan nilai secret. Jawab dalam bahasa Indonesia, markdown ringkas, maksimal ~400 kata.`;
+Untuk tiap temuan (urut Blocker dulu), pakai persis format ini:
+#### N. \`rule\` — \`file:baris\`
+- **Penyebab:** satu atau dua kalimat.
+- **Perbaikan:** langkah konkret, potongan kode singkat bila perlu.
+Kelompokkan temuan yang akarnya sama. Jangan menilai prioritas atau severity: itu sudah ditentukan gate.
+Jangan mengarang temuan yang tidak ada di input. Bila file temuan tidak ada di diff, baca dari lokasi
+yang tertera dan jangan berkomentar soal diff yang tidak lengkap.
+Jangan pernah menampilkan nilai secret. Jawab dalam bahasa Indonesia, tanpa pembuka/penutup, maksimal ~400 kata.`;
 
 /** Pure, so tests/logic/ai-review.test.ts can pin what leaves CI. */
 export function buildPrompt(v: Verdict, diff: string): string | null {
@@ -87,7 +89,8 @@ async function main() {
   }
   writeFileSync(join(REPORTS, 'ai-review.md'), section);
   const comment = join(REPORTS, 'pr-comment.md');
-  if (existsSync(comment)) writeFileSync(comment, `${readFileSync(comment, 'utf8')}\n\n${HEADING}\n${section}\n`);
+  // Folded: the verdict and the must-fix table stay the first thing a reviewer reads.
+  if (existsSync(comment)) writeFileSync(comment, `${readFileSync(comment, 'utf8')}\n\n<details><summary>🤖 Analisis AI (saran, bukan gate)</summary>\n\n${section}\n\n</details>\n`);
   const card = join(REPORTS, 'scorecard.html');
   if (existsSync(card)) writeFileSync(card, readFileSync(card, 'utf8').replace('</body>', `<h2>Analisis AI (saran, bukan gate)</h2><pre style="white-space:pre-wrap">${esc(section)}</pre></body>`));
   console.log(`ai-review: ${section.startsWith('Analisis AI tidak tersedia') ? section : 'ditulis ke reports/ai-review.md'}`);
