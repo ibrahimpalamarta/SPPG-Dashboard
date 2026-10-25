@@ -39,6 +39,13 @@ const schema = z.object({
   SESSION_IDLE_MINUTES: z.coerce.number().int().positive().default(8 * 60),
   SESSION_ABSOLUTE_HOURS: z.coerce.number().int().positive().default(7 * 24),
 
+  // Proxy hops in front of this API whose X-Forwarded-For is trusted. 1 = the
+  // ALB. The admin frontend relays logins and forwards the real client address,
+  // so when it reaches this API through the ALB too (client -> ALB -> frontend
+  // -> ALB -> API) set 2; otherwise every user shares the frontend's address
+  // and one person can exhaust the per-IP login limit for everyone.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(1).max(5).default(1),
+
   // Brute-force protection: per-account lockout plus a per-IP limiter on the
   // unauthenticated /api/auth routes.
   LOGIN_MAX_FAILURES: z.coerce.number().int().positive().default(5),

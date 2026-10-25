@@ -21,8 +21,8 @@ datasource db {
 // supaya ID internal yang berurutan tidak bocor / tidak bisa dienumerasi.
 // ---------------------------------------------------------------------------
 
-/// Authorization roles. Auth0 is the source of truth (Roles & Permissions);
-/// this column is the synced copy the backend actually enforces against.
+/// Authorization roles, enforced from users.role. Which permissions a role holds
+/// lives in role_permissions and is edited through the admin API.
 /// CMS_ADMIN berasal dari ERD (USER.role) dan SCRUM-14.
 enum Role {
   SUPER_ADMIN
