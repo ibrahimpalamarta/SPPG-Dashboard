@@ -44,6 +44,10 @@ describe('gate', () => {
     expect(run({ outcomes: { logic: 'failure' } }).verdict).not.toBe('pass');
   });
 
+  it('[QA-GATE] CI build gagal membuat verdict fail', () => {
+    expect(run({ outcomes: { ci: 'failure' } }).verdict).toBe('fail');
+  });
+
   it('[QA-GATE] status requirement mengikuti test', () => {
     const v = run({
       requirements: [req('AC-DQ-01'), req('AC-DQ-02'), req('AC-DASH-04'), req('AC-UP-01'), req('OD-02', null, 'decision')],
