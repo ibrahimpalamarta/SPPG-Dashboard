@@ -12,7 +12,7 @@ masing-masing, dan tiap job CI bekerja di `working-directory` yang sesuai.
 
 | Folder | Isi | Stack | URL staging |
 |---|---|---|---|
-| [`backend/`](backend/README.md) | REST API, auth + RBAC | Express, TypeScript, Prisma, Auth0 | `/api/*`, `/health` |
+| [`backend/`](backend/README.md) | REST API, auth + RBAC | Express, TypeScript, Prisma, auth internal | `/api/*`, `/health` |
 | [`frontend-admin/`](frontend-admin/README.md) | Backoffice + Dashboard Internal | Next.js (App Router) | `/admin` |
 | [`frontend-public/`](frontend-public/README.md) | Dashboard transparansi publik | Next.js (App Router) | `/` |
 | [`infra/`](infra/README.md) | Terraform: VPC, ECS, RDS, ECR, S3, ALB | Terraform, AWS `ap-southeast-3` | — |
