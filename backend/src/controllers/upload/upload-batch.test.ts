@@ -4,7 +4,7 @@ import type { Request, Response } from 'express';
 import ExcelJS from 'exceljs';
 import type { Db } from '../../db.js';
 import type { Role } from '../../auth/roles.js';
-import type { AppUser } from '../../auth/user-sync.js';
+import type { AppUser } from '../../auth/user.js';
 import { createUploadBatch, listUploadBatches, updateUploadBatch } from './upload-batch.js';
 import { InMemoryStagingRepository } from '../../lib/ingest/staging.js';
 

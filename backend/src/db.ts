@@ -34,7 +34,12 @@ export type Db = Pick<
   // The two public views are not modelled in schema.prisma, so the public
   // dashboard reaches them through a raw query.
   | '$queryRaw'
+  | '$transaction'
   | 'user'
+  | 'session'
+  | 'passwordResetToken'
+  | 'mfaRecoveryCode'
+  | 'rolePermission'
   | 'auditLog'
   | 'kitchen'
   | 'ingredient'

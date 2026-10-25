@@ -130,16 +130,13 @@ enum DocumentFileType {
 // Identitas & audit
 // ---------------------------------------------------------------------------
 
-/// Application-side user record. Holds NO credentials - Auth0 owns identity,
-/// `auth0Sub` is the only link between the two.
+/// Akun aplikasi. Identitas dan kredensial dikelola sendiri: login memakai
+/// email + `passwordHash` (argon2id), sesi ada di tabel `sessions`.
 ///
-/// TODO(catatan): ERD mencantumkan kolom `password_hash`. Kolom itu sengaja
-/// TIDAK dibuat - menyimpan kredensial bertentangan dengan arsitektur Auth0
-/// yang sudah berjalan dan tidak ada satu pun jalur kode yang menulisnya.
-/// Konfirmasi ke tim agar ERD diperbarui.
+/// `passwordHash` null = akun belum punya password (baru diundang, atau
+/// dimigrasi dari Auth0) dan belum bisa login sampai memakai link set-password.
 model User {
   id       BigInt  @id @default(autoincrement()) @map("user_id")
-  auth0Sub String  @unique @map("auth0_sub")
   email    String? @unique
   fullName String? @map("full_name")
   role     Role    @default(PUBLIC)
@@ -147,12 +144,24 @@ model User {
   status      ActiveStatus @default(ACTIVE)
   lastLoginAt DateTime?    @map("last_login")
 
+  passwordHash     String?   @map("password_hash")
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")
+
+  mfaEnabled   Boolean @default(false) @map("mfa_enabled")
+  /// Secret TOTP terenkripsi AES-256-GCM (lib/crypto). Jangan pernah dikirim ke klien.
+  mfaSecretEnc String? @map("mfa_secret_enc")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   /// Dapur yang boleh diakses (SCRUM-20). DATA_ADMIN wajib punya minimal satu;
   /// role lain tanpa baris di sini melihat seluruh dapur.
   kitchenScopes UserKitchenScope[]
+
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
+  mfaRecoveryCodes    MfaRecoveryCode[]
 
   auditLogs        AuditLog[]
   galleryImages    GalleryImage[]
@@ -162,6 +171,71 @@ model User {
 
   @@index([role])
   @@map("users")
+}
+
+/// Sesi login. Token mentah hanya ada di cookie klien; di sini hanya SHA-256-nya,
+/// jadi dump database tidak bisa dipakai untuk membajak sesi.
+model Session {
+  id     BigInt @id @default(autoincrement()) @map("session_id")
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String @unique @map("token_hash")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  /// Batas absolut; idle timeout dihitung dari `lastSeenAt`.
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  ip        String?
+  userAgent String? @map("user_agent")
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Token sekali pakai untuk set/reset password (juga dipakai sebagai undangan).
+model PasswordResetToken {
+  id     BigInt @id @default(autoincrement()) @map("token_id")
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// Kode pemulihan MFA, sekali pakai. Hanya hash-nya yang disimpan.
+model MfaRecoveryCode {
+  id     BigInt @id @default(autoincrement()) @map("code_id")
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
+}
+
+/// Role -> permission yang bisa diubah lewat API tanpa deploy. SUPER_ADMIN
+/// tidak disimpan di sini: ia selalu memegang semua permission (tidak bisa
+/// dicabut, supaya tidak ada skenario lockout). Nilai `permission` divalidasi
+/// terhadap daftar PERMISSIONS di kode.
+model RolePermission {
+  role       Role
+  permission String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([role, permission])
+  @@map("role_permissions")
 }
 
 /// User <-> dapur (SCRUM-20). Menggantikan `users.scope_id` supaya satu akun

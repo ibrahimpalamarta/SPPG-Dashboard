@@ -2,7 +2,7 @@ import type { RequestHandler } from 'express';
 import { prisma, type Db } from '../../db.js';
 import { sendJson } from '../../lib/serialize.js';
 import { resolveKitchenIds } from '../../auth/guard.js';
-import { ROLE_PERMISSIONS } from '../../auth/roles.js';
+import { env } from '../../config/env.js';
 
 /**
  * SCRUM-20/21: everything the app shell needs to draw itself — which menus to
@@ -23,7 +23,9 @@ export const getMe = (db: Db = prisma): RequestHandler => async (req, res) => {
     email: u.email,
     fullName: u.fullName,
     role: u.role,
-    permissions: ROLE_PERMISSIONS[u.role],
+    permissions: u.permissions,
+    mfaEnabled: u.mfaEnabled,
+    mfaEnrollmentRequired: env.MFA_REQUIRED_ROLES.includes(u.role) && !u.mfaEnabled,
     kitchens,
   });
 };

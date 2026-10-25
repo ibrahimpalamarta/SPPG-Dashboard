@@ -1,7 +1,7 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
-import type { AppUser } from '../../auth/user-sync.js';
+import type { AppUser } from '../../auth/user.js';
 import type { Db } from '../../db.js';
 import type { AuditEntry } from '../../auth/audit.js';
 import { ANNOUNCEMENT, createCms, updateCms } from './cms.js';
