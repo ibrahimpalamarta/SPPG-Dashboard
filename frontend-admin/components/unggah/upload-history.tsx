@@ -22,7 +22,7 @@ export async function UploadHistory() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-slate-900">Riwayat unggahan</h2>
+      <h2 className="text-lg font-semibold text-slate-900">Upload History</h2>
       <Card className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[48rem] text-left">
           <thead className="border-b border-slate-200 bg-slate-50 text-sm text-slate-500">
