@@ -1,1 +1,37 @@
 @import "tailwindcss";
+
+@property --sweep {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
+
+@keyframes grow-y {
+  from { transform: scaleY(0); }
+}
+
+@keyframes sweep {
+  from { --sweep: 0%; }
+}
+
+@keyframes reveal {
+  from { clip-path: inset(-10% 100% -10% 0); }
+  to { clip-path: inset(-10% -10% -10% 0); }
+}
+
+@keyframes pop {
+  from { opacity: 0; scale: 0; }
+}
+
+/* Chart entrance motion; skipped for users who prefer reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .grow-x { transform-origin: left; animation: grow-x 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .grow-y { transform-origin: bottom; animation: grow-y 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .sweep { mask-image: conic-gradient(#000 var(--sweep), transparent var(--sweep)); animation: sweep 1.1s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .reveal { animation: reveal 1.2s ease-out both; }
+  .pop { animation: pop 0.3s ease-out 1.1s both; }
+}
