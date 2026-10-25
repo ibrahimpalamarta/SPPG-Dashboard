@@ -46,3 +46,8 @@ Backend 131/131 lulus, `tsc` bersih.
 ## Skema
 - [PRD] `finance_txn_upload` (nama dataset + traceability §7.2) lewat `StagingRow`
 - [USULAN] wadah fisik → `schema-proposals/SCRUM-24.md`
+
+## Update 2026-10-25 — baseline Sukun (`feature/tahap2-upload-parsers`)
+- Baseline asli `CASHFLOW_SUKUN` sheet `Transaksi_Kas` berlayout **flat** (17 kolom, sama dengan layout DNM K-05): `id, txn_id, tanggal, tipe, arah, kategori, uraian, nama_barang, nama_penerima, qty, satuan, harga_satuan, jumlah_baris, total, confidence, status_review, catatan_review`. Satu baris per item; `total` diulang di tiap baris transaksi.
+- Fixture anonim `backend/src/lib/ingest/fixtures/sukun-cashflow.csv` (38 baris, nama orang/supplier diganti, B-FIXTURE-PII). Berkas asli tidak di-commit.
+- Test baru: semua baris non-kosong ter-staging termasuk 3 baris tanpa `txn_id`; total berulang dipertahankan per baris.

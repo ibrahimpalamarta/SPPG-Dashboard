@@ -266,7 +266,6 @@ backend/
 │   │   ├── pagination.ts              pageQuery + amplop { data, meta }
 │   │   ├── scope.ts                   filter multi-tenant per dapur
 │   │   ├── visibility.ts              penyaringan kolom biaya (SCRUM-13)
-│   │   ├── menu-workbook.ts           parser Excel → menu_plans (SCRUM-6)
 │   │   ├── s3.ts                      putObject ke bucket assets
 │   │   └── wrap.ts                    async error → next(err)
 │   ├── schemas/                       skema zod per domain
@@ -355,7 +354,7 @@ INTERNAL), `period?` (`YYYY-MM`), `notes?`.
 | hash sama untuk kitchen + domain yang sama | `201` + batch baru + `warning.code = DUPLICATE_FILE` | batch baru; penggandaan dicegah saat publish |
 | S3 gagal | `500` | `FAILED` (`error_code = STORAGE_FAILED`) — tidak tertinggal di PROCESSING |
 
-Key S3-nya `upload-batches/<publicId>.xlsx` (kolom `storage_key`), tidak pernah
+Key S3-nya `upload-batches/<publicId>.xlsx` (atau `.csv`) (kolom `storage_key`), tidak pernah
 memuat nama berkas asli. Batch lama sebelum SCRUM-22 tetap di key turunan hash.
 
 Transisi status hanya lewat `canTransition` di `src/lib/upload-status.ts`;
@@ -364,10 +363,9 @@ tak sah dengan `409 invalid_transition`. Event `upload_started`,
 `upload_completed`, `upload_failed` ditulis sebagai satu baris JSON di stdout
 lewat `trackEvent` (`src/lib/events.ts`).
 
-> **Header Excel-nya masih tebakan.** `HEADERS` di `src/lib/menu-workbook.ts`
-> diturunkan dari `schema.prisma` + form SOP-OPR-001, bukan dari workbook asli —
-> berkasnya belum tersedia. Kalau nama kolom di berkas sungguhan berbeda, ubah
-> label di map itu saja; tidak ada tempat lain yang perlu disentuh.
+> Berkas `.xlsx` dan `.csv` diterima. CSV dibaca sel demi sel sebagai string
+> apa adanya (lihat `src/lib/ingest/workbook.ts`); fixture anonim baseline Sukun
+> ada di `src/lib/ingest/fixtures/`.
 
 ### Yang belum terisi datanya
 

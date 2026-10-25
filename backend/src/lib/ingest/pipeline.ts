@@ -2,6 +2,7 @@ import type { UploadDomain } from '@prisma/client';
 import { WorkbookError, readWorkbook } from './workbook.js';
 import { stageRows, type DomainParser, type ParseContext, type StagedBatch, type StagingRepository } from './staging.js';
 import { cashflowParser } from './cashflow.js';
+import { menuParser } from './menu.js';
 
 /**
  * The generic fallback: every sheet. Domains with no dedicated parser
@@ -12,6 +13,7 @@ const rawParser: DomainParser = (sheets, ctx) => stageRows(sheets, ctx);
 /** One entry per domain with its own staging rules (SCRUM-35, 36, 118). */
 const parsers: Partial<Record<UploadDomain, DomainParser>> = {
   CASHFLOW: cashflowParser,
+  MENU: menuParser,
 };
 
 export type PipelineResult =
@@ -25,7 +27,7 @@ export type PipelineResult =
  */
 export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging: StagingRepository): Promise<PipelineResult> {
   try {
-    const sheets = await readWorkbook(buffer);
+    const sheets = await readWorkbook(buffer, ctx.sourceFileName);
     const parsed = (parsers[ctx.domain] ?? rawParser)(sheets, ctx);
     if (parsed.rows.length === 0) {
       await staging.deleteBatch(ctx.uploadBatchId);

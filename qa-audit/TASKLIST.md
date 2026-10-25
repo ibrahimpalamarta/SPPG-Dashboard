@@ -44,7 +44,7 @@ Setiap tiket dianggap selesai bila semua poin di kolom *Selesai bila* lulus, dan
 | T05 | Upload batch & metadata umum | 22, 37 | IN_PROGRESS (B-SCHEMA, B-ASSIGN) |
 | T06 | Excel pipeline + halaman Unggah Data + history/status | 24, 5, 25 | IN_PROGRESS |
 | T07 | Cashflow Upload v1 staging parser | 35 | IN_PROGRESS (B-SCHEMA, B-TPLVER) |
-| T08 | Menu Upload v1 staging parser | 36 | TODO |
+| T08 | Menu Upload v1 staging parser | 36 | IN_PROGRESS (B-SCHEMA) |
 | T09 | Input Maker Upload v1 + Sukun raw staging | 86, 118 (126 duplikat) | TODO |
 | T10 | Template resmi: generate, tombol download, tolak header-only | 130, 125, 131 | TODO |
 | **Tahap 3 — Mapping** ||||
@@ -130,10 +130,10 @@ file rusak/kosong/terenkripsi → batch FAILED/Ditahan dengan pesan Bahasa Indon
 |---|---|---|---|---|---|
 | T07.1 | SCRUM-35 | [DATA-002] Cashflow Upload v1 staging parser | IN_PROGRESS | U, D | Kolom sesuai Upload Contract diterima. Alias Lawang e/id didukung. Nilai mentah tidak hilang. Skema tidak valid → ditahan dan dilaporkan |
 
-#### T08 — Parser Menu · Butuh: T06 · Status: TODO
+#### T08 — Parser Menu · Butuh: T06 · Status: IN_PROGRESS (B-SCHEMA)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T08.1 | SCRUM-36 | [DATA-003] Menu Upload v1 staging parser | TODO | U, D | Kontrak umum 23 field. PCK tanpa Periode ditangani lewat aturan metadata. Koma desimal didukung. Field mentah utuh. Ganti parser lama `menu-workbook.ts` |
+| T08.1 | SCRUM-36 | [DATA-003] Menu Upload v1 staging parser | IN_PROGRESS (B-SCHEMA) | U, D | Kontrak umum 23 field. PCK tanpa Periode ditangani lewat aturan metadata. Koma desimal didukung. Field mentah utuh. Ganti parser lama `menu-workbook.ts` |
 
 #### T09 — Input Maker · Butuh: T06 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
@@ -147,7 +147,7 @@ file rusak/kosong/terenkripsi → batch FAILED/Ditahan dengan pesan Bahasa Indon
 |---|---|---|---|---|---|
 | T10.1 | SCRUM-130 | [DATA-050] Generate template resmi Cashflow & Menu | TODO (B-TPLVER) | U | Template Cashflow berisi Transaksi_Kas, Ringkasan_Transaksi, Referensi, Legenda_Kolom. Template Menu berisi Menu, Referensi, Legenda_Kolom. Header wajib, dropdown referensi, dan template_version konsisten |
 | T10.2 | SCRUM-125 | Tombol Download Template | TODO | UI | Template Cashflow v1 & Menu v1 bisa diunduh kosong; dropdown dari Referensi; jenis data tanpa template memakai file biasa |
-| T10.3 | SCRUM-131 | [DATA-051] Tolak template header-only | TODO | U, UI | Template valid tanpa baris data → status "Ditahan · file kosong", tidak ada staging/canonical, tombol unggah ulang tetap ada |
+| T10.3 | SCRUM-131 | [DATA-051] Tolak template header-only | IN_PROGRESS (B-TPLVER) | U, UI | Template valid tanpa baris data → status "Ditahan · file kosong", tidak ada staging/canonical, tombol unggah ulang tetap ada |
 
 ### Tahap 3 — Mapping
 

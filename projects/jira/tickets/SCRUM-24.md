@@ -40,3 +40,9 @@ Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-RAW) | Terakhir di
 ## Skema
 - [PRD] field traceability §7.2 (di `StagingRow`)
 - [USULAN] wadah staging + kolom mentah → `schema-proposals/SCRUM-24.md` (tidak dimigrasi; in-memory)
+
+## Update 2026-10-25 — CSV (`feature/tahap2-upload-parsers`)
+- [x] `.csv` diterima (`singleFile` + `readWorkbook(buffer, fileName)`): dibaca exceljs dengan map identitas, jadi setiap sel tetap string apa adanya ("Rp1.885.000", "16,45", "22/02/2026"). BOM dibuang; berkas biner/kosong → `CORRUPT_FILE`.
+- [x] Nama sheet CSV dari tab Google Sheets ("… - Transaksi_Kas.csv" → `Transaksi_Kas`); kosmetik, parser memakai header.
+- [x] Key S3 `upload-batches/<publicId>.csv`, `Content-Type: text/csv`.
+- Test: `src/lib/ingest/workbook.test.ts`, test CSV di `upload-batch.test.ts`.
