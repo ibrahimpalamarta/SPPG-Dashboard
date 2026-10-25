@@ -13,6 +13,7 @@ import { mayManageRole } from '../../auth/escalation.js';
 import { permissionsFor, setRolePermissions } from '../../auth/rbac-store.js';
 import { listSessions, revokeUserSessions } from '../../auth/session.js';
 import { ROLES } from '../../auth/roles.js';
+import { env } from '../../config/env.js';
 import type {
   auditLogListQuery,
   roleParam,
@@ -25,6 +26,26 @@ import type {
 const withScope = {
   kitchenScopes: { select: { kitchen: { select: { id: true, code: true, name: true } } } },
 } satisfies Prisma.UserInclude;
+
+const INVITE_TTL_MINUTES = () => env.INVITE_TTL_HOURS * 60;
+
+/**
+ * SCRUM-121: member status as the Anggota page shows it, derived rather than
+ * stored. An account with no password is an invitation: pending while its
+ * newest link is still open, expired otherwise. Cancelling an invitation
+ * deactivates the account, so it reads as INACTIVE.
+ */
+export type MemberStatus = 'ACTIVE' | 'PENDING' | 'EXPIRED' | 'INACTIVE';
+
+export function memberStatus(
+  u: { status: 'ACTIVE' | 'INACTIVE'; hasPassword: boolean },
+  openInviteExpiresAt: Date | undefined,
+  now = new Date(),
+): MemberStatus {
+  if (u.status === 'INACTIVE') return 'INACTIVE';
+  if (u.hasPassword) return 'ACTIVE';
+  return openInviteExpiresAt && openInviteExpiresAt > now ? 'PENDING' : 'EXPIRED';
+}
 
 export const listUsers = (db: Db = prisma): RequestHandler => async (req, res) => {
   const q = req.valid!.query as z.infer<typeof userListQuery>;
@@ -42,15 +63,24 @@ export const listUsers = (db: Db = prisma): RequestHandler => async (req, res) =
   const [rows, total] = await Promise.all([
     db.user.findMany({
       where,
-      include: withScope,
-      omit: withoutSecrets,
+      include: {
+        ...withScope,
+        passwordResetTokens: { where: { usedAt: null }, select: { expiresAt: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+      // passwordHash is read only to derive memberStatus and stripped below.
+      omit: { mfaSecretEnc: true },
       orderBy: { createdAt: 'desc' },
       ...pageArgs(q),
     }),
     db.user.count({ where }),
   ]);
 
-  sendJson(res, paginated(rows, total, q));
+  const now = new Date();
+  const members = rows.map(({ passwordHash, passwordResetTokens, ...u }) => ({
+    ...u,
+    memberStatus: memberStatus({ status: u.status, hasPassword: !!passwordHash }, passwordResetTokens[0]?.expiresAt, now),
+  }));
+  sendJson(res, paginated(members, total, q));
 };
 
 /** Every role involved must be one the actor may manage (see mayManageRole). */
@@ -91,7 +121,7 @@ export const createUser = (db: Db = prisma): RequestHandler => async (req, res) 
       include: withScope,
       omit: withoutSecrets,
     });
-    const invite = await issueResetToken(user.id, db);
+    const invite = await issueResetToken(user.id, db, INVITE_TTL_MINUTES());
     await writeAuditLog(db, {
       userId: req.user!.id,
       action: 'user.created',
@@ -129,6 +159,8 @@ export const createUser = (db: Db = prisma): RequestHandler => async (req, res) 
  *      silently sees no data at all.
  *   3. No privilege escalation: the actor must be allowed to manage both the
  *      account's current role and the role it is being moved to.
+ *   4. SCRUM-121: the last active PM MBG (SUPER_ADMIN with a password) can be
+ *      neither deactivated nor demoted.
  *
  * A role change or deactivation ends the account's sessions, so it applies at
  * once. `kitchenIds` replaces the whole set (SCRUM-20). The audit row records
@@ -153,8 +185,20 @@ export const updateUser = (db: Db = prisma): RequestHandler => async (req, res) 
     return;
   }
 
-  const currentKitchenIds = current.kitchenScopes.map((s) => s.kitchen.id);
   const nextRole = body.role ?? current.role;
+  if (
+    current.role === Role.SUPER_ADMIN &&
+    current.status === 'ACTIVE' &&
+    (nextRole !== Role.SUPER_ADMIN || body.status === 'INACTIVE') &&
+    (await db.user.count({
+      where: { id: { not: id }, role: Role.SUPER_ADMIN, status: 'ACTIVE', passwordHash: { not: null } },
+    })) === 0
+  ) {
+    sendError(res, 'LAST_SUPER_ADMIN');
+    return;
+  }
+
+  const currentKitchenIds = current.kitchenScopes.map((s) => s.kitchen.id);
   const nextKitchenIds = body.kitchenIds ?? currentKitchenIds;
   if (nextRole === Role.DATA_ADMIN && nextKitchenIds.length === 0) {
     sendError(res, 'VALIDATION_ERROR', {
@@ -216,7 +260,7 @@ export const updateUser = (db: Db = prisma): RequestHandler => async (req, res) 
 /** Loads the target of an `/admin/users/:id/...` action and applies the escalation check. */
 async function loadManageable(req: Request, res: Response, db: Db) {
   const { id } = req.valid!.params as { id: bigint };
-  const target = await db.user.findUnique({ where: { id }, select: { id: true, role: true } });
+  const target = await db.user.findUnique({ where: { id }, select: { id: true, role: true, status: true, passwordHash: true } });
   if (!target) {
     sendError(res, 'NOT_FOUND');
     return null;
@@ -228,18 +272,43 @@ async function loadManageable(req: Request, res: Response, db: Db) {
   return target;
 }
 
-/** A fresh set-password link for an existing account (forgotten password, lost invite). */
+/**
+ * A fresh set-password link for an existing account (forgotten password). For
+ * an account that never set a password this is "kirim ulang undangan": it
+ * gets the invitation lifetime and its own audit action.
+ */
 export const createPasswordReset = (db: Db = prisma): RequestHandler => async (req, res) => {
   const target = await loadManageable(req, res, db);
   if (!target) return;
-  const { token, expiresAt } = await issueResetToken(target.id, db);
+  const invite = !target.passwordHash;
+  const { token, expiresAt } = await issueResetToken(target.id, db, invite ? INVITE_TTL_MINUTES() : undefined);
   await writeAuditLog(db, {
     userId: req.user!.id,
-    action: 'user.password_reset_issued',
+    action: invite ? 'user.invite_resent' : 'user.password_reset_issued',
     entity: 'users',
     entityId: target.id,
   });
   sendJson(res, { resetToken: token, resetTokenExpiresAt: expiresAt });
+};
+
+/**
+ * SCRUM-121: withdraw an invitation that was not accepted yet. Its links stop
+ * working and the account is deactivated; reactivating it and sending the
+ * invitation again brings it back.
+ */
+export const cancelInvite = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const target = await loadManageable(req, res, db);
+  if (!target) return;
+  if (target.passwordHash || target.status !== 'ACTIVE') {
+    sendError(res, 'NOT_AN_INVITATION');
+    return;
+  }
+  await db.$transaction([
+    db.passwordResetToken.updateMany({ where: { userId: target.id, usedAt: null }, data: { usedAt: new Date() } }),
+    db.user.update({ where: { id: target.id }, data: { status: 'INACTIVE' } }),
+  ]);
+  await writeAuditLog(db, { userId: req.user!.id, action: 'user.invite_cancelled', entity: 'users', entityId: target.id });
+  res.status(204).end();
 };
 
 export const listUserSessions = (db: Db = prisma): RequestHandler => async (req, res) => {

@@ -38,6 +38,6 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | SCRUM-56 | [DATA-023] Lawang Cashflow profile | 3 | TODO | To Do | — | 2026-10-23 | B-SAMPLE-LWG |
 | SCRUM-32 | Lawang Cashflow adapter | 3 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-57 | [DATA-024] Persiapan adapter DNM/PCK/SML | 3 | TODO | To Do | — | 2026-10-23 | |
-| SCRUM-121 | Undang & kelola anggota | 1 (sisa) | TODO | To Do | — | 2026-10-23 | B-EMAIL |
-| SCRUM-122 | Aktivasi akun dari undangan | 1 (sisa) | TODO | To Do | — | 2026-10-23 | |
+| SCRUM-121 | Undang & kelola anggota | 1 | IN_PROGRESS (sebagian BLOCKED: B-EMAIL) | In Review | `feature/scrum-121-122-member-invite` | 2026-10-25 | Semua AC terpenuhi; tautan undangan disalin manual sampai ada email |
+| SCRUM-122 | Aktivasi akun dari undangan | 1 | IN_PROGRESS (review) | In Review | `feature/scrum-121-122-member-invite` | 2026-10-25 | Halaman aktivasi + login otomatis ke Overview |
 | SCRUM-123 | Tampilan bersih, Rencana disembunyikan, Data Reference PM-only | 1 (sisa) | TODO | To Do | — | 2026-10-23 | B-PLAN |

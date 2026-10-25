@@ -51,6 +51,12 @@ export async function apiSend(path: string, method: string, body?: unknown): Pro
   return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
 }
 
+/** Unauthenticated read (the activation page looking up its invitation). */
+export async function publicGet(path: string): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+  const res = await fetch(api(path), { headers: await clientHeaders(), cache: "no-store" });
+  return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
+}
+
 /** Unauthenticated call (login, MFA step, reset): no session exists yet. */
 export async function publicPost(path: string, body: unknown): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
   const res = await fetch(api(path), {
