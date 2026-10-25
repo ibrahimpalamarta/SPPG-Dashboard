@@ -21,8 +21,8 @@ datasource db {
 // supaya ID internal yang berurutan tidak bocor / tidak bisa dienumerasi.
 // ---------------------------------------------------------------------------
 
-/// Authorization roles. Auth0 is the source of truth (Roles & Permissions);
-/// this column is the synced copy the backend actually enforces against.
+/// Authorization roles, enforced from users.role. Which permissions a role holds
+/// lives in role_permissions and is edited through the admin API.
 /// CMS_ADMIN berasal dari ERD (USER.role) dan SCRUM-14.
 enum Role {
   SUPER_ADMIN
@@ -51,11 +51,37 @@ enum PendistribusianMbg {
   SIANG
 }
 
-/// Hasil pemeriksaan format berkas saat diunggah (SCRUM-5).
+/// Status batch unggahan (PRD FR-UP-05, SCRUM-22/37). Transisi yang sah ada
+/// di `src/lib/upload-status.ts`, bukan di sini.
 enum UploadStatus {
-  DITERIMA
-  DITOLAK
   PROCESSING
+  NEEDS_REVIEW
+  NEEDS_MAPPING_UPDATE
+  READY
+  PUBLISHED
+  FAILED
+}
+
+/// Domain berkas yang diunggah (PRD Phase 1).
+enum UploadDomain {
+  CASHFLOW
+  MENU
+  RAB
+  PO
+  GOODS_RECEIPT
+  VENDOR_PAYMENT
+  INPUT_MAKER
+}
+
+/// Sistem asal data (field traceability `source_system`).
+enum SourceSystem {
+  INTERNAL
+  EFI
+  SIPGN
+  POP
+  AKSIS
+  MPM
+  WEB_MANUAL
 }
 
 /// Jenis menu pada form perencanaan menu SOP-OPR-001.
@@ -104,16 +130,13 @@ enum DocumentFileType {
 // Identitas & audit
 // ---------------------------------------------------------------------------
 
-/// Application-side user record. Holds NO credentials - Auth0 owns identity,
-/// `auth0Sub` is the only link between the two.
+/// Akun aplikasi. Identitas dan kredensial dikelola sendiri: login memakai
+/// email + `passwordHash` (argon2id), sesi ada di tabel `sessions`.
 ///
-/// TODO(catatan): ERD mencantumkan kolom `password_hash`. Kolom itu sengaja
-/// TIDAK dibuat - menyimpan kredensial bertentangan dengan arsitektur Auth0
-/// yang sudah berjalan dan tidak ada satu pun jalur kode yang menulisnya.
-/// Konfirmasi ke tim agar ERD diperbarui.
+/// `passwordHash` null = akun belum punya password (baru diundang, atau
+/// dimigrasi dari Auth0) dan belum bisa login sampai memakai link set-password.
 model User {
   id       BigInt  @id @default(autoincrement()) @map("user_id")
-  auth0Sub String  @unique @map("auth0_sub")
   email    String? @unique
   fullName String? @map("full_name")
   role     Role    @default(PUBLIC)
@@ -121,13 +144,24 @@ model User {
   status      ActiveStatus @default(ACTIVE)
   lastLoginAt DateTime?    @map("last_login")
 
-  /// Scopes a DATA_ADMIN to a single SPPG Dapur. Nullable: hanya role
-  /// DATA_ADMIN yang di-scope, role lain melihat seluruh dapur.
-  scopeId BigInt?  @map("scope_id")
-  scope   Kitchen? @relation(fields: [scopeId], references: [id], onDelete: Restrict)
+  passwordHash     String?   @map("password_hash")
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")
+
+  mfaEnabled   Boolean @default(false) @map("mfa_enabled")
+  /// Secret TOTP terenkripsi AES-256-GCM (lib/crypto). Jangan pernah dikirim ke klien.
+  mfaSecretEnc String? @map("mfa_secret_enc")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Dapur yang boleh diakses (SCRUM-20). DATA_ADMIN wajib punya minimal satu;
+  /// role lain tanpa baris di sini melihat seluruh dapur.
+  kitchenScopes UserKitchenScope[]
+
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
+  mfaRecoveryCodes    MfaRecoveryCode[]
 
   auditLogs        AuditLog[]
   galleryImages    GalleryImage[]
@@ -136,8 +170,88 @@ model User {
   cmsDocuments     CmsDocument[]
 
   @@index([role])
-  @@index([scopeId])
   @@map("users")
+}
+
+/// Sesi login. Token mentah hanya ada di cookie klien; di sini hanya SHA-256-nya,
+/// jadi dump database tidak bisa dipakai untuk membajak sesi.
+model Session {
+  id     BigInt @id @default(autoincrement()) @map("session_id")
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String @unique @map("token_hash")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  /// Batas absolut; idle timeout dihitung dari `lastSeenAt`.
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  ip        String?
+  userAgent String? @map("user_agent")
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Token sekali pakai untuk set/reset password (juga dipakai sebagai undangan).
+model PasswordResetToken {
+  id     BigInt @id @default(autoincrement()) @map("token_id")
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// Kode pemulihan MFA, sekali pakai. Hanya hash-nya yang disimpan.
+model MfaRecoveryCode {
+  id     BigInt @id @default(autoincrement()) @map("code_id")
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
+}
+
+/// Role -> permission yang bisa diubah lewat API tanpa deploy. SUPER_ADMIN
+/// tidak disimpan di sini: ia selalu memegang semua permission (tidak bisa
+/// dicabut, supaya tidak ada skenario lockout). Nilai `permission` divalidasi
+/// terhadap daftar PERMISSIONS di kode.
+model RolePermission {
+  role       Role
+  permission String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([role, permission])
+  @@map("role_permissions")
+}
+
+/// User <-> dapur (SCRUM-20). Menggantikan `users.scope_id` supaya satu akun
+/// bisa memegang lebih dari satu dapur.
+model UserKitchenScope {
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([userId, kitchenId])
+  @@index([kitchenId])
+  @@map("user_kitchen_scopes")
 }
 
 /// Who did what, to which entity, when (SCRUM-1, SCRUM-14 "all actions logged").
@@ -174,6 +288,10 @@ model Kitchen {
 
   name String @unique
 
+  /// Kode singkat dapur (SKN, LWG, DNM, PCK, SML) untuk nama berkas dan
+  /// `source_record_id`. Nullable: Turen belum punya kode resmi.
+  code String? @unique
+
   /// Wilayah administratif. Nullable - TODO(catatan): master dapur belum ada
   /// sebagai berkas. "SPPG Data points" 9.1 menandai tabel ini "build new"
   /// dan menyebut nama dapur "today only implied by sheet name", jadi wilayah,
@@ -197,7 +315,7 @@ model Kitchen {
   menuNutritions MenuNutrition[]
   dailyKitchens  DailyKitchen[]
   menuCosts      MenuCost[]
-  scopedUsers    User[]
+  userScopes     UserKitchenScope[]
 
   @@index([status])
   @@map("kitchens")
@@ -277,9 +395,21 @@ model AkgTarget {
 // Unggah & data operasional
 // ---------------------------------------------------------------------------
 
-/// Satu berkas Excel yang diunggah Data Admin (SCRUM-5, 6, 7).
+/// Satu percobaan unggah berkas (SCRUM-5, 6, 7; metadata umum SCRUM-22/37).
+/// Satu baris per percobaan: berkas yang sama diunggah ulang menjadi batch
+/// baru, bukan ditolak.
 model UploadBatch {
   id BigInt @id @default(autoincrement()) @map("batch_id")
+
+  /// `upload_batch_id` di PRD — ID yang keluar ke klien dan masuk ke
+  /// `source_record_id` staging. BigInt `id` tetap internal.
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  domain       UploadDomain
+  sourceSystem SourceSystem @default(INTERNAL) @map("source_system")
+
+  /// Periode data, "YYYY-MM". Nullable: tidak semua domain punya periode.
+  period String?
 
   kitchenId BigInt  @map("kitchen_id")
   kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
@@ -290,16 +420,38 @@ model UploadBatch {
   uploadDate DateTime @default(now()) @map("upload_date")
   fileName   String   @map("file_name")
 
-  /// Sidik jari berkas. UNIQUE - inilah yang membuat SCRUM-6 ("re-import berkas
-  /// yang sama diperlakukan sebagai berkas yang sama bila tidak ada perubahan")
-  /// bisa ditegakkan di level database, bukan hanya di aplikasi.
-  fileHash String @unique @map("file_hash")
+  /// SHA-256 berkas. Tidak UNIQUE lagi (SCRUM-22): unggah ulang berkas yang
+  /// sama membuat batch baru plus peringatan duplikat; penggandaan fakta bisnis
+  /// dicegah saat publish, bukan di sini.
+  fileHash String @map("file_hash")
 
-  rowCount Int          @map("row_count")
+  /// Byte. Nullable hanya untuk batch sebelum SCRUM-22.
+  fileSize Int? @map("file_size")
+
+  /// Object key di S3. Tidak pernah memuat nama berkas asli. NULL bila berkas
+  /// gagal sebelum sempat disimpan.
+  storageKey String? @map("storage_key")
+
+  /// Diisi deteksi profile (SCRUM-39) dan parser (SCRUM-35/36), NULL selama
+  /// belum terdeteksi.
+  mappingProfileId String? @map("mapping_profile_id")
+  templateVersion  String? @map("template_version")
+
+  rowCount Int          @default(0) @map("row_count")
   status   UploadStatus @default(PROCESSING)
 
-  /// Alasan penolakan / catatan verifikasi.
+  /// Kode mesin dan ringkasan kegagalan, untuk status FAILED /
+  /// NEEDS_MAPPING_UPDATE.
+  errorCode    String? @map("error_code")
+  errorSummary String? @map("error_summary")
+  durationMs   Int?    @map("duration_ms")
+
+  /// Catatan verifikasi.
   notes String?
+
+  /// Diisi SCRUM-33 (validasi) dan SCRUM-95 (publish).
+  validatedAt DateTime? @map("validated_at")
+  publishedAt DateTime? @map("published_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -307,6 +459,8 @@ model UploadBatch {
   menuPlans MenuPlan[]
 
   @@index([kitchenId, uploadDate])
+  @@index([kitchenId, domain, uploadDate])
+  @@index([fileHash])
   @@map("upload_batches")
 }
 

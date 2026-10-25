@@ -88,10 +88,7 @@ jobs:
             -target=module.compute.aws_ecs_cluster.this \
             -target=module.compute.aws_ecs_task_definition.migrate \
             -var="aws_region=${{ vars.AWS_REGION }}" \
-            -var="backend_image_tag=${{ github.sha }}" \
-            -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
-            -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
-            -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+            -var="backend_image_tag=${{ github.sha }}"
           echo "ECR_BACKEND_URL=$(terraform output -raw ecr_backend_repository_url)" >> "$GITHUB_ENV"
 
       - name: Login to Amazon ECR
@@ -151,10 +148,7 @@ jobs:
         run: |
           terraform apply -auto-approve \
             -var="aws_region=${{ vars.AWS_REGION }}" \
-            -var="backend_image_tag=${{ github.sha }}" \
-            -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
-            -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
-            -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+            -var="backend_image_tag=${{ github.sha }}"
 
       # terraform apply returns as soon as UpdateService is accepted, so
       # without this the job goes green while the new tasks are still

@@ -6,6 +6,7 @@ import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
 import { writeAuditLog } from '../../auth/audit.js';
+import { codesByRolloutStatus, withRollout } from '../../lib/kitchen-rollout.js';
 import type { kitchenCreate, kitchenListQuery, kitchenUpdate } from '../../schemas/kitchen.js';
 
 type ListQuery = z.infer<typeof kitchenListQuery>;
@@ -18,6 +19,7 @@ export const listKitchens = (db: Db = prisma): RequestHandler => async (req, res
     ...(q.status && { status: q.status }),
     ...(q.type && { type: q.type }),
     ...(q.search && { name: { contains: q.search, mode: 'insensitive' } }),
+    ...(q.rolloutStatus && { code: { in: codesByRolloutStatus(q.rolloutStatus) } }),
   };
 
   const [rows, total] = await Promise.all([
@@ -25,7 +27,7 @@ export const listKitchens = (db: Db = prisma): RequestHandler => async (req, res
     db.kitchen.count({ where }),
   ]);
 
-  sendJson(res, paginated(rows, total, q));
+  sendJson(res, paginated(rows.map(withRollout), total, q));
 };
 
 export const getKitchen = (db: Db = prisma): RequestHandler => async (req, res) => {
@@ -35,7 +37,7 @@ export const getKitchen = (db: Db = prisma): RequestHandler => async (req, res) 
     sendError(res, 'NOT_FOUND');
     return;
   }
-  sendJson(res, row);
+  sendJson(res, withRollout(row));
 };
 
 export const createKitchen = (db: Db = prisma): RequestHandler => async (req, res) => {

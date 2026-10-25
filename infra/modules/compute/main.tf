@@ -268,6 +268,27 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# MFA_ENCRYPTION_KEY: encrypts TOTP secrets at rest and signs the MFA challenge
+# (backend/src/config/env.ts). Generated here so it never passes through a
+# person or a CI log; it lives in Secrets Manager and, like the DB password, in
+# Terraform state. Replacing this resource un-enrols every authenticator.
+resource "random_id" "mfa_key" {
+  byte_length = 32
+}
+
+resource "aws_secretsmanager_secret" "mfa_key" {
+  name = "${local.prefix}-mfa-encryption-key"
+
+  tags = {
+    Name = "${local.prefix}-mfa-encryption-key"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "mfa_key" {
+  secret_id     = aws_secretsmanager_secret.mfa_key.id
+  secret_string = random_id.mfa_key.b64_std
+}
+
 resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
   name = "${local.prefix}-ecs-task-exec-secrets"
   role = aws_iam_role.ecs_task_execution.id
@@ -277,7 +298,7 @@ resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["secretsmanager:GetSecretValue"]
-      Resource = var.db_secret_arn
+      Resource = [var.db_secret_arn, aws_secretsmanager_secret.mfa_key.arn]
     }]
   })
 }
@@ -313,9 +334,10 @@ resource "aws_iam_role_policy" "ecs_task_assets" {
   })
 }
 
-# Both frontends are static "coming soon" pages for now: no environment and no
-# secrets blocks, because neither app reads any configuration at runtime. The
-# port and HOSTNAME the container binds are baked into their Dockerfiles.
+# frontend-public is still a static "coming soon" page: no environment and no
+# secrets blocks, because it reads no configuration at runtime. The port and
+# HOSTNAME the container binds are baked into the Dockerfile. frontend-admin
+# below needs the API origin, since it relays logins and data calls server-side.
 resource "aws_ecs_task_definition" "frontend_admin" {
   family                   = "${local.prefix}-frontend-admin"
   requires_compatibilities = ["FARGATE"]
@@ -334,6 +356,12 @@ resource "aws_ecs_task_definition" "frontend_admin" {
         containerPort = var.frontend_container_port
         protocol      = "tcp"
       }]
+      # Not a secret. Over plain HTTP the ALB listener forwards /api/* straight
+      # to the backend; once a certificate is attached HTTP redirects to HTTPS,
+      # so set frontend_api_base_url to the certificate's domain.
+      environment = [
+        { name = "API_BASE_URL", value = var.frontend_api_base_url != "" ? var.frontend_api_base_url : "http://${aws_lb.this.dns_name}" },
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -408,13 +436,11 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "DB_HOST", value = var.db_endpoint },
         { name = "DB_PORT", value = tostring(var.db_port) },
         { name = "DB_NAME", value = var.db_name },
-        # Auth0 config is deliberately plain environment, not secrets: the API
-        # only verifies tokens against the public JWKS, so it holds no Auth0
-        # credentials. The Management API M2M secret used for seeding is never
-        # given to the running service.
-        { name = "AUTH0_DOMAIN", value = var.auth0_domain },
-        { name = "AUTH0_AUDIENCE", value = var.auth0_audience },
-        { name = "AUTH0_ROLES_CLAIM", value = var.auth0_roles_claim },
+        # The admin frontend relays logins and forwards the real client address
+        # in X-Forwarded-For; it reaches this API through the ALB, so two hops
+        # (ALB -> frontend -> ALB) are trusted. See TRUST_PROXY_HOPS in env.ts.
+        { name = "TRUST_PROXY_HOPS", value = "2" },
+        { name = "MFA_REQUIRED_ROLES", value = var.mfa_required_roles },
         # Uploads (SCRUM-5/14). Not a secret: the bucket name is visible in
         # every object URL, and access comes from the task role, not from a key.
         { name = "S3_BUCKET", value = var.assets_bucket_name },
@@ -427,6 +453,7 @@ resource "aws_ecs_task_definition" "backend" {
         [
           { name = "DB_USERNAME", valueFrom = "${var.db_secret_arn}:username::" },
           { name = "DB_PASSWORD", valueFrom = "${var.db_secret_arn}:password::" },
+          { name = "MFA_ENCRYPTION_KEY", valueFrom = aws_secretsmanager_secret.mfa_key.arn },
         ],
         var.public_db_secret_key == "" ? [] : [
           {

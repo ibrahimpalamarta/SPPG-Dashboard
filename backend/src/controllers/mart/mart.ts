@@ -31,7 +31,7 @@ export const listMenuNutritions = (db: Db = prisma): RequestHandler => async (re
   const q = req.valid!.query as z.infer<typeof menuNutritionQuery>;
   const scope = kitchenScope(req.user!, q.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 
@@ -64,7 +64,7 @@ export const listDailyKitchens = (db: Db = prisma): RequestHandler => async (req
   const q = req.valid!.query as z.infer<typeof dailyKitchenQuery>;
   const scope = kitchenScope(req.user!, q.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 
@@ -95,7 +95,7 @@ export const listAkgCompliances = (db: Db = prisma): RequestHandler => async (re
   const q = req.valid!.query as z.infer<typeof akgComplianceQuery>;
   const scope = kitchenScope(req.user!, q.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 
@@ -127,7 +127,7 @@ export const listMenuCosts = (db: Db = prisma): RequestHandler => async (req, re
   const q = req.valid!.query as z.infer<typeof menuCostQuery>;
   const scope = kitchenScope(req.user!, q.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 
