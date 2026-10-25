@@ -20,3 +20,4 @@ jobs:
     with:
       trigger: pr
       suite: smoke
+    secrets: inherit
