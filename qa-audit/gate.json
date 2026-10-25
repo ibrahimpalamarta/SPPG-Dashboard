@@ -1,0 +1,28 @@
+{
+  "$comment": "Satu-satunya sumber aturan gate. Hanya dibaca scripts/merge-report.ts. Ubah = catat alasan di docs/decision-log.md.",
+  "severity": {
+    "tsc": "Blocker",
+    "eslint": { "error": "Warning", "warning": "Info" },
+    "eslintA11yInactive": "Warning",
+    "semgrep": { "error": "Blocker", "warning": "Warning", "note": "Info" },
+    "gitleaks": "Blocker",
+    "vitest": { "failed": "Blocker" },
+    "playwright": { "failed": "Warning", "flaky": "Warning" },
+    "playwrightBlockerTags": ["smoke", "rbac", "pii"],
+    "axe": { "critical": "Blocker", "serious": "Blocker", "moderate": "Warning", "minor": "Warning" },
+    "trivy": { "CRITICAL": "Blocker", "HIGH": "Blocker", "MEDIUM": "Warning", "LOW": "Info" },
+    "zap": { "3": "Blocker", "2": "Warning", "1": "Info", "0": "Info" },
+    "lighthouseBelowThreshold": "Warning",
+    "visualDiffAboveThreshold": "Warning",
+    "toolMissingInCI": "Blocker",
+    "stageFailedWithoutReport": "Blocker",
+    "pendingFeaturePastTarget": "Blocker",
+    "noTestPastTarget": "Blocker"
+  },
+  "thresholds": {
+    "lighthouse": { "performance": 0.8, "accessibility": 0.9 },
+    "visualDiffRatio": 0.01
+  },
+  "unwaivable": ["gitleaks"],
+  "waivers": []
+}
