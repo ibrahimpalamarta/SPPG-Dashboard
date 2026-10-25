@@ -19,7 +19,7 @@ backend/
       20260820010000-reference-data.ts     6 dapur + 12 target AKG
     README.md              berkas ini
   scripts/
-    seed-superadmin.ts     satu akun Super Admin (butuh Auth0 M2M)
+    seed-superadmin.ts     satu akun Super Admin
 ```
 
 Prompt tugas meminta folder `migrations/`, `seed/`, dan `README.md` terpisah.
@@ -54,7 +54,7 @@ npm run migrate:deploy
 # seed_history untuk database ini. Aman diulang — yang sudah tercatat dilewati.
 npm run seed
 
-# opsional: satu akun Super Admin (butuh kredensial Auth0 M2M di .env)
+# opsional: satu akun Super Admin (SEED_SUPERADMIN_EMAIL di .env)
 npm run seed:superadmin
 ```
 
@@ -78,7 +78,7 @@ pernah jalan di suatu environment tidak boleh diubah atau diganti nama — nama
 berkasnya adalah primary key-nya di `seed_history`.
 
 `scripts/seed-superadmin.ts` sengaja **tidak** dipindah ke sistem ini: dia
-memanggil Auth0 Management API dan mencetak password sekali ke stdout, dua hal
+membuat kredensial dan mencetak link set-password sekali ke stdout, dua hal
 yang tidak cocok dengan seeder data biasa yang idealnya idempotent murni tanpa
 efek samping eksternal maupun rahasia yang tercetak. Tetap dijalankan terpisah
 lewat `npm run seed:superadmin`.
@@ -107,8 +107,9 @@ menyimpan nilai, bukan format, jadi tidak ada yang perlu ditegakkan di DDL.
 Dibuang: `menus`, `nutritions`, `transactions`, `documents`, `geographic_infos`.
 Dibentuk ulang: `users`, `audit_logs`, `kitchens`, `gallery_images`.
 
-`users.auth0_sub` dipertahankan sehingga tautan ke Auth0 tetap utuh walau
-`users.id` berpindah dari UUID ke BIGSERIAL dan ternomori ulang. `users.scope_id`
+(Riwayat: `users.auth0_sub` dulu dipertahankan di sini; kolomnya dibuang oleh migrasi
+`20261025000000_internal_auth` saat Auth0 diganti auth internal.) `users.id` berpindah
+dari UUID ke BIGSERIAL dan ternomori ulang. `users.scope_id`
 yang dulu UUID tanpa constraint kini FK sungguhan ke `kitchens` — menutup TODO
 yang sudah ada di schema sebelumnya (scoping DATA_ADMIN per dapur, SCRUM-1).
 
@@ -153,7 +154,7 @@ hanya memilih kolom non-sensitif:
 Yang **tidak pernah** masuk view: seluruh isi `menu_costs` (ditandai
 `[mart, internal-only]` di ERD), `menu_plans.harga_bahan`, `menu_plans.total_harga`,
 seluruh `recipe_costings`, `daily_kitchens.jumlah_pm` (hitungan penerima manfaat
-eksak), dan `users` (PII + `auth0_sub`).
+eksak), dan `users` (PII + hash password).
 
 Sejak migrasi `20260819000000_public_db_role`, siapa yang boleh membaca juga
 ditegakkan di database: role `sppg_public` hanya punya `GRANT SELECT` ke dua
@@ -195,9 +196,9 @@ Semua poin di bawah juga ditandai `TODO(catatan):` di `schema.prisma` dan/atau
 5. **Wilayah, jenis, dan koordinat 6 dapur kosong.** Master dapur belum ada
    sebagai berkas. Kolomnya dibuat nullable dan sengaja tidak ditebak.
 
-6. **`password_hash` tidak dibuat** meski ada di ERD — bertentangan dengan
-   arsitektur Auth0 yang sudah berjalan, dan tidak ada jalur kode yang
-   menulisnya. Perlu konfirmasi agar ERD diperbarui.
+6. **`password_hash` kini ada** (migrasi `20261025000000_internal_auth`) — auth
+   internal menggantikan Auth0. Tabel pendukung (`sessions`, `password_reset_tokens`,
+   `mfa_recovery_codes`, `role_permissions`) belum ada di ERD; perlu diperbarui.
 
 7. **`gallery_images` dipertahankan** walau tidak ada di ERD, karena fitur galeri
    CMS sudah terpasang. Konfirmasi apakah memang harus dihapus.

@@ -26,13 +26,15 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 
 **D-05 · 2026-10-23 · ASUMSI peran (B-ROLE).** PM MBG = `SUPER_ADMIN` (semua permission). Data Admin/PIC Kitchen = `DATA_ADMIN` (upload + lihat, kitchen sendiri). `INTERNAL` tetap view-only. Role lain di PRD §3 tinggal ditambah ke `ROLE_PERMISSIONS`.
 
-**D-06 · 2026-10-23 · Role disimpan di Postgres, bukan claim Auth0.** Claim hanya dipakai saat akun pertama kali dibuat (keputusan sesi 22 Okt). Mencabut role di Auth0 tidak berefek; perubahan role harus lewat admin API. Ini prasyarat SCRUM-121/122.
+**D-10 · 2026-10-25 · Auth0 diganti auth internal (password argon2id + sesi di Postgres, MFA TOTP).** Menggantikan D-06 dan D-09 (Auth0 dan `@auth0/nextjs-auth0` dihapus). Role tetap enum yang sama; peta role → permission pindah ke tabel `role_permissions` (bisa diubah tanpa deploy). Tanpa email dulu: undangan/reset lewat link dari Super Admin. Rincian: `backend/docs/AUTH.md`.
+
+**D-06 · 2026-10-23 · (DIGANTIKAN oleh D-10) Role disimpan di Postgres, bukan claim Auth0.** Claim hanya dipakai saat akun pertama kali dibuat (keputusan sesi 22 Okt). Mencabut role di Auth0 tidak berefek; perubahan role harus lewat admin API. Ini prasyarat SCRUM-121/122.
 
 **D-07 · 2026-10-23 · UI dibangun di atas mockup yang ada.** `frontend-admin` memakai Next 16 + Tailwind 4 + lucide-react. Mockup (overview/finance/kelengkapan/unggah-data) dipakai sebagai dasar layout; seluruh angka palsu (`lib/mock/*`) dihapus.
 
 **D-08 · 2026-10-23 · Fixture sintetis (B-FIXTURE-PII).** Fixture test meniru header & layout sampel nyata, dengan nilai karangan. Sampel mentah tidak masuk repo.
 
-**D-09 · 2026-10-23 · Auth0 di frontend: `@auth0/nextjs-auth0` 4.31.1, dipin exact.** Ini SDK resmi untuk Next App Router dan mendukung Next 16 (`proxy.ts`). Dipilih versi berumur ≥ 2 minggu: 4.33.0 terbit 22 Okt, terlalu baru untuk dipasang. Sesi di cookie terenkripsi, tanpa store baru. Satu-satunya dependensi baru di SCRUM-21.
+**D-09 · 2026-10-23 · (DIGANTIKAN oleh D-10) Auth0 di frontend: `@auth0/nextjs-auth0` 4.31.1, dipin exact.** Ini SDK resmi untuk Next App Router dan mendukung Next 16 (`proxy.ts`). Dipilih versi berumur ≥ 2 minggu: 4.33.0 terbit 22 Okt, terlalu baru untuk dipasang. Sesi di cookie terenkripsi, tanpa store baru. Satu-satunya dependensi baru di SCRUM-21.
 
 **D-10 · 2026-10-23 · Halaman ↔ permission.** Overview, Finance & Cost, Data Health = `dashboard:view`; Unggah Data = `upload:view`; Mapping & Validasi = `mapping:view`; Data Reference = `reference:view`; Manual / Quick Entry = `upload:create` (fallback hanya untuk yang boleh memasukkan data). Slug URL Bahasa Indonesia mengikuti mockup (`/unggah-data`, `/kesehatan-data`, …). Label menu mengikuti nama halaman PRD §5.
 
