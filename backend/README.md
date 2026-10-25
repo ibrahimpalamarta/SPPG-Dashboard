@@ -195,7 +195,7 @@ publishDate + audit log CMS.
 Ditambah untuk fase unggah: parsing workbook (pemetaan header yang toleran
 kapital/tanda baca/satuan, kolom wajib hilang, sel rusak dilaporkan bernomor
 baris, berkas non-xlsx), dan hasil `POST /api/upload-batches` —
-batch PROCESSING → NEEDS_MAPPING_UPDATE, `dryRun` yang tidak menulis apa pun,
+batch PROCESSING → NEEDS_REVIEW / NEEDS_MAPPING_UPDATE, `dryRun` yang tidak menulis apa pun,
 duplikat jadi peringatan, S3 gagal → FAILED, dan transisi status tak sah (SCRUM-22).
 Workbook uji dibangun di memori dengan exceljs, jadi tetap tanpa berkas fixture
 dan tanpa jaringan.
@@ -344,13 +344,15 @@ Sejak SCRUM-22/37 upload **hanya membuka batch dan menyimpan berkas**: tidak
 ada lagi tulisan ke `menu_plans` (tabel kanonik diisi saat publish nanti).
 Field form: `file`, `kitchenId`, `domain` (CASHFLOW, MENU, RAB, PO,
 GOODS_RECEIPT, VENDOR_PAYMENT, INPUT_MAKER), `sourceSystem?` (default
-INTERNAL), `period?` (`YYYY-MM`), `notes?`.
+INTERNAL), `period?` (`YYYY-MM`), `notes?`, `replaces?` (publicId batch karantina yang
+diunggah ulang; batch itu jadi `FAILED` + `error_code = REPLACED`, "Diganti").
 
 | Kondisi | Balasan | Baris `upload_batches` |
 |---|---|---|
 | bukan zip / bukan .xlsx | `400` | — |
 | `kitchenId` di luar scope | `403 forbidden_kitchen` | — |
-| berkas tersimpan | `201` + batch | `PROCESSING` → `NEEDS_MAPPING_UPDATE` (`error_code = PROFILE_NOT_DETECTED`) sampai parser registry SCRUM-24 dan deteksi profile SCRUM-39 ada |
+| berkas dikenali profil (SCRUM-39) | `201` + batch + `mapping` (ringkasan adapter) | `NEEDS_REVIEW`, `mapping_profile_id` + `template_version` terisi |
+| berkas tidak dikenali | `201` + batch + `columnDiff` | `NEEDS_MAPPING_UPDATE` (`error_code = PROFILE_NOT_DETECTED` / `PROFILE_AMBIGUOUS`) |
 | hash sama untuk kitchen + domain yang sama | `201` + batch baru + `warning.code = DUPLICATE_FILE` | batch baru; penggandaan dicegah saat publish |
 | S3 gagal | `500` | `FAILED` (`error_code = STORAGE_FAILED`) — tidak tertinggal di PROCESSING |
 
@@ -366,6 +368,10 @@ lewat `trackEvent` (`src/lib/events.ts`).
 > Berkas `.xlsx` dan `.csv` diterima. CSV dibaca sel demi sel sebagai string
 > apa adanya (lihat `src/lib/ingest/workbook.ts`); fixture anonim baseline Sukun
 > ada di `src/lib/ingest/fixtures/`.
+>
+> Profil mapping ada di `src/lib/mapping/profiles.ts` (registry = config di repo,
+> B-REG). Profil dipilih dari kitchen + domain + source + header; hasil adapter
+> belum disimpan (B-MAPOUT), hanya ringkasannya ikut response.
 
 ### Yang belum terisi datanya
 

@@ -20,11 +20,13 @@ export const STATUS = {
 } as const satisfies Record<string, { label: string; tone: string }>;
 
 /**
- * A few error codes read better than their status (SCRUM-131): a header-only
- * template is held for re-upload, not broken.
+ * A few error codes read better than their status: a header-only template is
+ * held for re-upload, not broken (SCRUM-131); a quarantined file that was
+ * re-uploaded is replaced, not failed (SCRUM-124).
  */
 const BY_ERROR_CODE: Record<string, { label: string; tone: string }> = {
   EMPTY_FILE: { label: "Ditahan · file kosong", tone: "bg-amber-100 text-amber-800" },
+  REPLACED: { label: "Diganti", tone: "bg-slate-100 text-slate-700" },
 };
 
 export function StatusBadge({ status, errorCode }: { status: string; errorCode?: string | null }) {

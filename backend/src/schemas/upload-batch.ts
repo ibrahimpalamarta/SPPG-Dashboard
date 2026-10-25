@@ -33,6 +33,8 @@ export const uploadBatchCreate = z.object({
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'must be YYYY-MM')
     .nullish(),
   notes: z.string().max(2000).nullish(),
+  /** SCRUM-124: public id of the quarantined batch this file re-uploads; it ends "Diganti". */
+  replaces: z.string().uuid().optional(),
 });
 
 /**

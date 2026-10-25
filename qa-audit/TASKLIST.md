@@ -48,11 +48,11 @@ Setiap tiket dianggap selesai bila semua poin di kolom *Selesai bila* lulus, dan
 | T09 | Input Maker Upload v1 + Sukun raw staging | 86, 118 (126 duplikat) | TODO |
 | T10 | Template resmi: generate, tombol download, tolak header-only | 130, 125, 131 | TODO |
 | **Tahap 3 — Mapping** ||||
-| T11 | Mapping Profile Registry + detect/apply per dapur | 26, 39 | TODO (B-REG) |
-| T12 | Schema mismatch handling + layar kolom berbeda | 94, 124 | TODO |
-| T13 | Sukun Cashflow profile/adapter | 27, 55 | TODO |
+| T11 | Mapping Profile Registry + detect/apply per dapur | 26, 39 | IN_PROGRESS (B-REG default dipakai, B-DD) |
+| T12 | Schema mismatch handling + layar kolom berbeda | 94, 124 | IN_PROGRESS (B-SCHEMA) |
+| T13 | Sukun Cashflow profile/adapter | 27, 55 | IN_PROGRESS (B-DD, B-MAPOUT) |
 | T14 | Lawang + persiapan DNM/PCK/SML Cashflow | 32, 56, 57 | TODO (B-SAMPLE-LWG/OTHER) |
-| T15 | Menu common adapter + menu_recipe_line + profil 5 dapur | 31, 73, 58 | TODO |
+| T15 | Menu common adapter + menu_recipe_line + profil 5 dapur | 31, 73, 58 | IN_PROGRESS (B-MAPOUT; T15.3 B-SAMPLE-LWG/OTHER) |
 | **Tahap 4 — Kanonik Finance** ||||
 | T16 | finance_transaction header/line + anti-double-count | 77, 40, 98, 41 | TODO |
 | T17 | Rantai RAB → PO → GR → Payment (Sukun) | 44, 28, 45, 29, 46, 47, 30 | TODO (B-RAW) |
@@ -155,23 +155,23 @@ file rusak/kosong/terenkripsi → batch FAILED/Ditahan dengan pesan Bahasa Indon
 benar (tercatat di audit batch); source/versi tidak dikenal masuk karantina; tidak ada
 logika yang di-hardcode berdasarkan nama dapur.
 
-#### T11 — Registry profil · Butuh: T06 · Status: TODO (B-REG)
+#### T11 — Registry profil · Butuh: T06 · Status: IN_PROGRESS (B-REG default dipakai, B-DD)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T11.1 | SCRUM-26 | Mapping Profile Registry service/config | TODO | U | Profil dimuat berdasarkan kitchen + domain + versi source |
-| T11.2 | SCRUM-39 | [DATA-005] Detect & apply profile | TODO | U | Source dikenal → profil terpilih secara deterministik. Versi/source tidak dikenal → karantina. Profil terpilih tersimpan di audit batch |
+| T11.1 | SCRUM-26 | Mapping Profile Registry service/config | IN_PROGRESS (B-REG, B-DD) | U | Profil dimuat berdasarkan kitchen + domain + versi source |
+| T11.2 | SCRUM-39 | [DATA-005] Detect & apply profile | IN_PROGRESS (B-TPLVER) | U | Source dikenal → profil terpilih secara deterministik. Versi/source tidak dikenal → karantina. Profil terpilih tersimpan di audit batch |
 
-#### T12 — Mismatch · Butuh: T11 · Status: TODO
+#### T12 — Mismatch · Butuh: T11 · Status: IN_PROGRESS (B-SCHEMA)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T12.1 | SCRUM-94 | Mapping/schema mismatch handling | TODO | U | File tidak dikenal/tidak kompatibel diblokir dengan pesan error yang bisa ditindaklanjuti |
-| T12.2 | SCRUM-124 | Layar sederhana file kolom berbeda | TODO | UI | Data Operasional hanya melihat tabel perbedaan kolom + tombol Unggah Ulang File (tanpa Buat format baru/Tolak). File lama otomatis berstatus Diganti |
+| T12.1 | SCRUM-94 | Mapping/schema mismatch handling | IN_PROGRESS | U | File tidak dikenal/tidak kompatibel diblokir dengan pesan error yang bisa ditindaklanjuti |
+| T12.2 | SCRUM-124 | Layar sederhana file kolom berbeda | IN_PROGRESS (B-SCHEMA) | UI | Data Operasional hanya melihat tabel perbedaan kolom + tombol Unggah Ulang File (tanpa Buat format baru/Tolak). File lama otomatis berstatus Diganti |
 
-#### T13 — Sukun Cashflow · Butuh: T07, T11 · Status: TODO
+#### T13 — Sukun Cashflow · Butuh: T07, T11 · Status: IN_PROGRESS (B-DD, B-MAPOUT)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T13.1 | SCRUM-55 | [DATA-022] Sukun Cashflow profile MAP-SKN-CF-001 | TODO (B-DD) | U, D | Parsing mata uang, grouping header/line, normalisasi kategori/unit. Versi mapping tersimpan. Sampel cocok dengan total sumber |
-| T13.2 | SCRUM-27 | Sukun Cashflow adapter | TODO | U | Field wajib Cashflow termapping; Rp, total, unit, review status ditangani |
+| T13.1 | SCRUM-55 | [DATA-022] Sukun Cashflow profile MAP-SKN-CF-001 | IN_PROGRESS (B-DD) | U, D | Parsing mata uang, grouping header/line, normalisasi kategori/unit. Versi mapping tersimpan. Sampel cocok dengan total sumber |
+| T13.2 | SCRUM-27 | Sukun Cashflow adapter | IN_PROGRESS (B-MAPOUT) | U | Field wajib Cashflow termapping; Rp, total, unit, review status ditangani |
 
 #### T14 — Cashflow dapur lain · Butuh: T13 · Status: TODO (B-SAMPLE-LWG, B-SAMPLE-OTHER, B-LWG)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
@@ -180,11 +180,11 @@ logika yang di-hardcode berdasarkan nama dapur.
 | T14.2 | SCRUM-32 | Lawang Cashflow adapter | TODO | U | Model kanonik dipakai ulang dengan alias lokal, tanpa formula KPI khusus Lawang |
 | T14.3 | SCRUM-57 | [DATA-024] Persiapan adapter DNM/PCK/SML | TODO | U | Variasi nama sheet DNM ditangani; alias PCK teruji; SML diperlakukan sebagai readiness, data kosong tidak dibaca sebagai 0 |
 
-#### T15 — Menu mapping · Butuh: T08, T11 · Status: TODO
+#### T15 — Menu mapping · Butuh: T08, T11 · Status: IN_PROGRESS (B-MAPOUT)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T15.1 | SCRUM-31 | Menu common adapter MAP-SKN-MENU-001 | TODO | U | Menu Upload v1 → menu_recipe_line; varian multi-sheet/header SKN ditangani |
-| T15.2 | SCRUM-73 | [DATA-041] menu_recipe_line canonical transform | TODO | U, D | Baris berisi serving_date, kitchen/region, menu, porsi/segmen, gizi, porsi rencana, lineage. Sheet/baris duplikat di-dedup dengan key yang disepakati |
+| T15.1 | SCRUM-31 | Menu common adapter MAP-SKN-MENU-001 | IN_PROGRESS (B-MAPOUT, B-DD) | U | Menu Upload v1 → menu_recipe_line; varian multi-sheet/header SKN ditangani |
+| T15.2 | SCRUM-73 | [DATA-041] menu_recipe_line canonical transform | IN_PROGRESS (B-MAPOUT, B-DD) | U, D | Baris berisi serving_date, kitchen/region, menu, porsi/segmen, gizi, porsi rencana, lineage. Sheet/baris duplikat di-dedup dengan key yang disepakati |
 | T15.3 | SCRUM-58 | [DATA-025] Profil Menu 5 dapur | TODO (B-SAMPLE-LWG/OTHER) | U | Lima profil → menu_recipe_upload. Periode PCK eksplisit. Bumil/Busui DNM dipertahankan. Multi-ingredient SML di-flag, tidak dikarang |
 
 ### Tahap 4 — Kanonik Finance
