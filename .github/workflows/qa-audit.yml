@@ -51,6 +51,25 @@ jobs:
       - name: Setup
         uses: ./.github/actions/qa-setup
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      # The former ci.yml PR jobs, so a PR carries one check. Independent of the
+      # fail-fast gate; a failure is a Blocker via stageFailedWithoutReport.
+      - name: 0. CI build
+        id: ci
+        continue-on-error: true
+        working-directory: .
+        run: |
+          set -euo pipefail
+          (cd backend && npm run build && npm test)
+          (cd frontend-public && npm ci --no-audit --no-fund && npm run build)
+          terraform fmt -check -recursive infra
+          for dir in infra/backend-bootstrap infra/environments/staging infra/environments/production; do
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+          done
+
       - name: 1. Code audit
         id: code
         continue-on-error: true
@@ -84,6 +103,7 @@ jobs:
       - name: 6. Report & gate
         if: ${{ always() }}
         env:
+          OUTCOME_CI: ${{ steps.ci.outcome }}
           OUTCOME_CODE: ${{ steps.gate-code.outcome == 'failure' && 'failure' || steps.code.outcome }}
           OUTCOME_LOGIC: ${{ steps.logic.outcome }}
           OUTCOME_ENV: ${{ steps.env.outcome }}

@@ -39,9 +39,9 @@ export type Gate = {
   waivers: Waiver[];
 };
 
-export const STAGES = { code: 'Code audit', logic: 'Logic test', env: 'Environment', e2e: 'Feature E2E', ui: 'UI/UX', report: 'Laporan & gate' } as const;
+export const STAGES = { ci: 'CI build', code: 'Code audit', logic: 'Logic test', env: 'Environment', e2e: 'Feature E2E', ui: 'UI/UX', report: 'Laporan & gate' } as const;
 export type Stage = keyof typeof STAGES;
-const TOOL_STAGE: Record<string, Stage> = { tsc: 'code', eslint: 'code', semgrep: 'code', gitleaks: 'code', vitest: 'logic', playwright: 'e2e' };
+const TOOL_STAGE: Record<string, Stage> = { ci: 'ci', tsc: 'code', eslint: 'code', semgrep: 'code', gitleaks: 'code', vitest: 'logic', playwright: 'e2e' };
 const RANK: Record<Severity, number> = { Blocker: 0, Warning: 1, Info: 2 };
 
 const ids = (title: string) => [...title.matchAll(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\]/g)].map((m) => m[1]!);
@@ -194,10 +194,11 @@ export function evaluate(input: { gate: Gate; requirements: Requirement[]; findi
   const findings = input.findings.map((f) => ({ ...f }));
 
   // A stage that failed but left no finding behind would otherwise read as clean.
+  // CI build writes no raw report; its failure is a red build/test, so a product failure, not infra.
   for (const [stage, outcome] of Object.entries(input.outcomes) as [Stage, string][]) {
     if (stage === 'env' || outcome !== 'failure') continue;
     if (!findings.some((f) => TOOL_STAGE[f.tool] === stage && f.severity === 'Blocker')) {
-      findings.push({ severity: g.stageFailedWithoutReport, tool: 'infra', rule: `${stage}-failed`, message: `Tahap ${STAGES[stage]} gagal tanpa laporan yang menjelaskan.` });
+      findings.push({ severity: g.stageFailedWithoutReport, tool: stage === 'ci' ? 'ci' : 'infra', rule: `${stage}-failed`, message: `Tahap ${STAGES[stage]} gagal tanpa laporan yang menjelaskan.` });
     }
   }
 
@@ -310,7 +311,7 @@ function main() {
   }
 
   const outcomes: Outcomes = {};
-  for (const s of ['code', 'logic', 'env', 'e2e', 'ui'] as const) {
+  for (const s of ['ci', 'code', 'logic', 'env', 'e2e', 'ui'] as const) {
     const o = process.env[`OUTCOME_${s.toUpperCase()}`];
     if (o) outcomes[s] = o;
   }
