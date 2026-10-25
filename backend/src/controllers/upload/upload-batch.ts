@@ -1,21 +1,20 @@
 import type { RequestHandler } from 'express';
 import { createHash } from 'node:crypto';
 import type { z } from 'zod';
-import { Prisma, UploadDomain, UploadStatus } from '@prisma/client';
+import { Prisma, UploadStatus } from '@prisma/client';
 import { prisma, type Db } from '../../db.js';
 import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
 import { kitchenScope, kitchenWhere } from '../../lib/scope.js';
-import { parseMenuWorkbook } from '../../lib/menu-workbook.js';
-import { XLSX_MIME, putObject, type PutObject } from '../../lib/s3.js';
+import { CSV_MIME, XLSX_MIME, putObject, type PutObject } from '../../lib/s3.js';
 import { dateFilter } from '../../schemas/common.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
 import { canTransition } from '../../lib/upload-status.js';
-import { WorkbookError, assertXlsxContainer } from '../../lib/ingest/workbook.js';
+import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
 import { parseToStaging } from '../../lib/ingest/pipeline.js';
-import { stagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
+import { InMemoryStagingRepository, stagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
 import type {
   uploadBatchCreate,
   uploadBatchCreateQuery,
@@ -85,7 +84,8 @@ const PREVIEW_ROWS = 50;
  * name (SCRUM-22 security note): one object per attempt, nothing user-supplied
  * in the path.
  */
-export const uploadKey = (publicId: string): string => `upload-batches/${publicId}.xlsx`;
+export const uploadKey = (publicId: string, fileName = ''): string =>
+  `upload-batches/${publicId}${isCsv(fileName) ? '.csv' : '.xlsx'}`;
 
 /** PRD §9 copy for a file no mapping profile recognises. */
 const NOT_RECOGNISED = 'Format file belum dikenali untuk kitchen/source ini. File belum dipublish.';
@@ -98,7 +98,8 @@ const NOT_RECOGNISED = 'Format file belum dikenali untuk kitchen/source ini. Fil
  *   - every attempt is its own batch, failed ones included; an identical
  *     earlier file for the same kitchen + domain only adds a `warning`
  *     (duplicates are stopped at publish, not at upload)
- *   - a file that is not an .xlsx container (renamed, password-protected) is
+ *   - a file that is not the container its extension promises (renamed or
+ *     password-protected .xlsx, binary .csv) is
  *     FAILED and never stored; a corrupt or empty workbook is FAILED with no
  *     staged rows left behind
  *   - a parsed file ends NEEDS_MAPPING_UPDATE until profile detection
@@ -124,28 +125,30 @@ export const createUploadBatch =
     const { buffer, originalname, size } = req.file!;
     const fileHash = createHash('sha256').update(buffer).digest('hex');
 
-    // SCRUM-6 AC1: parse and report, nothing written. Menu only until the
-    // staging parsers (SCRUM-24/36) replace this preview.
+    const context = (uploadBatchId: string, kitchenCode: string) => ({
+      uploadBatchId,
+      kitchenCode,
+      domain: body.domain,
+      sourceSystem: body.sourceSystem,
+      sourceFileName: originalname,
+      fileHash,
+      loadedAt: new Date(),
+    });
+
+    // SCRUM-6 AC1: parse and report, nothing written. Same parser as a real
+    // upload (SCRUM-36), into a throwaway repository.
     if (dryRun) {
-      try {
-        assertXlsxContainer(buffer);
-      } catch (err) {
-        if (!(err instanceof WorkbookError)) throw err;
-        sendError(res, 'VALIDATION_ERROR', { fields: { file: [err.message] } });
+      const parsed = await parseToStaging(buffer, context('dry-run', String(body.kitchenId)), new InMemoryStagingRepository());
+      if (!parsed.ok) {
+        sendError(res, 'VALIDATION_ERROR', { fields: { file: [parsed.errorSummary] } });
         return;
       }
-      if (body.domain !== UploadDomain.MENU) {
-        sendError(res, 'VALIDATION_ERROR', { fields: { dryRun: ['only available for MENU'] } });
-        return;
-      }
-      const { columns, rows, errors } = await parseMenuWorkbook(buffer);
       sendJson(res, {
         fileName: originalname,
         fileHash,
-        columns,
-        rowCount: rows.length,
-        errors,
-        rows: rows.slice(0, PREVIEW_ROWS),
+        sheets: parsed.batch.sheets,
+        rowCount: parsed.batch.rows.length,
+        rows: parsed.batch.rows.slice(0, PREVIEW_ROWS),
       });
       return;
     }
@@ -194,16 +197,16 @@ export const createUploadBatch =
     let sheets: unknown[] = [];
     const ingest = async () => {
       try {
-        assertXlsxContainer(buffer);
+        assertReadable(buffer, originalname);
       } catch (err) {
         if (!(err instanceof WorkbookError)) throw err;
         // Not stored: a renamed or encrypted file has no business in the bucket.
         return finish({ status: UploadStatus.FAILED, errorCode: err.code, errorSummary: err.message });
       }
 
-      const storageKey = uploadKey(batch.publicId);
+      const storageKey = uploadKey(batch.publicId, originalname);
       try {
-        await put(storageKey, buffer, XLSX_MIME);
+        await put(storageKey, buffer, isCsv(originalname) ? CSV_MIME : XLSX_MIME);
       } catch (err) {
         await finish({
           status: UploadStatus.FAILED,
@@ -214,20 +217,8 @@ export const createUploadBatch =
         throw err;
       }
 
-      const parsed = await parseToStaging(
-        buffer,
-        {
-          uploadBatchId: batch.publicId,
-          // Turen has no code yet (B-TUREN); its numeric id is just as stable.
-          kitchenCode: kitchen.code ?? String(kitchen.id),
-          domain: body.domain,
-          sourceSystem: body.sourceSystem,
-          sourceFileName: originalname,
-          fileHash,
-          loadedAt: new Date(),
-        },
-        staging,
-      );
+      // Turen has no code yet (B-TUREN); its numeric id is just as stable.
+      const parsed = await parseToStaging(buffer, context(batch.publicId, kitchen.code ?? String(kitchen.id)), staging);
       if (!parsed.ok) {
         return finish({ storageKey, status: UploadStatus.FAILED, errorCode: parsed.errorCode, errorSummary: parsed.errorSummary });
       }

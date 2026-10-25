@@ -35,10 +35,12 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   const [kitchen, setKitchen] = useState(kitchenId ?? kitchens[0].id);
   const [domain, setDomain] = useState("CASHFLOW");
   const [file, setFile] = useState<File | null>(null);
-  const current = result?.ok ? 3 : step;
+  // "Unggah ulang" goes back to the file step without dropping kitchen/domain.
+  const [retry, setRetry] = useState(false);
+  const current = result?.ok && !retry ? 3 : step;
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} onSubmit={() => setRetry(false)} className="space-y-5">
       <input type="hidden" name="kitchenId" value={kitchen} />
       <input type="hidden" name="domain" value={domain} />
 
@@ -104,8 +106,8 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
 
         <div hidden={current !== 2} className="space-y-4">
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold text-slate-800">File (.xlsx, maks. 10 MB)</span>
-            <input type="file" name="file" accept=".xlsx" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium" />
+            <span className="font-semibold text-slate-800">File (.xlsx atau .csv, maks. 10 MB)</span>
+            <input type="file" name="file" accept=".xlsx,.csv" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium" />
           </label>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-slate-500">File dipilih</dt>
@@ -130,10 +132,10 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
           </div>
         </div>
 
-        {result?.ok && (
+        {result?.ok && current === 3 && (
           <section aria-live="polite" className="space-y-3 text-sm">
             <div className="flex flex-wrap items-center gap-3">
-              <StatusBadge status={result.status} />
+              <StatusBadge status={result.status} errorCode={result.errorCode} />
               <span className="font-mono text-xs text-slate-500">Batch {result.batchId}</span>
               <span className="text-slate-600">{result.rowCount} baris</span>
             </div>
@@ -148,9 +150,16 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
                 ))}
               </ul>
             )}
-            <Link href="/mapping-validasi" className="inline-block font-medium text-emerald-700 hover:underline">
-              Ke Mapping &amp; Validasi
-            </Link>
+            <div className="flex flex-wrap items-center gap-4">
+              {result.status !== "NEEDS_REVIEW" && (
+                <button type="button" onClick={() => { setRetry(true); setStep(2); }} className={primaryButton}>
+                  Unggah Ulang File
+                </button>
+              )}
+              <Link href="/mapping-validasi" className="inline-block font-medium text-emerald-700 hover:underline">
+                Ke Mapping &amp; Validasi
+              </Link>
+            </div>
           </section>
         )}
       </Card>

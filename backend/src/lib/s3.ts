@@ -10,6 +10,7 @@ const client = new S3Client({ region: env.AWS_REGION });
 
 /** Matches what the caller must send and what we store back on the object. */
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+export const CSV_MIME = 'text/csv';
 
 export type PutObject = (key: string, body: Buffer, contentType: string) => Promise<string>;
 

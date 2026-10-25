@@ -10,18 +10,18 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | SCRUM-132 | [DATA-052] Dapur reference & rollout status | 3 (ditarik maju) | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-LWG, B-TUREN) | In Review | `feature/scrum-123-clean-ui` (review) | 2026-10-25 | AC kode terpenuhi; sisa keputusan kolom, Lawang, kode Turen |
 | SCRUM-22 | Create upload batch & metadata | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-ASSIGN) | In Progress | `feature/scrum-22-upload-batch` | 2026-10-23 | Backend selesai; kolom di luar [PRD] menunggu approval |
 | SCRUM-37 | [DATA-001] Upload batch common metadata | 2 | IN_PROGRESS | To Do | `feature/scrum-22-upload-batch` | 2026-10-23 | Satu unit dengan SCRUM-22 |
-| SCRUM-24 | Excel upload pipeline | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-RAW) | In Progress | `feature/scrum-24-excel-pipeline` | 2026-10-23 | Reader semua sheet + registry + staging in-memory + FAILED codes selesai; staging persisten menunggu skema |
+| SCRUM-24 | Excel upload pipeline | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-RAW) | In Progress | `feature/tahap2-upload-parsers` | 2026-10-25 | xlsx + CSV (nilai mentah string, tanpa tebak angka/tanggal) ke staging in-memory; staging persisten menunggu skema |
 | SCRUM-5 | Halaman Upload Data | 2 | IN_PROGRESS (sebagian BLOCKED: B-AUTH0-FE) | In Progress | `feature/scrum-5-upload-page` | 2026-10-23 | Form + Server Action + hasil/status/duplikat selesai; tautan history menunggu SCRUM-25 |
-| SCRUM-35 | [DATA-002] Cashflow Upload v1 parser | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-TPLVER) | To Do | `feature/scrum-35-cashflow-parser` | 2026-10-23 | Parser staging dari kontrak template Sukun; sheet PII dilewati; staging persisten menunggu skema |
-| SCRUM-36 | [DATA-003] Menu Upload v1 parser | 2 | TODO | To Do | — | 2026-10-23 | Parser lama `menu-workbook.ts` hanya untuk dryRun, header tebakan |
-| SCRUM-25 | Upload history/status | 2 | IN_PROGRESS | In Progress | — | 2026-10-23 | List/detail endpoint ada; UI hanya mockup |
+| SCRUM-35 | [DATA-002] Cashflow Upload v1 parser | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-TPLVER) | To Do | `feature/tahap2-upload-parsers` | 2026-10-25 | Teruji juga dengan layout flat baseline Sukun (fixture anonim `sukun-cashflow.csv`); staging persisten menunggu skema |
+| SCRUM-36 | [DATA-003] Menu Upload v1 parser | 2 | IN_PROGRESS (sebagian BLOCKED: B-SCHEMA) | To Do | `feature/tahap2-upload-parsers` | 2026-10-25 | `menuParser` 23 kolom baseline Sukun; `menu-workbook.ts` dihapus, dryRun pakai parser staging |
+| SCRUM-25 | Upload history/status | 2 | IN_PROGRESS | In Progress | `feature/tahap2-upload-parsers` | 2026-10-25 | List/detail endpoint + tabel history nyata; kolom profil/validasi/publish menyusul SCRUM-39/23 |
 | SCRUM-86 | [DATA-048] Input Maker Upload v1 contract | 2 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-118 | Input Maker Sukun raw staging | 2 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-126 | (duplikat SCRUM-118) | 2 | DUPLICATE | To Do | — | 2026-10-23 | Tidak dikerjakan |
 | SCRUM-38 | [DATA-004] Photo/scan metadata | 2 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-130 | [DATA-050] Template resmi | 2 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-125 | Tombol Download Template | 2 | TODO | To Do | — | 2026-10-23 | |
-| SCRUM-131 | [DATA-051] Tolak template header-only | 2 | TODO | To Do | — | 2026-10-23 | |
+| SCRUM-131 | [DATA-051] Tolak template header-only | 2 | IN_PROGRESS (sebagian BLOCKED: B-TPLVER) | To Do | `feature/tahap2-upload-parsers` | 2026-10-25 | Header-only → EMPTY_FILE tanpa staging, badge "Ditahan · file kosong" + Unggah Ulang; pengenalan "template valid" menunggu SCRUM-130 |
 | SCRUM-124 | Layar kolom berbeda | 2 (setelah registry) | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-26 | Mapping Profile Registry | 3 | TODO | To Do | — | 2026-10-23 | |
 | SCRUM-39 | [DATA-005] Detect & apply profile | 3 | TODO | To Do | — | 2026-10-23 | |

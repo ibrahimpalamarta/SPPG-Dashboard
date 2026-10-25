@@ -1,7 +1,9 @@
 import ExcelJS from 'exceljs';
+import { Readable } from 'node:stream';
+import { extname } from 'node:path';
 
 /**
- * SCRUM-24: every sheet of an .xlsx read as-is — no trimming, no number
+ * SCRUM-24: every sheet of an .xlsx (or the one sheet of a .csv) read as-is — no trimming, no number
  * parsing, no date guessing. Normalisation belongs to the adapters (Tahap 3);
  * this layer only has to make sure nothing in the source is lost.
  *
@@ -72,17 +74,67 @@ export function assertXlsxContainer(buffer: Buffer): void {
   }
 }
 
-export async function readWorkbook(buffer: Buffer): Promise<RawSheet[]> {
+export const isCsv = (fileName: string) => extname(fileName).toLowerCase() === '.csv';
+
+/** A text file has no NUL bytes; a renamed .xlsx/.xls or an image does. */
+export function assertCsvText(buffer: Buffer): void {
+  if (buffer.length === 0 || buffer.includes(0)) {
+    throw new WorkbookError('CORRUPT_FILE', 'File CSV kosong atau bukan teks. Ekspor ulang sebagai CSV lalu upload lagi.');
+  }
+}
+
+/** Checks the container the extension promises, before anything is stored. */
+export const assertReadable = (buffer: Buffer, fileName: string) =>
+  isCsv(fileName) ? assertCsvText(buffer) : assertXlsxContainer(buffer);
+
+/**
+ * "Copy of X.xlsx - Transaksi_Kas.csv" (a Google Sheets export) names the
+ * sheet after the last " - ". Excel forbids []:*?/\ and >31 chars in a sheet
+ * name; the name is cosmetic anyway, parsers go by headers.
+ */
+const csvSheetName = (fileName: string) =>
+  fileName
+    .replace(/\.csv$/i, '')
+    .split(' - ')
+    .pop()!
+    .replace(/[[\]:*?/\\]/g, '')
+    .trim()
+    .slice(0, 31) || 'CSV';
+
+async function readCsv(buffer: Buffer, fileName: string): Promise<RawSheet[]> {
+  assertCsvText(buffer);
+  const workbook = new ExcelJS.Workbook();
+  const text = buffer.toString('utf8').replace(/^﻿/, '');
+  try {
+    // Identity map: every cell stays the string written in the file. The
+    // default map turns "1.885" into a number and "01-02-2026" into a date,
+    // which is exactly the guessing this layer must not do.
+    await workbook.csv.read(Readable.from([text]), {
+      sheetName: csvSheetName(fileName),
+      map: (v: string) => (v === '' ? null : v),
+    });
+  } catch {
+    throw new WorkbookError('CORRUPT_FILE', 'File CSV tidak bisa dibaca. Ekspor ulang sebagai CSV lalu upload lagi.');
+  }
+  return toRawSheets(workbook);
+}
+
+/** `fileName` picks the format by extension; anything but .csv is read as .xlsx. */
+export async function readWorkbook(buffer: Buffer, fileName = ''): Promise<RawSheet[]> {
+  if (isCsv(fileName)) return readCsv(buffer, fileName);
   assertXlsxContainer(buffer);
   const workbook = new ExcelJS.Workbook();
   try {
     // exceljs declares its own `Buffer extends ArrayBuffer`; a Node Buffer
-    // loads fine at runtime (same cast as menu-workbook.ts).
+    // loads fine at runtime.
     await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
   } catch {
     throw new WorkbookError('CORRUPT_FILE', 'File rusak dan tidak bisa dibaca. Simpan ulang dari Excel lalu upload lagi.');
   }
+  return toRawSheets(workbook);
+}
 
+function toRawSheets(workbook: ExcelJS.Workbook): RawSheet[] {
   return workbook.worksheets.map((ws, i) => {
     const rows: RawRow[] = [];
     ws.eachRow({ includeEmpty: false }, (row) => {

@@ -7,6 +7,7 @@ import type { Role } from '../../auth/roles.js';
 import type { AppUser } from '../../auth/user.js';
 import { createUploadBatch, listUploadBatches, updateUploadBatch } from './upload-batch.js';
 import { InMemoryStagingRepository } from '../../lib/ingest/staging.js';
+import { fixture } from '../../lib/ingest/fixtures.js';
 
 const userWith = (role: Role, kitchenId: bigint | null = null): AppUser =>
   ({ id: 1n, role, kitchenScopes: kitchenId === null ? [] : [{ kitchenId }] }) as AppUser;
@@ -17,8 +18,8 @@ async function validWorkbook(): Promise<Buffer> {
   const sheet = wb.addWorksheet('Menu');
   sheet.addRow([
     'Tanggal',
-    'Jenis Menu',
-    'Kelompok Porsi',
+    'Menu Type',
+    'Porsi',
     'Menu',
     'Bahan',
     'Berat Bersih',
@@ -195,6 +196,22 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.equal(out.body?.warning, undefined);
   });
 
+  test('a CSV export is stored as .csv and staged like a workbook (SCRUM-24)', async () => {
+    const { db, calls } = fakeDb();
+    const puts: { key: string; type: string }[] = [];
+    const put = async (key: string, _b: Buffer, type: string) => (puts.push({ key, type }), key);
+    const staging = new InMemoryStagingRepository();
+    const bytes = fixture('sukun-menu.csv');
+    const req = { ...(await withFile(bytes)), file: { buffer: bytes, originalname: 'MENU - 12.csv', size: bytes.length } as Express.Multer.File };
+
+    const out = await run(createUploadBatch(db, put, staging), req);
+
+    assert.equal(out.status, 201);
+    assert.deepEqual(puts, [{ key: 'upload-batches/pub-1.csv', type: 'text/csv' }]);
+    assert.equal((calls.updates.at(-1) as Record<string, unknown>).rowCount, 22);
+    assert.equal((await staging.getBatch('pub-1'))?.rows.length, 22);
+  });
+
   test('the same file again is a new batch plus a duplicate warning, not a 409', async () => {
     const { db, calls } = fakeDb({ findFirst: async () => ({ publicId: 'pub-old' }) });
     const { put } = fakePut();
@@ -290,7 +307,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
 
     assert.equal(out.status, 200);
     assert.equal(out.body?.rowCount, 1);
-    assert.ok((out.body?.columns as string[]).includes('Jumlah PM'));
+    assert.ok(Object.values((out.body?.sheets as { headers: Record<string, string> }[])[0].headers).includes('Jumlah PM'));
     assert.equal(calls.created, undefined);
     assert.equal(puts.length, 0);
   });

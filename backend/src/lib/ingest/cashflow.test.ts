@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { parseToStaging } from './pipeline.js';
 import { InMemoryStagingRepository, type ParseContext } from './staging.js';
+import { fixture } from './fixtures.js';
 
 const ctx: ParseContext = {
   uploadBatchId: 'cf-1',
@@ -105,5 +106,25 @@ describe('cashflowParser (SCRUM-35)', () => {
     wb.getWorksheet('Sheet1')!.addRow(['01/09/2026', 'x']);
     const out = await parseToStaging(Buffer.from((await wb.xlsx.writeBuffer()) as unknown as ArrayBuffer), ctx, new InMemoryStagingRepository());
     assert.equal(out.ok ? null : out.errorCode, 'EMPTY_FILE');
+  });
+});
+
+describe('cashflowParser on the Sukun baseline layout (SCRUM-35)', () => {
+  const csv = { ...ctx, sourceFileName: 'CASHFLOW_SUKUN - Transaksi_Kas.csv' };
+
+  test('the flat Transaksi_Kas export stages every non-blank row, id-less ones included', async () => {
+    const out = await parseToStaging(fixture('sukun-cashflow.csv'), csv, new InMemoryStagingRepository());
+    assert.ok(out.ok);
+    // 38 data lines; the last line of the file is entirely blank and carries nothing.
+    assert.equal(out.batch.rows.length, 38);
+    const noTxn = out.batch.rows.filter((r) => r.cells.B === undefined);
+    assert.equal(noTxn.length, 3, 'rows without txn_id are staged for the profile to flag, not dropped');
+  });
+
+  test('multi-line transactions keep the repeated total on every line, untouched', async () => {
+    const out = await parseToStaging(fixture('sukun-cashflow.csv'), csv, new InMemoryStagingRepository());
+    assert.ok(out.ok);
+    const lines = out.batch.rows.filter((r) => r.cells.B?.value === 'TXN-B0050');
+    assert.deepEqual(lines.map((r) => r.cells.N.value), ['Rp3.373.000', 'Rp3.373.000', 'Rp3.373.000', 'Rp3.373.000']);
   });
 });
