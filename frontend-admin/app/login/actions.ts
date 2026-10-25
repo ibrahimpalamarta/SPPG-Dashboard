@@ -30,6 +30,25 @@ export async function login(_prev: LoginState, form: FormData): Promise<LoginSta
   return complete(res, safeReturnTo(form.get("returnTo")), "password");
 }
 
+/**
+ * Local development shortcut: signs in as the dev account behind the chosen
+ * role card, with credentials from the server's own env. It is a real backend
+ * login — the backend authenticates as usual — so nothing is loosened there.
+ * Refuses outright in a production build or without DEV_AUTO_LOGIN=true.
+ */
+export async function devLogin(_prev: LoginState, form: FormData): Promise<LoginState> {
+  if (process.env.NODE_ENV === "production" || process.env.DEV_AUTO_LOGIN !== "true") {
+    return { step: "password", message: "Login cepat tidak tersedia." };
+  }
+  const key = text(form, "role") === "pm" ? "PM" : "OPERASIONAL";
+  const email = process.env[`DEV_LOGIN_${key}_EMAIL`];
+  const password = process.env[`DEV_LOGIN_${key}_PASSWORD`];
+  if (!email || !password) return { step: "password", message: `Akun dev ${key} belum diatur di .env.local.` };
+
+  const res = await publicPost("/auth/login", { email, password });
+  return complete(res, safeReturnTo(form.get("returnTo")), "password");
+}
+
 export async function verifyMfa(prev: LoginState, form: FormData): Promise<LoginState> {
   const res = await publicPost("/auth/mfa/verify", { mfaToken: prev.mfaToken, code: text(form, "code") });
   const next = await complete(res, safeReturnTo(form.get("returnTo")), "mfa");
