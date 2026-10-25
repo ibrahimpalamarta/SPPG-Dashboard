@@ -1,21 +1,64 @@
 import { Router } from 'express';
-import { requireRole } from '../../auth/guard.js';
+import { requirePermission } from '../../auth/guard.js';
 import { validate } from '../../middleware/validate.js';
 import { wrap } from '../../lib/wrap.js';
 import { idParam } from '../../schemas/common.js';
-import { auditLogListQuery, userListQuery, userUpdate } from '../../schemas/user.js';
-import { listAuditLogs, listUsers, updateUser } from '../../controllers/admin/user.js';
+import {
+  auditLogListQuery,
+  roleParam,
+  rolePermissionsBody,
+  userCreate,
+  userListQuery,
+  userUpdate,
+} from '../../schemas/user.js';
+import {
+  createPasswordReset,
+  createUser,
+  listAuditLogs,
+  listRoles,
+  listUserSessions,
+  listUsers,
+  resetUserMfa,
+  revokeAllUserSessions,
+  updateRolePermissions,
+  updateUser,
+} from '../../controllers/admin/user.js';
 
-/** Account administration and the audit trail: Super Admin only. */
+/**
+ * Account administration, role editing and the audit trail. Each route names
+ * the permission it needs; none relies on the menu being hidden in the UI.
+ */
 export const adminRouter = Router();
 
-adminRouter.use(requireRole('SUPER_ADMIN'));
-
-adminRouter.get('/users', validate({ query: userListQuery }), wrap(listUsers()));
+adminRouter.get('/users', requirePermission('users:read'), validate({ query: userListQuery }), wrap(listUsers()));
+adminRouter.post('/users', requirePermission('users:manage'), validate({ body: userCreate }), wrap(createUser()));
 adminRouter.patch(
   '/users/:id',
+  requirePermission('users:manage'),
   validate({ params: idParam, body: userUpdate }),
   wrap(updateUser()),
 );
+adminRouter.post(
+  '/users/:id/password-reset',
+  requirePermission('users:manage'),
+  validate({ params: idParam }),
+  wrap(createPasswordReset()),
+);
+adminRouter.post('/users/:id/mfa-reset', requirePermission('users:manage'), validate({ params: idParam }), wrap(resetUserMfa()));
+adminRouter.get('/users/:id/sessions', requirePermission('users:read'), validate({ params: idParam }), wrap(listUserSessions()));
+adminRouter.delete(
+  '/users/:id/sessions',
+  requirePermission('users:manage'),
+  validate({ params: idParam }),
+  wrap(revokeAllUserSessions()),
+);
 
-adminRouter.get('/audit-logs', validate({ query: auditLogListQuery }), wrap(listAuditLogs()));
+adminRouter.get('/roles', requirePermission('settings:manage'), wrap(listRoles()));
+adminRouter.put(
+  '/roles/:role/permissions',
+  requirePermission('settings:manage'),
+  validate({ params: roleParam, body: rolePermissionsBody }),
+  wrap(updateRolePermissions()),
+);
+
+adminRouter.get('/audit-logs', requirePermission('audit:read'), validate({ query: auditLogListQuery }), wrap(listAuditLogs()));

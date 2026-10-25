@@ -1,4 +1,4 @@
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import type { z } from 'zod';
 import { Prisma, Role } from '@prisma/client';
 import { prisma, type Db } from '../../db.js';
@@ -7,9 +7,24 @@ import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
 import { dateFilter } from '../../schemas/common.js';
 import { writeAuditLog } from '../../auth/audit.js';
-import type { auditLogListQuery, userListQuery, userUpdate } from '../../schemas/user.js';
+import { withoutSecrets, type AppUser } from '../../auth/user.js';
+import { issueResetToken } from '../../auth/reset.js';
+import { mayManageRole } from '../../auth/escalation.js';
+import { permissionsFor, setRolePermissions } from '../../auth/rbac-store.js';
+import { listSessions, revokeUserSessions } from '../../auth/session.js';
+import { ROLES } from '../../auth/roles.js';
+import type {
+  auditLogListQuery,
+  roleParam,
+  rolePermissionsBody,
+  userCreate,
+  userListQuery,
+  userUpdate,
+} from '../../schemas/user.js';
 
-const withScope = { scope: { select: { id: true, name: true } } };
+const withScope = {
+  kitchenScopes: { select: { kitchen: { select: { id: true, code: true, name: true } } } },
+} satisfies Prisma.UserInclude;
 
 export const listUsers = (db: Db = prisma): RequestHandler => async (req, res) => {
   const q = req.valid!.query as z.infer<typeof userListQuery>;
@@ -28,6 +43,7 @@ export const listUsers = (db: Db = prisma): RequestHandler => async (req, res) =
     db.user.findMany({
       where,
       include: withScope,
+      omit: withoutSecrets,
       orderBy: { createdAt: 'desc' },
       ...pageArgs(q),
     }),
@@ -37,25 +53,98 @@ export const listUsers = (db: Db = prisma): RequestHandler => async (req, res) =
   sendJson(res, paginated(rows, total, q));
 };
 
+/** Every role involved must be one the actor may manage (see mayManageRole). */
+async function mayManageAll(actor: AppUser, roles: Role[], db: Db): Promise<boolean> {
+  for (const role of new Set(roles)) {
+    if (!(await mayManageRole(actor, role, db))) return false;
+  }
+  return true;
+}
+
 /**
- * Role and scope are the only editable columns — Auth0 owns email and name,
- * and findOrCreateUser overwrites them at the next login anyway.
+ * Invitation. Creates the account with no password and returns a one-time
+ * set-password token — the only copy. There is no outbound email yet, so the
+ * admin hands the link over themselves.
+ */
+export const createUser = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const body = req.valid!.body as z.infer<typeof userCreate>;
+
+  if (!(await mayManageAll(req.user!, [body.role], db))) {
+    sendError(res, 'FORBIDDEN');
+    return;
+  }
+  if (body.role === Role.DATA_ADMIN && body.kitchenIds.length === 0) {
+    sendError(res, 'VALIDATION_ERROR', {
+      fields: { 'body.kitchenIds': ['required when role is DATA_ADMIN'] },
+    });
+    return;
+  }
+
+  try {
+    const user = await db.user.create({
+      data: {
+        email: body.email,
+        fullName: body.fullName,
+        role: body.role,
+        kitchenScopes: { create: body.kitchenIds.map((kitchenId) => ({ kitchenId })) },
+      },
+      include: withScope,
+      omit: withoutSecrets,
+    });
+    const invite = await issueResetToken(user.id, db);
+    await writeAuditLog(db, {
+      userId: req.user!.id,
+      action: 'user.created',
+      entity: 'users',
+      entityId: user.id,
+      metadata: { role: body.role, kitchens: body.kitchenIds.map(String) },
+    });
+    sendJson(res, { user, resetToken: invite.token, resetTokenExpiresAt: invite.expiresAt }, 201);
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2002') {
+        sendError(res, 'CONFLICT');
+        return;
+      }
+      // kitchen_id is a real FK to kitchens; a bad id is the caller's mistake.
+      if (err.code === 'P2003') {
+        sendError(res, 'VALIDATION_ERROR', { fields: { 'body.kitchenIds': ['no kitchen with that id'] } });
+        return;
+      }
+    }
+    throw err;
+  }
+};
+
+/**
+ * Role, status, kitchen scope and display name are editable; the email is the
+ * login and is not.
  *
- * Two invariants are enforced here rather than in the schema, because both
- * need to see the resulting row rather than just the request body:
+ * Invariants enforced here rather than in the schema, because they need to see
+ * the resulting row rather than just the request body:
  *
  *   1. A Super Admin cannot demote or deactivate itself. Locking the last
  *      administrator out of the backoffice needs a database round-trip to fix.
- *   2. A DATA_ADMIN must end up with a scope. Without one, resolveScopeId
- *      returns null-scoped nothing and the account silently sees no data.
+ *   2. A DATA_ADMIN must end up with at least one kitchen. Without one it
+ *      silently sees no data at all.
+ *   3. No privilege escalation: the actor must be allowed to manage both the
+ *      account's current role and the role it is being moved to.
+ *
+ * A role change or deactivation ends the account's sessions, so it applies at
+ * once. `kitchenIds` replaces the whole set (SCRUM-20). The audit row records
+ * the set before and after — the NFR-03 hook for role/scope changes.
  */
 export const updateUser = (db: Db = prisma): RequestHandler => async (req, res) => {
   const { id } = req.valid!.params as { id: bigint };
   const body = req.valid!.body as z.infer<typeof userUpdate>;
 
-  const current = await db.user.findUnique({ where: { id } });
+  const current = await db.user.findUnique({ where: { id }, include: withScope, omit: withoutSecrets });
   if (!current) {
     sendError(res, 'NOT_FOUND');
+    return;
+  }
+  if (!(await mayManageAll(req.user!, [current.role, body.role ?? current.role], db))) {
+    sendError(res, 'FORBIDDEN');
     return;
   }
 
@@ -64,11 +153,12 @@ export const updateUser = (db: Db = prisma): RequestHandler => async (req, res) 
     return;
   }
 
+  const currentKitchenIds = current.kitchenScopes.map((s) => s.kitchen.id);
   const nextRole = body.role ?? current.role;
-  const nextScope = body.scopeId !== undefined ? body.scopeId : current.scopeId;
-  if (nextRole === Role.DATA_ADMIN && nextScope === null) {
+  const nextKitchenIds = body.kitchenIds ?? currentKitchenIds;
+  if (nextRole === Role.DATA_ADMIN && nextKitchenIds.length === 0) {
     sendError(res, 'VALIDATION_ERROR', {
-      fields: { 'body.scopeId': ['required when role is DATA_ADMIN'] },
+      fields: { 'body.kitchenIds': ['required when role is DATA_ADMIN'] },
     });
     return;
   }
@@ -77,12 +167,23 @@ export const updateUser = (db: Db = prisma): RequestHandler => async (req, res) 
     const row = await db.user.update({
       where: { id },
       data: {
+        ...(body.fullName !== undefined && { fullName: body.fullName }),
         ...(body.role !== undefined && { role: body.role }),
         ...(body.status !== undefined && { status: body.status }),
-        ...(body.scopeId !== undefined && { scopeId: body.scopeId }),
+        ...(body.kitchenIds !== undefined && {
+          kitchenScopes: {
+            deleteMany: {},
+            create: body.kitchenIds.map((kitchenId) => ({ kitchenId })),
+          },
+        }),
       },
       include: withScope,
+      omit: withoutSecrets,
     });
+
+    if ((body.role !== undefined && body.role !== current.role) || body.status === 'INACTIVE') {
+      await revokeUserSessions(id, db);
+    }
 
     await writeAuditLog(db, {
       userId: req.user!.id,
@@ -92,20 +193,124 @@ export const updateUser = (db: Db = prisma): RequestHandler => async (req, res) 
       metadata: {
         fields: Object.keys(body),
         ...(body.role && { roleFrom: current.role, roleTo: body.role }),
+        ...(body.status && { statusFrom: current.status, statusTo: body.status }),
+        ...(body.kitchenIds && {
+          kitchensFrom: currentKitchenIds.map(String),
+          kitchensTo: body.kitchenIds.map(String),
+        }),
       },
     });
 
     sendJson(res, row);
   } catch (err) {
-    // scope_id is a real FK to kitchens; a bad id is the caller's mistake.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
       sendError(res, 'VALIDATION_ERROR', {
-        fields: { 'body.scopeId': ['no kitchen with that id'] },
+        fields: { 'body.kitchenIds': ['no kitchen with that id'] },
       });
       return;
     }
     throw err;
   }
+};
+
+/** Loads the target of an `/admin/users/:id/...` action and applies the escalation check. */
+async function loadManageable(req: Request, res: Response, db: Db) {
+  const { id } = req.valid!.params as { id: bigint };
+  const target = await db.user.findUnique({ where: { id }, select: { id: true, role: true } });
+  if (!target) {
+    sendError(res, 'NOT_FOUND');
+    return null;
+  }
+  if (!(await mayManageRole(req.user!, target.role, db))) {
+    sendError(res, 'FORBIDDEN');
+    return null;
+  }
+  return target;
+}
+
+/** A fresh set-password link for an existing account (forgotten password, lost invite). */
+export const createPasswordReset = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const target = await loadManageable(req, res, db);
+  if (!target) return;
+  const { token, expiresAt } = await issueResetToken(target.id, db);
+  await writeAuditLog(db, {
+    userId: req.user!.id,
+    action: 'user.password_reset_issued',
+    entity: 'users',
+    entityId: target.id,
+  });
+  sendJson(res, { resetToken: token, resetTokenExpiresAt: expiresAt });
+};
+
+export const listUserSessions = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const target = await loadManageable(req, res, db);
+  if (!target) return;
+  sendJson(res, await listSessions(target.id, db));
+};
+
+export const revokeAllUserSessions = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const target = await loadManageable(req, res, db);
+  if (!target) return;
+  const { count } = await revokeUserSessions(target.id, db);
+  await writeAuditLog(db, {
+    userId: req.user!.id,
+    action: 'session.revoked',
+    entity: 'users',
+    entityId: target.id,
+    metadata: { by: 'admin', count },
+  });
+  res.status(204).end();
+};
+
+/** For a user who lost their authenticator and their recovery codes. */
+export const resetUserMfa = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const target = await loadManageable(req, res, db);
+  if (!target) return;
+  await db.$transaction([
+    db.user.update({ where: { id: target.id }, data: { mfaEnabled: false, mfaSecretEnc: null } }),
+    db.mfaRecoveryCode.deleteMany({ where: { userId: target.id } }),
+  ]);
+  await revokeUserSessions(target.id, db);
+  await writeAuditLog(db, { userId: req.user!.id, action: 'user.mfa_reset', entity: 'users', entityId: target.id });
+  res.status(204).end();
+};
+
+export const listRoles = (db: Db = prisma): RequestHandler => async (_req, res) => {
+  const roles = await Promise.all(ROLES.map(async (role) => ({ role, permissions: await permissionsFor(role, db) })));
+  sendJson(res, roles);
+};
+
+/**
+ * Replace a role's permissions. SUPER_ADMIN is fixed (it cannot be locked
+ * out), and a non-Super Admin may neither edit its own role nor grant a
+ * permission it does not hold itself.
+ */
+export const updateRolePermissions = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const { role } = req.valid!.params as z.infer<typeof roleParam>;
+  const { permissions } = req.valid!.body as z.infer<typeof rolePermissionsBody>;
+  const actor = req.user!;
+
+  if (role === Role.SUPER_ADMIN) {
+    sendError(res, 'FORBIDDEN', { reason: 'super admin permissions are fixed' });
+    return;
+  }
+  if (
+    actor.role !== Role.SUPER_ADMIN &&
+    (role === actor.role || permissions.some((p) => !actor.permissions.includes(p)))
+  ) {
+    sendError(res, 'FORBIDDEN');
+    return;
+  }
+
+  const before = await permissionsFor(role, db);
+  await setRolePermissions(role, permissions, db);
+  await writeAuditLog(db, {
+    userId: actor.id,
+    action: 'role.permissions_updated',
+    entity: 'role_permissions',
+    metadata: { role, from: [...before], to: permissions },
+  });
+  sendJson(res, { role, permissions });
 };
 
 /** SCRUM-1: the audit trail, readable but never writable through the API. */

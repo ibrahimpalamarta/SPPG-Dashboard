@@ -1,36 +1,33 @@
-import type { User } from '@prisma/client';
-import { resolveScopeId } from '../auth/guard.js';
+import { resolveKitchenIds } from '../auth/guard.js';
+import type { AppUser } from '../auth/user.js';
 
 /**
  * Multi-tenant filtering. The tenant is `Kitchen`; every scoped table carries
  * `kitchenId` (menu_plans, upload_batches, and the four kitchen-keyed marts).
  *
- * The rule in one place so no controller reinvents it: a DATA_ADMIN sees only
- * its own dapur, everyone else sees all of them. A `kitchenId` from the query
- * string only ever *narrows* the result — it can never widen it past the
- * caller's own scope.
+ * The rule in one place so no controller reinvents it: a scoped caller sees
+ * only its own dapur (SCRUM-20: possibly several), everyone else sees all of
+ * them. A `kitchenId` from the query string only ever *narrows* the result —
+ * it can never widen it past the caller's own scope.
  */
 export type ScopeResult =
-  | { ok: true; kitchenId?: bigint }
+  | { ok: true; kitchenIds?: bigint[] }
   | { ok: false };
 
-export function kitchenScope(user: User, requested?: bigint): ScopeResult {
-  const scopeId = resolveScopeId(user);
+export function kitchenScope(user: AppUser, requested?: bigint): ScopeResult {
+  const allowed = resolveKitchenIds(user);
 
-  if (scopeId === null) {
-    // Unrestricted caller: honour the filter if one was asked for.
-    return { ok: true, ...(requested !== undefined && { kitchenId: requested }) };
+  if (requested !== undefined) {
+    return allowed === null || allowed.includes(requested)
+      ? { ok: true, kitchenIds: [requested] }
+      : { ok: false };
   }
-
-  // A scoped caller with no scope_id set has no dapur to read — fail closed
-  // rather than falling through to "see everything".
-  if (requested !== undefined && requested !== scopeId) return { ok: false };
-  return { ok: true, kitchenId: scopeId };
+  return allowed === null ? { ok: true } : { ok: true, kitchenIds: allowed };
 }
 
 /** Prisma `where` fragment for a table with a direct `kitchenId` column. */
 export function kitchenWhere(scope: Extract<ScopeResult, { ok: true }>) {
-  return scope.kitchenId === undefined ? {} : { kitchenId: scope.kitchenId };
+  return scope.kitchenIds === undefined ? {} : { kitchenId: { in: scope.kitchenIds } };
 }
 
 /**
@@ -38,5 +35,5 @@ export function kitchenWhere(scope: Extract<ScopeResult, { ok: true }>) {
  * `menuPlan` — recipe_costings and akg_compliances.
  */
 export function menuPlanWhere(scope: Extract<ScopeResult, { ok: true }>) {
-  return scope.kitchenId === undefined ? {} : { menuPlan: { kitchenId: scope.kitchenId } };
+  return scope.kitchenIds === undefined ? {} : { menuPlan: { kitchenId: { in: scope.kitchenIds } } };
 }

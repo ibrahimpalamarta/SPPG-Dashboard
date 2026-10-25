@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UploadStatus } from '@prisma/client';
+import { SourceSystem, UploadDomain, UploadStatus } from '@prisma/client';
 import { pageQuery } from '../lib/pagination.js';
 import { dateRangeFields, optionalBigInt, refineDateRange } from './common.js';
 
@@ -7,23 +7,31 @@ export const uploadBatchListQuery = refineDateRange(
   pageQuery.extend({
     ...dateRangeFields,
     kitchenId: optionalBigInt,
+    domain: z.nativeEnum(UploadDomain).optional(),
     status: z.nativeEnum(UploadStatus).optional(),
   }),
 );
 
 /**
- * SCRUM-5. The workbook itself arrives as `multipart/form-data`, so everything
- * here is a form field and every value is a string.
+ * SCRUM-5/22. The workbook itself arrives as `multipart/form-data`, so
+ * everything here is a form field and every value is a string.
  *
- * `fileName`, `fileHash` and `rowCount` are no longer accepted from the client:
- * the server has the bytes now, so it takes those from the file itself. A
- * caller can no longer register a batch whose hash does not match its contents.
+ * `fileName`, `fileHash`, `fileSize` and `rowCount` are never accepted from the
+ * client: the server has the bytes, so it takes those from the file itself.
  */
 export const uploadBatchCreate = z.object({
   kitchenId: z
     .string()
     .regex(/^\d+$/, 'must be a positive integer id')
     .transform((v) => BigInt(v)),
+  domain: z.nativeEnum(UploadDomain),
+  sourceSystem: z.nativeEnum(SourceSystem).default(SourceSystem.INTERNAL),
+  // TODO(OD): which domains *require* a period is not decided yet; optional
+  // for all of them until it is.
+  period: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'must be YYYY-MM')
+    .nullish(),
   notes: z.string().max(2000).nullish(),
 });
 
@@ -43,11 +51,17 @@ export const uploadBatchCreateQuery = z.object({
     .transform((v) => v === 'true'),
 });
 
-/** SCRUM-5: the verification outcome. PROCESSING is the initial state and
- * cannot be set again from outside. */
+/**
+ * SCRUM-22: the review step. Only the states a reviewer may set by hand;
+ * PROCESSING / NEEDS_MAPPING_UPDATE are set by the pipeline and PUBLISHED by
+ * the publish flow. Whether the move is legal from the current state is
+ * checked against `upload-status.ts` in the controller.
+ */
 export const uploadBatchUpdate = z
   .object({
-    status: z.enum([UploadStatus.DITERIMA, UploadStatus.DITOLAK]).optional(),
+    status: z
+      .enum([UploadStatus.NEEDS_REVIEW, UploadStatus.READY, UploadStatus.FAILED])
+      .optional(),
     notes: z.string().max(2000).nullish(),
   })
   .refine((v) => v.status !== undefined || v.notes !== undefined, {
