@@ -3,7 +3,7 @@ import type { Tone } from "@/components/ui/badge";
 
 export type Severity = "blocker" | "check" | "auto";
 
-export type Finding = {
+type Finding = {
   id: string;
   severity: Severity;
   title: string;
