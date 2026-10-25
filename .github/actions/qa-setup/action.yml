@@ -1,11 +1,11 @@
 name: qa-audit setup
-description: Node 22, Semgrep, gitleaks, npm dependencies (qa-audit, backend, frontend-admin) and Chromium.
+description: Node 24, Semgrep, gitleaks, npm dependencies (qa-audit, backend, frontend-admin) and Chromium.
 runs:
   using: composite
   steps:
     - uses: actions/setup-node@v4
       with:
-        node-version: 22
+        node-version: 24
         cache: npm
         cache-dependency-path: |
           qa-audit/package-lock.json

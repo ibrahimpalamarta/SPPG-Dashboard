@@ -1,14 +1,11 @@
 name: CI
 
-# Pre-merge gate for all three tiers, plus the only gate `develop` has: it is a
-# transit branch with no deploy workflow, so a push straight to it would
-# otherwise go unchecked. staging/main stay pull_request-only — a push there
-# already runs the matching deploy workflow, which gates on the same build/test
-# before it touches AWS. Nothing here is deployed and no AWS credential is ever
-# issued: no `environment:`, no `id-token: write`.
+# The only gate a push to `develop` has: it is a transit branch with no deploy
+# workflow, so a push straight to it would otherwise go unchecked. PRs run the
+# same jobs as step "0. CI build" of the single qa-audit check (qa-audit.yml).
+# Nothing here is deployed and no AWS credential is ever issued: no
+# `environment:`, no `id-token: write`.
 on:
-  pull_request:
-    branches: [develop, staging, main]
   push:
     branches: [develop]
 
