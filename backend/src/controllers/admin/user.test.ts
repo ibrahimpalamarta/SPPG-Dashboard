@@ -5,7 +5,16 @@ import type { Db } from '../../db.js';
 import type { Permission, Role } from '../../auth/roles.js';
 import type { AppUser } from '../../auth/user.js';
 import { clearPermissionCache } from '../../auth/rbac-store.js';
-import { createUser, revokeAllUserSessions, updateRolePermissions, updateUser } from './user.js';
+import {
+  cancelInvite,
+  createPasswordReset,
+  createUser,
+  listUsers,
+  memberStatus,
+  revokeAllUserSessions,
+  updateRolePermissions,
+  updateUser,
+} from './user.js';
 
 const actor = (role: Role, permissions: Permission[], id = 1n): AppUser =>
   ({ id, role, permissions, kitchenScopes: [] }) as unknown as AppUser;
@@ -16,7 +25,9 @@ const TABLE: Partial<Record<Role, Permission[]>> = {
   INTERNAL: ['upload:view'],
 };
 
-function setup(targets: Record<string, { role: Role }> = {}) {
+type Target = { role: Role; status?: 'ACTIVE' | 'INACTIVE'; passwordHash?: string | null };
+
+function setup(targets: Record<string, Target> = {}, { otherSuperAdmins = 1 } = {}) {
   const calls = {
     sessionsRevoked: [] as unknown[],
     audit: [] as unknown[],
@@ -38,6 +49,7 @@ function setup(targets: Record<string, { role: Role }> = {}) {
         calls.created.push(data);
         return { id: 99n, ...data };
       },
+      count: async () => otherSuperAdmins,
     },
     rolePermission: {
       findMany: async ({ where }: { where: { role: Role } }) =>
@@ -203,5 +215,88 @@ describe('role permissions editor', () => {
   test('but may grant permissions it holds to another role', async () => {
     const { db } = setup();
     assert.equal((await put(db, MANAGER, 'PUBLIC', ['upload:view'])).status, 200);
+  });
+});
+
+const HOUR = 3_600_000;
+const hoursFromNow = (iso: unknown) => (new Date(iso as string).getTime() - Date.now()) / HOUR;
+
+describe('SCRUM-121: members and invitations', () => {
+  test('memberStatus: inactive wins, a password means active, else the invitation decides', () => {
+    const later = new Date(Date.now() + HOUR);
+    const earlier = new Date(Date.now() - HOUR);
+    assert.equal(memberStatus({ status: 'INACTIVE', hasPassword: true }, undefined), 'INACTIVE');
+    assert.equal(memberStatus({ status: 'ACTIVE', hasPassword: true }, undefined), 'ACTIVE');
+    assert.equal(memberStatus({ status: 'ACTIVE', hasPassword: false }, later), 'PENDING');
+    assert.equal(memberStatus({ status: 'ACTIVE', hasPassword: false }, earlier), 'EXPIRED');
+    assert.equal(memberStatus({ status: 'ACTIVE', hasPassword: false }, undefined), 'EXPIRED');
+  });
+
+  test('the list carries memberStatus and never the password hash', async () => {
+    const rows = [
+      { id: 1n, status: 'ACTIVE', passwordHash: 'h', passwordResetTokens: [] },
+      { id: 2n, status: 'ACTIVE', passwordHash: null, passwordResetTokens: [{ expiresAt: new Date(Date.now() + HOUR) }] },
+    ];
+    const db = { user: { findMany: async () => rows, count: async () => rows.length } } as unknown as Db;
+    const out = await call(listUsers(db), { valid: { query: { page: 1, pageSize: 20 } } });
+    const data = out.body?.data as Record<string, unknown>[];
+    assert.deepEqual(data.map((u) => u.memberStatus), ['ACTIVE', 'PENDING']);
+    for (const u of data) {
+      assert.equal('passwordHash' in u, false);
+      assert.equal('passwordResetTokens' in u, false);
+    }
+  });
+
+  test('an invitation link lives INVITE_TTL_HOURS (72 by default), on create and on resend', async () => {
+    const { db, calls } = setup({ '5': { role: 'INTERNAL', passwordHash: null } });
+    const body = { email: 'x@example.com', fullName: 'X', role: 'INTERNAL', kitchenIds: [] };
+    const created = await call(createUser(db), { user: SUPER, valid: { body } });
+    assert.ok(Math.abs(hoursFromNow(created.body?.resetTokenExpiresAt) - 72) < 0.1);
+
+    const resent = await call(createPasswordReset(db), { user: SUPER, valid: { params: { id: 5n } } });
+    assert.ok(Math.abs(hoursFromNow(resent.body?.resetTokenExpiresAt) - 72) < 0.1);
+    assert.equal((calls.audit.at(-1) as { action: string }).action, 'user.invite_resent');
+  });
+
+  test('a password reset for an active account keeps the short reset lifetime', async () => {
+    const { db, calls } = setup({ '5': { role: 'INTERNAL', passwordHash: 'h' } });
+    const out = await call(createPasswordReset(db), { user: SUPER, valid: { params: { id: 5n } } });
+    assert.ok(hoursFromNow(out.body?.resetTokenExpiresAt) <= 1);
+    assert.equal((calls.audit.at(-1) as { action: string }).action, 'user.password_reset_issued');
+  });
+
+  test('cancelling an invitation deactivates the account and is audited', async () => {
+    const { db, calls } = setup({ '5': { role: 'INTERNAL', passwordHash: null } });
+    const out = await call(cancelInvite(db), { user: SUPER, valid: { params: { id: 5n } } });
+    assert.equal(out.status, 204);
+    assert.deepEqual((calls.updated[0] as { data: unknown }).data, { status: 'INACTIVE' });
+    assert.equal((calls.audit[0] as { action: string }).action, 'user.invite_cancelled');
+  });
+
+  test('only an open invitation can be cancelled, and not by someone below its role', async () => {
+    const active = setup({ '5': { role: 'INTERNAL', passwordHash: 'h' } });
+    assert.equal((await call(cancelInvite(active.db), { user: SUPER, valid: { params: { id: 5n } } })).status, 409);
+    const cancelled = setup({ '5': { role: 'INTERNAL', passwordHash: null, status: 'INACTIVE' } });
+    assert.equal((await call(cancelInvite(cancelled.db), { user: SUPER, valid: { params: { id: 5n } } })).status, 409);
+    const pm = setup({ '5': { role: 'SUPER_ADMIN', passwordHash: null } });
+    assert.equal((await call(cancelInvite(pm.db), { user: MANAGER, valid: { params: { id: 5n } } })).status, 403);
+    assert.equal(active.calls.updated.length + cancelled.calls.updated.length + pm.calls.updated.length, 0);
+  });
+
+  test('the last active PM MBG can be neither deactivated nor demoted', async () => {
+    const { db, calls } = setup({ '5': { role: 'SUPER_ADMIN' } }, { otherSuperAdmins: 0 });
+    for (const body of [{ status: 'INACTIVE' }, { role: 'INTERNAL' }]) {
+      const out = await call(updateUser(db), { user: SUPER, valid: { params: { id: 5n }, body } });
+      assert.equal(out.status, 409);
+      assert.equal(out.body?.error, 'last_super_admin');
+    }
+    assert.equal(calls.updated.length, 0);
+  });
+
+  test('with another active PM MBG left, deactivating one is allowed', async () => {
+    const { db, calls } = setup({ '5': { role: 'SUPER_ADMIN' } }, { otherSuperAdmins: 1 });
+    const out = await call(updateUser(db), { user: SUPER, valid: { params: { id: 5n }, body: { status: 'INACTIVE' } } });
+    assert.equal(out.status, 200);
+    assert.equal(calls.updated.length, 1);
   });
 });

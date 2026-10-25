@@ -55,6 +55,8 @@ const schema = z.object({
 
   // Lifetime of a set/reset-password link.
   PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(60),
+  // SCRUM-121: lifetime of an invitation (set-password link of a new account).
+  INVITE_TTL_HOURS: z.coerce.number().int().positive().default(72),
 
   // 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts TOTP secrets
   // at rest and signs the short-lived MFA challenge token. Rotating it
