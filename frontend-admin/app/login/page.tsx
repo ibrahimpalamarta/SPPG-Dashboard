@@ -7,8 +7,6 @@ export const metadata: Metadata = { title: "Masuk · SPPG Internal" };
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { returnTo, expired, reset } = await searchParams;
   const notice = expired ? "Sesi Anda berakhir. Silakan masuk kembali." : reset ? "Password diperbarui. Silakan masuk." : undefined;
-  // Local development only: never true in a production build, whatever the env says.
-  const quickLogin = process.env.NODE_ENV !== "production" && process.env.DEV_AUTO_LOGIN === "true";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-linear-to-br from-emerald-50 via-white to-emerald-50 p-4 sm:p-8">
@@ -27,8 +25,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
         <section className="p-6 sm:p-10">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Masuk ke dashboard</h1>
-          <p className="mt-2 text-sm text-slate-500">{quickLogin ? "Pilih peran Anda, lalu masuk." : "Masuk dengan akun kerja Anda."}</p>
-          <LoginForm quickLogin={quickLogin} returnTo={typeof returnTo === "string" ? returnTo : undefined} notice={notice} />
+          <p className="mt-2 text-sm text-slate-500">Pilih peran Anda, lalu masuk dengan akun kerja.</p>
+          <LoginForm returnTo={typeof returnTo === "string" ? returnTo : undefined} notice={notice} />
         </section>
       </div>
     </main>
