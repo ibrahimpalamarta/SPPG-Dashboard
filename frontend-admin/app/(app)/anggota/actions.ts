@@ -10,6 +10,7 @@ export type UserActionState = {
   role?: string;
   emailed?: boolean;
   expiresAt?: string;
+  token?: string;
 };
 
 const text = (form: FormData, key: string) => (typeof form.get(key) === "string" ? (form.get(key) as string) : "");
@@ -41,7 +42,7 @@ export async function createUser(_prev: UserActionState, form: FormData): Promis
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
   const data = res.data as Record<string, unknown>;
-  return { ok: true, email, role, emailed: Boolean(data.emailed), expiresAt: String(data.resetTokenExpiresAt) };
+  return { ok: true, email, role, emailed: Boolean(data.emailed), expiresAt: String(data.resetTokenExpiresAt), token: String(data.resetToken) };
 }
 
 export async function saveUser(id: string, _prev: UserActionState, form: FormData): Promise<UserActionState> {
