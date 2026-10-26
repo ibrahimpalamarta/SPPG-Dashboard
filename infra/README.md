@@ -90,9 +90,8 @@ Buat dengan key yang sama di environment `staging` dan `production`, isi value b
 | `AWS_REGION` | `ap-southeast-3` — harus region tempat state bucket & VPC berada |
 | `AWS_ROLE_ARN` | ARN role OIDC (dari `backend-bootstrap` output) |
 | `TF_STATE_BUCKET`, `TF_LOCK_TABLE` | Dari `backend-bootstrap` output |
-| `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_ROLES_CLAIM` | Tenant Auth0 environment tsb — bukan rahasia, API hanya memverifikasi token |
 
-Tujuh variable, itu saja. Yang sengaja **tidak** ada di sini:
+Empat variable, itu saja. Yang sengaja **tidak** ada di sini:
 
 - `ECR_BACKEND_URL` / `ECR_FRONTEND_ADMIN_URL` / `ECR_FRONTEND_PUBLIC_URL` — URL ketiga repository ECR sudah jadi `terraform output` di tiap environment, jadi workflow membacanya dari sana. Tiga nilai lebih sedikit yang bisa basi saat pindah akun.
 - `AWS_ACCOUNT_ID` — hanya dipakai `backend-bootstrap` (untuk menyusun ARN di policy IAM), bukan oleh environment stack.

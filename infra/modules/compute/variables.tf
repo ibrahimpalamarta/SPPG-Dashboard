@@ -180,17 +180,14 @@ variable "acm_certificate_arn" {
   default     = ""
 }
 
-variable "auth0_domain" {
-  description = "Auth0 tenant domain, e.g. your-tenant.us.auth0.com. Not a secret."
+variable "frontend_api_base_url" {
+  description = "Origin the admin frontend calls the backend on, e.g. https://dashboard.example.go.id. Empty uses the ALB's own DNS name over HTTP, which only works while no ACM certificate is attached (HTTP then redirects to HTTPS)."
   type        = string
+  default     = ""
 }
 
-variable "auth0_audience" {
-  description = "Auth0 API identifier the backend validates tokens against. Not a secret."
+variable "mfa_required_roles" {
+  description = "Comma-separated roles that cannot use the app without MFA, e.g. SUPER_ADMIN. Empty = MFA optional for everyone."
   type        = string
-}
-
-variable "auth0_roles_claim" {
-  description = "Namespaced custom claim carrying the user's Auth0 roles."
-  type        = string
+  default     = ""
 }
