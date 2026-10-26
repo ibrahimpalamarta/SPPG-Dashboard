@@ -13,7 +13,7 @@
 ## Ruang lingkup
 | Termasuk | Tidak termasuk |
 |---|---|
-| `backend/`, `frontend-admin/` (type check, lint, Semgrep, gitleaks, E2E) | `frontend-public/` (masih "Segera Hadir"; dibangun oleh `ci.yml`) |
+| `backend/`, `frontend-admin/` (type check, lint, Semgrep, gitleaks, E2E) | `frontend-public/` (masih "Segera Hadir"; dibangun oleh step `0. CI build`) |
 | Postgres sementara di runner/laptop | Production — dilarang, ada guard |
 | Staging milik sendiri, hanya untuk ZAP mingguan (fase 4) | E2E ke staging (fase 5) |
 | Usulan kontrak `data-testid` | Mengubah kode aplikasi |
