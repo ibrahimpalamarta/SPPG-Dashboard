@@ -352,7 +352,9 @@ export function prComment(v: Evaluation & { meta: Record<string, string>; stages
   const byStatus = new Map<string, number>();
   for (const r of v.requirements) byStatus.set(r.status, (byStatus.get(r.status) ?? 0) + 1);
   const stageRows = Object.entries(STAGES).map(([k, label]) => `| ${label} | ${STAGE_ICON[v.stages[k] ?? ''] ?? '➖'} ${v.stages[k] ?? '-'} |`);
-  const passed = Object.keys(STAGES).filter((k) => v.stages[k] === 'success').length;
+  // Out of the stages that ran: a skipped or absent stage is not a failure to count against.
+  const ran = Object.keys(STAGES).filter((k) => v.stages[k] && v.stages[k] !== 'skipped');
+  const passed = ran.filter((k) => v.stages[k] === 'success').length;
   const headline =
     v.verdict === 'pass'
       ? 'Tidak ada Blocker. Aman di-merge.'
@@ -387,7 +389,7 @@ export function prComment(v: Evaluation & { meta: Record<string, string>; stages
           '</details>',
         ].join('\n'),
     '',
-    `<details><summary>Tahap: ${passed}/${Object.keys(STAGES).length} lulus</summary>`,
+    `<details><summary>Tahap: ${passed}/${ran.length} lulus</summary>`,
     '',
     '| Tahap | Status |',
     '|---|---|',

@@ -52,11 +52,31 @@ jobs:
       - name: Start clock
         run: echo "QA_STARTED_AT=$(date +%s%3N)" >> "$GITHUB_ENV"
 
+      # Restored before Setup so hashing the lockfiles does not walk node_modules.
+      # Next invalidates its own cache per file; restore-keys takes the newest entry.
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend-admin/.next/cache
+            frontend-public/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('frontend-admin/package-lock.json', 'frontend-public/package-lock.json') }}-${{ github.sha }}
+          restore-keys: nextjs-${{ runner.os }}-${{ hashFiles('frontend-admin/package-lock.json', 'frontend-public/package-lock.json') }}-
+
+      # Providers are downloaded once per lock file instead of once per init.
+      - name: Cache Terraform providers
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/terraform-plugins
+          key: terraform-${{ runner.os }}-${{ hashFiles('infra/**/.terraform.lock.hcl') }}
+
       - name: Setup
         uses: ./.github/actions/qa-setup
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
 
       - name: Cache Next.js build
         uses: actions/cache@v4
@@ -68,19 +88,31 @@ jobs:
 
       # Backend build+test, frontend-public build, terraform fmt/validate, so a PR carries one check. Independent of the
       # fail-fast gate; a failure is a Blocker via stageFailedWithoutReport.
+      # Three lanes touch disjoint folders, so they run together; each line is
+      # prefixed with its lane and the step fails if any lane does.
       - name: 0. CI build
         id: ci
         continue-on-error: true
         working-directory: .
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/terraform-plugins
         run: |
-          set -euo pipefail
-          (cd backend && npm run build && npm test)
-          (cd frontend-public && npm ci --no-audit --no-fund && npm run build)
-          terraform fmt -check -recursive infra
-          for dir in infra/backend-bootstrap infra/environments/staging infra/environments/production; do
-            terraform -chdir="$dir" init -backend=false -input=false
-            terraform -chdir="$dir" validate
-          done
+          set -uo pipefail
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          ( (set -e; cd backend && npm run build && npm test) 2>&1 | sed -u 's/^/[backend] /' ) & lanes=($!)
+          ( (set -e; cd frontend-public && npm run build) 2>&1 | sed -u 's/^/[frontend-public] /' ) & lanes+=($!)
+          # inits stay in one lane: terraform does not support concurrent init on one plugin cache.
+          ( (
+            set -e
+            terraform fmt -check -recursive infra
+            for dir in infra/backend-bootstrap infra/environments/staging infra/environments/production; do
+              terraform -chdir="$dir" init -backend=false -input=false
+              terraform -chdir="$dir" validate
+            done
+          ) 2>&1 | sed -u 's/^/[terraform] /' ) & lanes+=($!)
+          fail=0
+          for lane in "${lanes[@]}"; do wait "$lane" || fail=1; done
+          exit $fail
 
       - name: 1. Code audit
         id: code
@@ -124,6 +156,21 @@ jobs:
           OUTCOME_UI: skipped
         run: npm run report
 
+      # Nothing after the report needs the servers; free them before the slow AI call.
+      - name: Stop environment
+        if: ${{ always() }}
+        run: npm run env:down
+
+      # The verdict goes out now, without waiting for the AI; the comment is edited
+      # in place again below once the analysis exists.
+      - name: PR comment
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: bash scripts/post-pr-comment.sh
+
       # Advisory only: appends "Analisis AI" to pr-comment.md and scorecard.html,
       # never touches the verdict (QD-30).
       - name: AI review
@@ -140,9 +187,13 @@ jobs:
         if: ${{ always() && steps.env.outcome == 'failure' }}
         run: tail -n 100 reports/env.log || true
 
-      - name: Stop environment
-        if: ${{ always() }}
-        run: npm run env:down
+      - name: PR comment (with AI analysis)
+        if: ${{ always() && github.event_name == 'pull_request' && hashFiles('qa-audit/reports/ai-review.md') != '' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: bash scripts/post-pr-comment.sh
 
       - name: Upload reports
         if: ${{ always() }}
@@ -151,19 +202,3 @@ jobs:
           name: qa-audit-${{ inputs.trigger }}-${{ github.run_attempt }}
           path: qa-audit/reports
           retention-days: ${{ inputs.retention-days }}
-
-      # One comment per PR, edited in place on every run (marker in pr-comment.md).
-      - name: PR comment
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          [ -f reports/pr-comment.md ] || exit 0
-          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- qa-audit -->")) | .id' | head -n1)
-          if [ -n "$id" ]; then
-            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@reports/pr-comment.md > /dev/null
-          else
-            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@reports/pr-comment.md > /dev/null
-          fi
