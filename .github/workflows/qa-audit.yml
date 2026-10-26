@@ -66,7 +66,7 @@ jobs:
           restore-keys: |
             nextjs-frontend-public-${{ runner.os }}-${{ hashFiles('frontend-public/package-lock.json') }}-
 
-      # The former ci.yml PR jobs, so a PR carries one check. Independent of the
+      # Backend build+test, frontend-public build, terraform fmt/validate, so a PR carries one check. Independent of the
       # fail-fast gate; a failure is a Blocker via stageFailedWithoutReport.
       - name: 0. CI build
         id: ci
