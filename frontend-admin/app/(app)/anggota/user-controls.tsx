@@ -167,7 +167,7 @@ function InviteModal({ open, onClose, kitchens }: { open: boolean; onClose: () =
 export function RoleForm({ user }: { user: UserRow }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<UserActionState, FormData>(async (prev, form) => {
-    const next = await saveUser(user.id, prev, form);
+    const next = await saveUser(user.id, user.kitchenScopes.length > 0, prev, form);
     if (next.ok) setOpen(false);
     return next;
   }, {});

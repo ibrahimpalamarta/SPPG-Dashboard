@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { apiSend } from "@/lib/api";
+import { apiGet, apiSend } from "@/lib/api";
 
 export type UserActionState = {
   message?: string;
@@ -15,6 +15,12 @@ export type UserActionState = {
 
 const text = (form: FormData, key: string) => (typeof form.get(key) === "string" ? (form.get(key) as string) : "");
 const ids = (form: FormData) => form.getAll("kitchenIds").filter((v): v is string => typeof v === "string" && v !== "");
+
+/** PRD v2: Data Operasional covers every kitchen, but the backend scopes a DATA_ADMIN per kitchen and rejects an empty set. */
+async function allKitchenIds(): Promise<string[]> {
+  const { data } = await apiGet<{ data: { id: string }[] }>("/kitchens?pageSize=100");
+  return data.map((k) => k.id);
+}
 
 const untilDate = (iso: unknown) => new Date(String(iso)).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
@@ -32,11 +38,12 @@ function failure(res: Awaited<ReturnType<typeof apiSend>>): UserActionState {
 export async function createUser(_prev: UserActionState, form: FormData): Promise<UserActionState> {
   const email = text(form, "email");
   const role = text(form, "role");
+  const picked = ids(form);
   const res = await apiSend("/admin/users", "POST", {
     email,
     fullName: text(form, "fullName"),
     role,
-    kitchenIds: ids(form),
+    kitchenIds: role === "DATA_ADMIN" && picked.length === 0 ? await allKitchenIds() : picked,
     message: text(form, "message") || undefined,
   });
   if (!res.ok) return failure(res);
@@ -45,12 +52,16 @@ export async function createUser(_prev: UserActionState, form: FormData): Promis
   return { ok: true, email, role, emailed: Boolean(data.emailed), expiresAt: String(data.resetTokenExpiresAt), token: String(data.resetToken) };
 }
 
-export async function saveUser(id: string, _prev: UserActionState, form: FormData): Promise<UserActionState> {
+export async function saveUser(id: string, hasKitchens: boolean, _prev: UserActionState, form: FormData): Promise<UserActionState> {
+  const role = text(form, "role");
+  // Only a member with no kitchens yet needs them filled; otherwise the backend keeps the current scope.
+  const kitchenIds = role === "DATA_ADMIN" && !hasKitchens ? await allKitchenIds() : undefined;
   const res = await apiSend(`/admin/users/${id}`, "PATCH", {
     // A disabled control (your own row) is not submitted: leave the field out, don't send "".
     fullName: text(form, "fullName") || undefined,
-    role: text(form, "role") || undefined,
+    role: role || undefined,
     status: text(form, "status") || undefined,
+    kitchenIds,
   });
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
