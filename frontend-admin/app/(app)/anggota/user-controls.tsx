@@ -171,7 +171,7 @@ export function RoleForm({ user, kitchens }: { user: UserRow; kitchens: Kitchen[
   );
 }
 
-export type Confirm = { title: string; subtitle: string; body: string; label: string };
+type Confirm = { title: string; subtitle: string; body: string; label: string };
 
 /** A one-click admin action. Optional confirm dialog first; the result shows as a toast at the bottom (kept open while it carries a link). */
 export function ActionButton({ action, label, confirm }: { action: () => Promise<UserActionState>; label: string; confirm?: Confirm }) {
