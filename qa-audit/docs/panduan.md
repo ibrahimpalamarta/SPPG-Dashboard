@@ -22,6 +22,7 @@ tercatat sebagai Info).
 | `npm run stage:e2e` | Playwright (environment harus sudah `up`) |
 | `npm run report` | Gabungkan raw → verdict, scorecard, komentar PR |
 | `npm run typecheck` | tsc untuk qa-audit sendiri |
+| `npm run evidence -- SCRUM-xx` | Screenshot test lulus untuk satu tiket (bukti komentar Jira, QD-34) |
 
 Iterasi cepat pada test E2E:
 ```bash
