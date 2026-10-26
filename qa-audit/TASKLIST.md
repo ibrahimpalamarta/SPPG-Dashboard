@@ -115,25 +115,25 @@ file rusak/kosong/terenkripsi → batch FAILED/Ditahan dengan pesan Bahasa Indon
 #### T05 — Upload batch & metadata · Butuh: T04 · Status: IN_PROGRESS (B-SCHEMA, B-ASSIGN)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T05.1 | SCRUM-22 | Create upload batch & metadata | IN_PROGRESS | U | Batch ID dibuat; file, source, uploader, kitchen, domain, timestamp, status tersimpan |
-| T05.2 | SCRUM-37 | [DATA-001] Common upload batch metadata | IN_PROGRESS | U | upload_batch_id; kitchen_id, source_system, source_file_name, template_version, loaded_at tersimpan dan menempel di setiap baris staging |
+| T05.1 | SCRUM-22 | Create upload batch & metadata | IN REVIEW | U | Batch ID dibuat; file, source, uploader, kitchen, domain, timestamp, status tersimpan |
+| T05.2 | SCRUM-37 | [DATA-001] Common upload batch metadata | IN REVIEW | U | upload_batch_id; kitchen_id, source_system, source_file_name, template_version, loaded_at tersimpan dan menempel di setiap baris staging |
 
 #### T06 — Pipeline & halaman upload · Butuh: T05 · Status: IN_PROGRESS
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T06.1 | SCRUM-24 | Excel upload pipeline | IN_PROGRESS (B-SCHEMA, B-RAW) | U | xlsx/CSV diterima, di-parse ke staging, nilai baris mentah utuh. Re-parse idempoten |
-| T06.2 | SCRUM-5 | Data Operasional - Upload existing files | IN_PROGRESS | UI | Data Operasional memilih kitchen/domain + file valid → batch dibuat dengan status Processing, hasil dan duplikat tampil |
-| T06.3 | SCRUM-25 | Upload history/status | IN_PROGRESS | U, UI | Daftar batch dengan status, mapping profile, hasil validasi, waktu publish. UI tidak lagi mockup |
+| T06.1 | SCRUM-24 | Excel upload pipeline | IN REVIEW | U | xlsx/CSV diterima, di-parse ke staging, nilai baris mentah utuh. Re-parse idempoten |
+| T06.2 | SCRUM-5 | Data Operasional - Upload existing files | IN REVIEW | UI | Data Operasional memilih kitchen/domain + file valid → batch dibuat dengan status Processing, hasil dan duplikat tampil |
+| T06.3 | SCRUM-25 | Upload history/status | IN REVIEW | U, UI | Daftar batch dengan status, mapping profile, hasil validasi, waktu publish. UI tidak lagi mockup |
 
 #### T07 — Parser Cashflow · Butuh: T06 · Status: IN_PROGRESS (B-SCHEMA, B-TPLVER)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T07.1 | SCRUM-35 | [DATA-002] Cashflow Upload v1 staging parser | IN_PROGRESS | U, D | Kolom sesuai Upload Contract diterima. Alias Lawang e/id didukung. Nilai mentah tidak hilang. Skema tidak valid → ditahan dan dilaporkan |
+| T07.1 | SCRUM-35 | [DATA-002] Cashflow Upload v1 staging parser | IN REVIEW | U, D | Kolom sesuai Upload Contract diterima. Alias Lawang e/id didukung. Nilai mentah tidak hilang. Skema tidak valid → ditahan dan dilaporkan |
 
 #### T08 — Parser Menu · Butuh: T06 · Status: IN_PROGRESS (B-SCHEMA)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T08.1 | SCRUM-36 | [DATA-003] Menu Upload v1 staging parser | IN_PROGRESS (B-SCHEMA) | U, D | Kontrak umum 23 field. PCK tanpa Periode ditangani lewat aturan metadata. Koma desimal didukung. Field mentah utuh. Ganti parser lama `menu-workbook.ts` |
+| T08.1 | SCRUM-36 | [DATA-003] Menu Upload v1 staging parser | IN REVIEW | U, D | Kontrak umum 23 field. PCK tanpa Periode ditangani lewat aturan metadata. Koma desimal didukung. Field mentah utuh. Ganti parser lama `menu-workbook.ts` |
 
 #### T09 — Input Maker · Butuh: T06 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
@@ -147,7 +147,7 @@ file rusak/kosong/terenkripsi → batch FAILED/Ditahan dengan pesan Bahasa Indon
 |---|---|---|---|---|---|
 | T10.1 | SCRUM-130 | [DATA-050] Generate template resmi Cashflow & Menu | TODO (B-TPLVER) | U | Template Cashflow berisi Transaksi_Kas, Ringkasan_Transaksi, Referensi, Legenda_Kolom. Template Menu berisi Menu, Referensi, Legenda_Kolom. Header wajib, dropdown referensi, dan template_version konsisten |
 | T10.2 | SCRUM-125 | Tombol Download Template | TODO | UI | Template Cashflow v1 & Menu v1 bisa diunduh kosong; dropdown dari Referensi; jenis data tanpa template memakai file biasa |
-| T10.3 | SCRUM-131 | [DATA-051] Tolak template header-only | IN_PROGRESS (B-TPLVER) | U, UI | Template valid tanpa baris data → status "Ditahan · file kosong", tidak ada staging/canonical, tombol unggah ulang tetap ada |
+| T10.3 | SCRUM-131 | [DATA-051] Tolak template header-only | IN REVIEW | U, UI | Template valid tanpa baris data → status "Ditahan · file kosong", tidak ada staging/canonical, tombol unggah ulang tetap ada |
 
 ### Tahap 3 — Mapping
 
@@ -165,7 +165,7 @@ logika yang di-hardcode berdasarkan nama dapur.
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
 | T12.1 | SCRUM-94 | Mapping/schema mismatch handling | IN_PROGRESS | U | File tidak dikenal/tidak kompatibel diblokir dengan pesan error yang bisa ditindaklanjuti |
-| T12.2 | SCRUM-124 | Layar sederhana file kolom berbeda | IN_PROGRESS (B-SCHEMA) | UI | Data Operasional hanya melihat tabel perbedaan kolom + tombol Unggah Ulang File (tanpa Buat format baru/Tolak). File lama otomatis berstatus Diganti |
+| T12.2 | SCRUM-124 | Layar sederhana file kolom berbeda | IN REVIEW | UI | Data Operasional hanya melihat tabel perbedaan kolom + tombol Unggah Ulang File (tanpa Buat format baru/Tolak). File lama otomatis berstatus Diganti |
 
 #### T13 — Sukun Cashflow · Butuh: T07, T11 · Status: IN_PROGRESS (B-DD, B-MAPOUT)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
@@ -362,3 +362,19 @@ Total: 104 tiket = 101 dikerjakan + 3 duplikat. SCRUM-22 (tanpa assignee di Jira
 
 Sumber: JQL `project = SCRUM`, assignee Maulana Ibrahim, status belum Done (±100 tiket, banyak tumpang-tindih: tiket "adapter" vs "[DATA-xxx] profile", tiket widget vs semantic query-nya). Aturan: (1) tiket yang menghasilkan kode/dataset yang sama digabung (mis. SCRUM-27+55, 62+97); (2) duplikat persis (126, 127, 128) ikut task aslinya; (3) urutan = Tahap 1–3 di STATUS.md, lalu urutan epic PRD (kanonik → validasi/publish → KPI → health → manual/foto → UAT → Phase 2). Jira tidak diubah; status task diambil dari STATUS.md.
 Diperluas 2026-10-25: TASKLIST memuat rincian **per tiket** (104), dengan nomor urut `Txx.y`, dependensi antar task (*Butuh*), kolom *Selesai bila* yang diringkas dari acceptance criteria Jira, jenis uji (`U` = `npm test` backend, `UI` = cek manual per role, `D` = rekonsiliasi data), dan gerbang uji per tahap. Di dalam satu task, urutannya: dataset/semantic query (backend) dulu, baru widget (UI).
+
+## Label Jira per tahap (2026-10-26)
+
+Label Inggris huruf kecil: `stage-N` + area fitur (+ `kitchen-<nama>`). Tiket duplikat (126-128) diberi label `duplicate`. Epic hanya dipindah bila parent salah; parent selain itu tidak diubah.
+
+| Tahap | Label fitur | Tiket SCRUM |
+|---|---|---|
+| Stage 1 | auth-rbac, app-shell, member-management, data-reference | 20,21,121,122,123,132 (epic SCRUM-16) |
+| Stage 2 | upload, upload-ui/batch/pipeline/history/template, input-maker | 5,22,24,25,35,36,37,86,118,125,126,130,131 (epic SCRUM-6; 36,86,118 dipindah ke SCRUM-6) |
+| Stage 3 | mapping, mapping-registry, mapping-mismatch, cashflow, menu | 26,27,31,32,39,55,56,57,58,73,94,124 (epic SCRUM-12; 94,124 dipindah dari SCRUM-17/SCRUM-6) |
+| Stage 4 | rab-po-payment, finance-canonical, finance-dataset | 28,29,30,40,41,44-47,49,50,72,77,98 |
+| Stage 5 | normalization, validation, dq-finance, dq-menu, review-publish | 33,34,42,43,48,51-54,78,84,85,95,96,117,119,120,127,128 |
+| Stage 6 | kpi-finance, kpi-menu, data-health | 59-68,74,76,97,99-107,115,116,129 |
+| Stage 7 | manual-entry, photo-upload | 38,75,108,133-135 |
+| Stage 8 | pilot-uat | 69,70,71,113 |
+| Stage 9 | phase2-rollout | 79-83 |
