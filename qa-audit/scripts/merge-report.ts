@@ -46,7 +46,7 @@ export type Stage = keyof typeof STAGES;
 const TOOL_STAGE: Record<string, Stage> = { ci: 'ci', tsc: 'code', eslint: 'code', knip: 'code', semgrep: 'code', gitleaks: 'code', vitest: 'logic', playwright: 'e2e' };
 const RANK: Record<Severity, number> = { Blocker: 0, Warning: 1, Info: 2 };
 
-const ids = (title: string) => [...title.matchAll(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\]/g)].map((m) => m[1]!);
+export const ids = (title: string) => [...title.matchAll(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\]/g)].map((m) => m[1]!);
 
 // ---------------------------------------------------------------------------
 // Collectors: raw tool output -> findings + test cases. No gate decisions here
@@ -81,10 +81,10 @@ function sarif(tool: string, doc: Sarif, severityOf: (level: string, tags: strin
   });
 }
 
-type PwSpec = { title: string; tags?: string[]; tests: { projectName: string; status: string; annotations?: { type: string }[] }[] };
-type PwSuite = { title: string; file?: string; specs?: PwSpec[]; suites?: PwSuite[] };
+type PwSpec = { title: string; tags?: string[]; tests: { projectName: string; status: string; annotations?: { type: string }[]; results?: { attachments?: { name: string; path?: string }[] }[] }[] };
+export type PwSuite = { title: string; file?: string; specs?: PwSpec[]; suites?: PwSuite[] };
 
-function* pwTests(suites: PwSuite[] = [], path: string[] = []): Generator<{ title: string; spec: PwSpec; test: PwSpec['tests'][number] }> {
+export function* pwTests(suites: PwSuite[] = [], path: string[] = []): Generator<{ title: string; spec: PwSpec; test: PwSpec['tests'][number] }> {
   for (const s of suites) {
     const here = s.file === s.title ? path : [...path, s.title];
     for (const spec of s.specs ?? []) for (const test of spec.tests) yield { title: [...here, spec.title].join(' › '), spec, test };
