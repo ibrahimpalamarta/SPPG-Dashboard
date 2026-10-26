@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, BookOpen, Building2, Coins, FileText, Package, UserRound, Utensils, Wallet, WalletCards, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Coins, FileText, Package, UserRound, Utensils, Wallet, WalletCards, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { uploadFile, type UploadResult } from "./actions";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/lib/upload";
@@ -11,16 +11,16 @@ import type { Kitchen } from "@/lib/me";
 const field = "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20";
 const primaryButton = "inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60";
 const choice = (selected: boolean) =>
-  `rounded-xl border p-4 text-left disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 ${selected ? "border-emerald-600 ring-1 ring-emerald-600" : "border-slate-200 enabled:hover:border-emerald-300"}`;
+  `rounded-xl border p-4 text-left disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-40 ${selected ? "border-emerald-600 ring-1 ring-emerald-600" : "border-slate-200 enabled:hover:border-emerald-300"}`;
 
 // `value` mirrors backend UploadDomain; no value = no backend support yet (Manual Entry / not ingested).
-const DOMAIN_CARDS: { value?: string; label: string; note: string; icon: LucideIcon; optional?: boolean }[] = [
+const DOMAIN_CARDS: { value?: string; label: string; note: string; icon: LucideIcon }[] = [
   { value: "CASHFLOW", label: "Cashflow", note: "Catatan uang masuk & keluar", icon: Wallet },
   { value: "RAB", label: "RAB", note: "Rencana anggaran per periode", icon: Utensils },
   { value: "PO", label: "Purchase Order", note: "Daftar pesanan ke supplier", icon: FileText },
   { value: "VENDOR_PAYMENT", label: "Pembayaran Supplier", note: "Bukti bayar ke supplier (Input Maker / EFI)", icon: Coins },
-  { value: "MENU", label: "Master Menu", note: "Menu & gizi yang direncanakan", icon: BookOpen, optional: true },
-  { value: "GOODS_RECEIPT", label: "Penerimaan Barang", note: "Barang yang diterima dapur", icon: Package, optional: true },
+  { value: "MENU", label: "Master Menu", note: "Menu & gizi yang direncanakan", icon: BookOpen },
+  { value: "GOODS_RECEIPT", label: "Penerimaan Barang", note: "Barang yang diterima dapur", icon: Package },
   { label: "Saldo Rekening", note: "Belum bisa diunggah. Laporan saldo harian (VA / LapKeu).", icon: WalletCards },
   { label: "Jumlah Penerima Manfaat", note: "Belum ada file. Isi lewat Manual Entry.", icon: UserRound },
 ];
@@ -40,7 +40,17 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   const current = result?.ok && !retry ? 3 : step;
 
   return (
-    <form action={action} onSubmit={() => setRetry(false)} className="space-y-5">
+    // Not `action={action}`: React resets the form after an action, which empties the file input
+    // while `file` still shows its name, so a failed upload would need the file picked again.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        setRetry(false);
+        const data = new FormData(e.currentTarget);
+        startTransition(() => action(data));
+      }}
+      className="space-y-5"
+    >
       <input type="hidden" name="kitchenId" value={kitchen} />
       <input type="hidden" name="domain" value={domain} />
       {/* SCRUM-124: re-uploading a quarantined file closes it as "Diganti". */}
@@ -60,29 +70,23 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
         <div hidden={current !== 1} className="space-y-6">
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold text-slate-800">1. Pilih kitchen</legend>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <select value={kitchen} onChange={(e) => setKitchen(e.target.value)} className={`${field} max-w-md`}>
               {kitchens.map((k) => (
-                <button key={k.id} type="button" aria-pressed={kitchen === k.id} onClick={() => setKitchen(k.id)} className={choice(kitchen === k.id)}>
-                  <span className="flex items-center gap-2 font-semibold text-slate-900">
-                    <Building2 className="size-4 text-slate-500" aria-hidden="true" />
-                    {k.code ? `${k.code} · ${k.name}` : k.name}
-                  </span>
-                </button>
+                <option key={k.id} value={k.id}>
+                  {k.code ? `${k.code} · ${k.name}` : k.name}
+                </option>
               ))}
-            </div>
+            </select>
           </fieldset>
 
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold text-slate-800">2. Pilih jenis data</legend>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {DOMAIN_CARDS.map(({ value, label, note, icon: Icon, optional }) => (
+              {DOMAIN_CARDS.map(({ value, label, note, icon: Icon }) => (
                 <button key={label} type="button" disabled={!value} aria-pressed={value === domain} onClick={() => value && setDomain(value)} className={choice(value === domain)}>
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="flex items-center gap-2 font-semibold">
-                      <Icon className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                      {label}
-                    </span>
-                    {optional && <span className="rounded-md border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">Opsional</span>}
+                  <span className="flex items-center gap-2 font-semibold">
+                    <Icon className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                    {label}
                   </span>
                   <span className="mt-2 block text-sm text-slate-500">{note}</span>
                 </button>

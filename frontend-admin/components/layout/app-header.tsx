@@ -42,10 +42,12 @@ export function AppHeader({ items }: { items: readonly NavItem[] }) {
         <button type="button" disabled title="Segera hadir" aria-label="Notifikasi" className={`${iconButton} disabled:cursor-not-allowed disabled:opacity-60`}>
           <Bell className="size-5" aria-hidden="true" />
         </button>
-        <Link href="/unggah-data" className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800">
-          <Plus className="size-4" aria-hidden="true" />
-          Unggah Data
-        </Link>
+        {pathname !== "/unggah-data" && (
+          <Link href="/unggah-data" className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800">
+            <Plus className="size-4" aria-hidden="true" />
+            Unggah Data
+          </Link>
+        )}
       </div>
     </header>
   );

@@ -38,7 +38,7 @@ export async function uploadFile(_prev: UploadResult | null, form: FormData): Pr
   if (!res.ok) {
     if (res.status === 403) return { ok: false, message: body.message ?? "Anda tidak memiliki akses untuk mengunggah." };
     const fields = body.details?.fields as Record<string, string[]> | undefined;
-    return { ok: false, message: fields ? Object.values(fields).flat().join(" ") : "Upload gagal. Coba lagi beberapa saat lagi." };
+    return { ok: false, message: fields ? Object.values(fields).flat().join(" ") : `Upload gagal (${res.status}). Coba lagi beberapa saat lagi.` };
   }
   return {
     ok: true,

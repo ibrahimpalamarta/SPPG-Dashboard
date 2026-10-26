@@ -23,7 +23,7 @@ export default async function Page() {
       ) : (
         <UploadForm kitchens={me.kitchens} kitchenId={me.kitchens[0]?.id} />
       )}
-      <UploadHistory />
+      <UploadHistory canOpen={me.permissions.includes("mapping:view")} />
     </div>
   );
 }
