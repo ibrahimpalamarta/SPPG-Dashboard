@@ -4,6 +4,7 @@ import type { Request, RequestHandler, Response } from 'express';
 import type { Db } from '../../db.js';
 import type { Permission, Role } from '../../auth/roles.js';
 import type { AppUser } from '../../auth/user.js';
+import type { SendMail } from '../../lib/mailer.js';
 import { clearPermissionCache } from '../../auth/rbac-store.js';
 import {
   cancelInvite,
@@ -94,6 +95,9 @@ async function call(handler: RequestHandler, req: Partial<Request>) {
   return out;
 }
 
+// .env.test sets EMAIL_FROM, so every handler gets a stub instead of the real SES client.
+const noMail: SendMail = async () => {};
+
 const SUPER = actor('SUPER_ADMIN', ['users:manage', 'settings:manage']);
 // users:manage on a lower-ranked account: the privilege-escalation candidate.
 const MANAGER = actor('INTERNAL', ['users:manage', 'upload:view', 'settings:manage']);
@@ -102,7 +106,7 @@ describe('privilege escalation', () => {
   test('a user manager cannot mint a SUPER_ADMIN', async () => {
     const { db, calls } = setup();
     const body = { email: 'x@example.com', fullName: 'X', role: 'SUPER_ADMIN', kitchenIds: [] };
-    const out = await call(createUser(db), { user: MANAGER, valid: { body } });
+    const out = await call(createUser(db, noMail), { user: MANAGER, valid: { body } });
     assert.equal(out.status, 403);
     assert.equal(calls.created.length, 0);
   });
@@ -126,14 +130,14 @@ describe('privilege escalation', () => {
     // DATA_ADMIN has upload:create, which MANAGER does not hold.
     const { db, calls } = setup();
     const body = { email: 'x@example.com', fullName: 'X', role: 'DATA_ADMIN', kitchenIds: [1n] };
-    assert.equal((await call(createUser(db), { user: MANAGER, valid: { body } })).status, 403);
+    assert.equal((await call(createUser(db, noMail), { user: MANAGER, valid: { body } })).status, 403);
     assert.equal(calls.created.length, 0);
   });
 
   test('a manager may create a role within its own permissions', async () => {
     const { db } = setup();
     const body = { email: 'x@example.com', fullName: 'X', role: 'INTERNAL', kitchenIds: [] };
-    const out = await call(createUser(db), { user: MANAGER, valid: { body } });
+    const out = await call(createUser(db, noMail), { user: MANAGER, valid: { body } });
     assert.equal(out.status, 201);
     assert.equal(typeof out.body?.resetToken, 'string');
   });
@@ -141,7 +145,7 @@ describe('privilege escalation', () => {
   test('SUPER_ADMIN may create any role, and a new DATA_ADMIN needs a kitchen', async () => {
     const { db } = setup();
     const make = (role: string, kitchenIds: bigint[]) =>
-      call(createUser(db), {
+      call(createUser(db, noMail), {
         user: SUPER,
         valid: { body: { email: 'x@example.com', fullName: 'X', role, kitchenIds } },
       });
@@ -250,17 +254,38 @@ describe('SCRUM-121: members and invitations', () => {
   test('an invitation link lives INVITE_TTL_HOURS (72 by default), on create and on resend', async () => {
     const { db, calls } = setup({ '5': { role: 'INTERNAL', passwordHash: null } });
     const body = { email: 'x@example.com', fullName: 'X', role: 'INTERNAL', kitchenIds: [] };
-    const created = await call(createUser(db), { user: SUPER, valid: { body } });
+    const created = await call(createUser(db, noMail), { user: SUPER, valid: { body } });
     assert.ok(Math.abs(hoursFromNow(created.body?.resetTokenExpiresAt) - 72) < 0.1);
 
-    const resent = await call(createPasswordReset(db), { user: SUPER, valid: { params: { id: 5n } } });
+    const resent = await call(createPasswordReset(db, noMail), { user: SUPER, valid: { params: { id: 5n } } });
     assert.ok(Math.abs(hoursFromNow(resent.body?.resetTokenExpiresAt) - 72) < 0.1);
     assert.equal((calls.audit.at(-1) as { action: string }).action, 'user.invite_resent');
   });
 
+  test('an invitation is emailed with the activation link and the admin message', async () => {
+    const { db } = setup();
+    const sent: { to: string; text: string }[] = [];
+    const mail: SendMail = async (to, _subject, text) => void sent.push({ to, text });
+    const body = { email: 'x@example.com', fullName: 'X', role: 'INTERNAL', kitchenIds: [], message: 'Halo tim' };
+    const out = await call(createUser(db, mail), { user: SUPER, valid: { body } });
+    assert.equal(out.body?.emailed, true);
+    assert.equal(sent[0]?.to, 'x@example.com');
+    assert.ok(sent[0]?.text.includes(`https://example.com/admin/aktivasi/${out.body?.resetToken}`));
+    assert.ok(sent[0]?.text.includes('Halo tim'));
+  });
+
+  test('a failing SES send does not fail the invitation; the admin gets the link instead', async () => {
+    const { db } = setup();
+    const mail: SendMail = async () => Promise.reject(new Error('ses down'));
+    const body = { email: 'x@example.com', fullName: 'X', role: 'INTERNAL', kitchenIds: [] };
+    const out = await call(createUser(db, mail), { user: SUPER, valid: { body } });
+    assert.equal(out.status, 201);
+    assert.equal(out.body?.emailed, false);
+  });
+
   test('a password reset for an active account keeps the short reset lifetime', async () => {
     const { db, calls } = setup({ '5': { role: 'INTERNAL', passwordHash: 'h' } });
-    const out = await call(createPasswordReset(db), { user: SUPER, valid: { params: { id: 5n } } });
+    const out = await call(createPasswordReset(db, noMail), { user: SUPER, valid: { params: { id: 5n } } });
     assert.ok(hoursFromNow(out.body?.resetTokenExpiresAt) <= 1);
     assert.equal((calls.audit.at(-1) as { action: string }).action, 'user.password_reset_issued');
   });

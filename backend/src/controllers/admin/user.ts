@@ -14,6 +14,7 @@ import { permissionsFor, setRolePermissions } from '../../auth/rbac-store.js';
 import { listSessions, revokeUserSessions } from '../../auth/session.js';
 import { ROLES } from '../../auth/roles.js';
 import { env } from '../../config/env.js';
+import { sendMail, type SendMail } from '../../lib/mailer.js';
 import type {
   auditLogListQuery,
   roleParam,
@@ -28,6 +29,24 @@ const withScope = {
 } satisfies Prisma.UserInclude;
 
 const INVITE_TTL_MINUTES = () => env.INVITE_TTL_HOURS * 60;
+
+/**
+ * Emails the activation link through SES. False when mail is not configured or
+ * SES fails, so the admin still gets the link in the response to hand over.
+ */
+async function sendInvite(send: SendMail, to: string | null, token: string, message?: string): Promise<boolean> {
+  if (!to || !env.EMAIL_FROM || !env.ADMIN_BASE_URL) return false;
+  const link = `${env.ADMIN_BASE_URL.replace(/\/$/, '')}/aktivasi/${token}`;
+  const note = message ? `\n\nPesan dari pengundang:\n${message}` : '';
+  const text = `Anda diundang ke SPPG Internal. Buat kata sandi untuk mengaktifkan akun:\n\n${link}${note}\n\nLink berlaku ${env.INVITE_TTL_HOURS} jam dan hanya bisa dipakai sekali.`;
+  try {
+    await send(to, 'Undangan SPPG Internal', text);
+    return true;
+  } catch (err) {
+    console.error('invitation email failed', { error: String(err) });
+    return false;
+  }
+}
 
 /**
  * SCRUM-121: member status as the Anggota page shows it, derived rather than
@@ -93,10 +112,10 @@ async function mayManageAll(actor: AppUser, roles: Role[], db: Db): Promise<bool
 
 /**
  * Invitation. Creates the account with no password and returns a one-time
- * set-password token — the only copy. There is no outbound email yet, so the
- * admin hands the link over themselves.
+ * set-password token — the only copy. The link is also emailed through SES;
+ * when that is not configured (`emailed: false`) the admin hands it over.
  */
-export const createUser = (db: Db = prisma): RequestHandler => async (req, res) => {
+export const createUser = (db: Db = prisma, send: SendMail = sendMail): RequestHandler => async (req, res) => {
   const body = req.valid!.body as z.infer<typeof userCreate>;
 
   if (!(await mayManageAll(req.user!, [body.role], db))) {
@@ -129,7 +148,8 @@ export const createUser = (db: Db = prisma): RequestHandler => async (req, res) 
       entityId: user.id,
       metadata: { role: body.role, kitchens: body.kitchenIds.map(String) },
     });
-    sendJson(res, { user, resetToken: invite.token, resetTokenExpiresAt: invite.expiresAt }, 201);
+    const emailed = await sendInvite(send, user.email, invite.token, body.message);
+    sendJson(res, { user, resetToken: invite.token, resetTokenExpiresAt: invite.expiresAt, emailed }, 201);
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === 'P2002') {
@@ -260,7 +280,7 @@ export const updateUser = (db: Db = prisma): RequestHandler => async (req, res) 
 /** Loads the target of an `/admin/users/:id/...` action and applies the escalation check. */
 async function loadManageable(req: Request, res: Response, db: Db) {
   const { id } = req.valid!.params as { id: bigint };
-  const target = await db.user.findUnique({ where: { id }, select: { id: true, role: true, status: true, passwordHash: true } });
+  const target = await db.user.findUnique({ where: { id }, select: { id: true, email: true, role: true, status: true, passwordHash: true } });
   if (!target) {
     sendError(res, 'NOT_FOUND');
     return null;
@@ -277,7 +297,7 @@ async function loadManageable(req: Request, res: Response, db: Db) {
  * an account that never set a password this is "kirim ulang undangan": it
  * gets the invitation lifetime and its own audit action.
  */
-export const createPasswordReset = (db: Db = prisma): RequestHandler => async (req, res) => {
+export const createPasswordReset = (db: Db = prisma, send: SendMail = sendMail): RequestHandler => async (req, res) => {
   const target = await loadManageable(req, res, db);
   if (!target) return;
   const invite = !target.passwordHash;
@@ -288,7 +308,8 @@ export const createPasswordReset = (db: Db = prisma): RequestHandler => async (r
     entity: 'users',
     entityId: target.id,
   });
-  sendJson(res, { resetToken: token, resetTokenExpiresAt: expiresAt });
+  const emailed = invite ? await sendInvite(send, target.email, token) : false;
+  sendJson(res, { resetToken: token, resetTokenExpiresAt: expiresAt, emailed });
 };
 
 /**

@@ -224,8 +224,10 @@ Rate limiter Express (`express-rate-limit`) tidak diuji unit — diuji manual.
 
 ## Keterbatasan yang diketahui
 
-- **Undangan tanpa email.** Link undangan dan reset buatan admin diserahkan
-  manual; hanya "Lupa kata sandi?" mandiri yang dikirim lewat SES.
+- **Reset buatan admin tanpa email.** Undangan (buat & kirim ulang) dikirim lewat
+  SES berisi link `ADMIN_BASE_URL/aktivasi/<token>` plus pesan opsional dari
+  pengundang; bila SES belum dikonfigurasi atau gagal, respons `emailed: false`
+  dan link diserahkan manual. Reset password akun aktif tetap manual.
 - **Kode TOTP bisa dipakai ulang dalam jendela 30 detik** (tidak ada pelacakan
   langkah terakhir). Dibatasi lockout 5 percobaan.
 - **MFA tanpa QR code** — pengguna memasukkan secret / membuka tautan otpauth.

@@ -399,9 +399,11 @@ describe('SCRUM-122: getInvitation', () => {
   }
   const ask = (db: Db, token = TOKEN) => call(getInvitation(db), { valid: { params: { token } } });
 
-  test('an open invitation shows who it is for and the role, nothing else', async () => {
+  test('an open invitation shows who it is for, the role and when it expires, nothing else', async () => {
     const out = await ask((await invited()).db);
-    assert.deepEqual(out.body, { email: 'pic@example.com', role: 'DATA_ADMIN' });
+    const { expiresAt, ...rest } = out.body as { expiresAt: Date };
+    assert.ok(new Date(expiresAt) > new Date());
+    assert.deepEqual(rest, { email: 'pic@example.com', role: 'DATA_ADMIN' });
   });
 
   test('expired, used, cancelled, unknown, or a reset link of an active account are refused alike', async () => {
