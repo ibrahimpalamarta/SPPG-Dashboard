@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { AuthCard } from "@/components/ui/form";
 import { publicGet } from "@/lib/api";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
@@ -25,22 +26,25 @@ export default async function Page({ params }: PageProps<"/aktivasi/[token]">) {
     );
   }
 
-  const invite = res.data as { email: string; fullName: string | null; role: Role };
+  const invite = res.data as { email: string; fullName: string | null; role: Role; expiresAt: string };
   return (
-    <AuthCard title="Aktivasi akun">
-      <dl className="space-y-3 text-sm">
-        {[
-          ["Email", invite.email],
-          ["Nama", invite.fullName ?? "—"],
-          ["Peran", ROLE_LABELS[invite.role]],
-        ].map(([label, value]) => (
-          <div key={label} className="space-y-1">
-            <dt className="font-medium text-slate-700">{label}</dt>
-            <dd className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">{value}</dd>
-          </div>
-        ))}
+    <AuthCard title="Aktifkan akun Anda">
+      <dl className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+        <dt className="text-slate-500">Nama</dt>
+        <dd className="font-medium text-slate-800">{invite.fullName ?? "—"}</dd>
+        <dt className="text-slate-500">Email</dt>
+        <dd className="break-all text-slate-800">{invite.email}</dd>
+        <dt className="text-slate-500">Role</dt>
+        <dd>
+          <Badge tone="blue">{ROLE_LABELS[invite.role]}</Badge> <span className="text-xs text-slate-500">ditetapkan pengundang</span>
+        </dd>
+        <dt className="text-slate-500">Berlaku s/d</dt>
+        <dd className="text-slate-800">{new Date(invite.expiresAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</dd>
       </dl>
-      <ResetForm token={token} />
+      <ResetForm token={token} submitLabel="Aktifkan & masuk" />
+      <Link href="/" className="block text-center text-sm font-medium text-slate-500 hover:text-slate-800">
+        Batal, kembali ke dashboard
+      </Link>
     </AuthCard>
   );
 }
