@@ -36,7 +36,7 @@ export default async function Page({ params }: PageProps<"/aktivasi/[token]">) {
         <dd className="break-all text-slate-800">{invite.email}</dd>
         <dt className="text-slate-500">Role</dt>
         <dd>
-          <Badge tone="blue">{ROLE_LABELS[invite.role]}</Badge> <span className="text-xs text-slate-500">ditetapkan pengundang</span>
+          <Badge tone="blue">{ROLE_LABELS[invite.role]}</Badge>
         </dd>
         <dt className="text-slate-500">Berlaku s/d</dt>
         <dd className="text-slate-800">{new Date(invite.expiresAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</dd>
