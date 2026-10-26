@@ -55,6 +55,11 @@ const schema = z.object({
 
   // Lifetime of a set/reset-password link.
   PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(60),
+  // Self-service "forgot password": the verified SES sender and the public URL
+  // of the admin frontend (including its /admin base path) the emailed link
+  // points at. Either unset = the endpoint still answers but sends nothing.
+  EMAIL_FROM: z.string().min(1).optional(),
+  ADMIN_BASE_URL: z.string().url().optional(),
   // SCRUM-121: lifetime of an invitation (set-password link of a new account).
   INVITE_TTL_HOURS: z.coerce.number().int().positive().default(72),
 

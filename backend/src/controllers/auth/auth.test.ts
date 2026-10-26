@@ -6,7 +6,7 @@ import type { Db } from '../../db.js';
 import { hashPassword } from '../../auth/password.js';
 import { newTotpSecret } from '../../auth/mfa.js';
 import { decrypt, sha256, signChallenge } from '../../lib/crypto.js';
-import { changePassword, getInvitation, login, logout, mfaDisable, mfaEnable, resetPassword, verifyMfa } from './auth.js';
+import { changePassword, forgotPassword, getInvitation, login, logout, mfaDisable, mfaEnable, resetPassword, verifyMfa } from './auth.js';
 
 const PASSWORD = 'Correct-Horse-9';
 const NEW_PASSWORD = 'Another-Horse-42';
@@ -72,6 +72,7 @@ async function fakeDb() {
         const row = resets.find((r) => matches(r, where));
         return row && { ...row, user: users.find((u) => u.id === row.userId) };
       },
+      create: async ({ data }: { data: Row }) => resets.push({ id: BigInt(resets.length + 1), usedAt: null, ...data }),
       updateMany: updateMany(resets),
     },
     mfaRecoveryCode: {
@@ -256,6 +257,34 @@ describe('MFA', () => {
     });
     assert.equal(out.status, 204);
     assert.equal(users[0]!.mfaEnabled, false);
+  });
+});
+
+describe('forgotPassword', () => {
+  async function run(email: string, patch: Row = {}) {
+    const f = await fakeDb();
+    Object.assign(f.users[0]!, patch);
+    const sent: { to: string; text: string }[] = [];
+    const out = await call(forgotPassword(f.db, async (to, _subject, text) => void sent.push({ to, text })), withBody({ email }));
+    return { f, out, sent };
+  }
+
+  test('emails a single-use link to an active account', async () => {
+    const { f, out, sent } = await run('pic@example.com');
+
+    assert.equal(out.status, 204);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0]!.to, 'pic@example.com');
+    const token = /reset-password\/(\S+)/.exec(sent[0]!.text)![1]!;
+    assert.equal(f.resets[0]!.tokenHash, sha256(token));
+  });
+
+  test('answers the same and sends nothing for an unknown, disabled or password-less account', async () => {
+    for (const r of [await run('nobody@example.com'), await run('pic@example.com', { status: 'INACTIVE' }), await run('pic@example.com', { passwordHash: null })]) {
+      assert.equal(r.out.status, 204);
+      assert.equal(r.sent.length, 0);
+      assert.equal(r.f.resets.length, 0);
+    }
   });
 });
 
