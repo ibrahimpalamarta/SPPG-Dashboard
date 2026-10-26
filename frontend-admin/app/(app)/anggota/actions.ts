@@ -6,7 +6,6 @@ import { apiSend } from "@/lib/api";
 export type UserActionState = {
   message?: string;
   ok?: boolean;
-  resetPath?: string;
   email?: string;
   role?: string;
   emailed?: boolean;
@@ -16,8 +15,6 @@ export type UserActionState = {
 const text = (form: FormData, key: string) => (typeof form.get(key) === "string" ? (form.get(key) as string) : "");
 const ids = (form: FormData) => form.getAll("kitchenIds").filter((v): v is string => typeof v === "string" && v !== "");
 
-/** One-time activation link (SCRUM-122); the browser adds its own origin. */
-const activationPath = (token: unknown) => `${process.env.NEXT_PUBLIC_BASE_PATH}/aktivasi/${token}`;
 const untilDate = (iso: unknown) => new Date(String(iso)).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
 function failure(res: Awaited<ReturnType<typeof apiSend>>): UserActionState {
@@ -44,7 +41,7 @@ export async function createUser(_prev: UserActionState, form: FormData): Promis
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
   const data = res.data as Record<string, unknown>;
-  return { ok: true, email, role, emailed: Boolean(data.emailed), expiresAt: String(data.resetTokenExpiresAt), resetPath: activationPath(data.resetToken) };
+  return { ok: true, email, role, emailed: Boolean(data.emailed), expiresAt: String(data.resetTokenExpiresAt) };
 }
 
 export async function saveUser(id: string, _prev: UserActionState, form: FormData): Promise<UserActionState> {
