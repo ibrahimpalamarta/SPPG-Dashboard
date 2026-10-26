@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireRole } from '../../auth/guard.js';
+import { requirePermission } from '../../auth/guard.js';
 import { validate } from '../../middleware/validate.js';
 import { singleFile } from '../../middleware/upload.js';
 import { wrap } from '../../lib/wrap.js';
@@ -19,24 +19,26 @@ import {
 
 export const uploadBatchRouter = Router();
 
-// SCRUM-7: history is readable by every authenticated role; the controller
-// narrows the rows to the caller's dapur.
+// SCRUM-7/20: history needs upload:view; the controller narrows the rows to
+// the caller's dapur.
+uploadBatchRouter.use(requirePermission('upload:view'));
 uploadBatchRouter.get('/', validate({ query: uploadBatchListQuery }), wrap(listUploadBatches()));
 uploadBatchRouter.get('/:id', validate({ params: idParam }), wrap(getUploadBatch()));
 
-// SCRUM-5/6: only the roles that actually enter data may upload or review one.
+// SCRUM-20: uploading needs upload:create; changing a batch's verdict is a
+// review (batch:review, PM only).
 // multer runs before validate() because it is what populates req.body for a
 // multipart request — there is nothing to validate until it has parsed the form.
 uploadBatchRouter.post(
   '/',
-  requireRole('SUPER_ADMIN', 'DATA_ADMIN'),
-  singleFile('file', ['.xlsx']),
+  requirePermission('upload:create'),
+  singleFile('file', ['.xlsx', '.csv']),
   validate({ body: uploadBatchCreate, query: uploadBatchCreateQuery }),
   wrap(createUploadBatch()),
 );
 uploadBatchRouter.patch(
   '/:id',
-  requireRole('SUPER_ADMIN', 'DATA_ADMIN'),
+  requirePermission('batch:review'),
   validate({ params: idParam, body: uploadBatchUpdate }),
   wrap(updateUploadBatch()),
 );

@@ -1,0 +1,20 @@
+# Rule kustom qa-audit, dijalankan bersama ruleset p/typescript (scripts/code-audit.ts).
+rules:
+  - id: sppg-log-request-body
+    languages: [typescript]
+    severity: ERROR
+    message: Jangan menulis body request ke log; bisa memuat password atau PII (PRD NFR-02, keputusan D-13).
+    pattern-either:
+      - pattern: console.$F(..., $REQ.body, ...)
+      - pattern: console.$F(..., $REQ.body.$X, ...)
+
+  - id: sppg-raw-sql-unsafe
+    languages: [typescript]
+    severity: ERROR
+    message: $queryRawUnsafe/$executeRawUnsafe melewati parameter binding Prisma. Pakai tagged template, atau format() dengan %I/%L dan catat waiver di gate.json.
+    metadata:
+      category: security
+      cwe: "CWE-89: SQL Injection"
+    pattern-either:
+      - pattern: $DB.$queryRawUnsafe(...)
+      - pattern: $DB.$executeRawUnsafe(...)

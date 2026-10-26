@@ -1,0 +1,53 @@
+name: qa-audit setup
+description: Node 24, Semgrep, gitleaks, npm dependencies (qa-audit, backend, frontend-admin) and Chromium.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: npm
+        cache-dependency-path: |
+          qa-audit/package-lock.json
+          backend/package-lock.json
+          frontend-admin/package-lock.json
+
+    # Semgrep ships through pip; pinned, bump deliberately (docs/ci.md).
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - shell: bash
+      run: pip install --quiet --disable-pip-version-check semgrep==1.180.0
+
+    - shell: bash
+      env:
+        GITLEAKS_VERSION: 8.30.1
+      run: curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | sudo tar -xz -C /usr/local/bin gitleaks
+
+    - shell: bash
+      run: |
+        for dir in qa-audit backend frontend-admin; do
+          (cd "$dir" && npm ci --no-audit --no-fund)
+        done
+
+    - id: pw
+      shell: bash
+      working-directory: qa-audit
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+    # Key = OS + arch + Playwright version: a bump re-downloads the browser.
+    - id: pw-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.pw.outputs.version }}
+
+    # Browser binary only on a miss; OS libraries (apt) are not cached, so a hit still needs them.
+    - if: steps.pw-cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: qa-audit
+      run: npx playwright install --with-deps chromium
+    - if: steps.pw-cache.outputs.cache-hit == 'true'
+      shell: bash
+      working-directory: qa-audit
+      run: npx playwright install-deps chromium

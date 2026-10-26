@@ -1,0 +1,169 @@
+name: qa-audit (reusable)
+
+# All six stages in one job, called by the thin per-trigger wrappers
+# (qa-pr.yml, ...). Every stage step is continue-on-error: its outcome is
+# handed to merge-report as OUTCOME_*, and the report step alone decides
+# whether the check is red. See qa-audit/docs/ci.md.
+on:
+  workflow_call:
+    inputs:
+      trigger:
+        type: string
+        required: true
+      suite:
+        type: string
+        default: smoke
+      enforce:
+        type: boolean
+        default: true
+      security-full:
+        type: boolean
+        default: false
+      retention-days:
+        type: number
+        default: 30
+    secrets:
+      # Optional: empty skips the advisory AI review (QD-30).
+      AI_API_KEY:
+        required: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: qa-audit
+    env:
+      QA_TRIGGER: ${{ inputs.trigger }}
+      QA_SUITE: ${{ inputs.suite }}
+      QA_SECURITY_FULL: ${{ inputs.security-full && '1' || '0' }}
+      ENFORCE: ${{ inputs.enforce && '1' || '0' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # gitleaks scans the PR's commits, so it needs the base branch history.
+          fetch-depth: 0
+
+      - name: Start clock
+        run: echo "QA_STARTED_AT=$(date +%s%3N)" >> "$GITHUB_ENV"
+
+      - name: Setup
+        uses: ./.github/actions/qa-setup
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: frontend-public/.next/cache
+          key: nextjs-frontend-public-${{ runner.os }}-${{ hashFiles('frontend-public/package-lock.json') }}-${{ hashFiles('frontend-public/**/*.[jt]s', 'frontend-public/**/*.[jt]sx', '!frontend-public/node_modules/**', '!frontend-public/.next/**') }}
+          restore-keys: |
+            nextjs-frontend-public-${{ runner.os }}-${{ hashFiles('frontend-public/package-lock.json') }}-
+
+      # The former ci.yml PR jobs, so a PR carries one check. Independent of the
+      # fail-fast gate; a failure is a Blocker via stageFailedWithoutReport.
+      - name: 0. CI build
+        id: ci
+        continue-on-error: true
+        working-directory: .
+        run: |
+          set -euo pipefail
+          (cd backend && npm run build && npm test)
+          (cd frontend-public && npm ci --no-audit --no-fund && npm run build)
+          terraform fmt -check -recursive infra
+          for dir in infra/backend-bootstrap infra/environments/staging infra/environments/production; do
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+          done
+
+      - name: 1. Code audit
+        id: code
+        continue-on-error: true
+        env:
+          QA_GIT_RANGE: ${{ github.base_ref && format('origin/{0}..HEAD', github.base_ref) || 'origin/develop..HEAD' }}
+        run: npm run stage:code
+
+      - name: 1. Fail-fast gate
+        id: gate-code
+        continue-on-error: true
+        run: npm run report -- --stage=code
+
+      - name: 2. Logic test
+        id: logic
+        if: ${{ !cancelled() && steps.gate-code.outcome == 'success' }}
+        continue-on-error: true
+        run: npm run stage:logic
+
+      - name: 3. Environment
+        id: env
+        if: ${{ !cancelled() && steps.gate-code.outcome == 'success' }}
+        continue-on-error: true
+        run: npm run stage:env
+
+      - name: 4. Feature E2E
+        id: e2e
+        if: ${{ !cancelled() && steps.env.outcome == 'success' }}
+        continue-on-error: true
+        run: npm run stage:e2e
+
+      - name: 6. Report & gate
+        if: ${{ always() }}
+        env:
+          OUTCOME_CI: ${{ steps.ci.outcome }}
+          OUTCOME_CODE: ${{ steps.gate-code.outcome == 'failure' && 'failure' || steps.code.outcome }}
+          OUTCOME_LOGIC: ${{ steps.logic.outcome }}
+          OUTCOME_ENV: ${{ steps.env.outcome }}
+          OUTCOME_E2E: ${{ steps.e2e.outcome }}
+          # Stage 5 (visual, Lighthouse) lands in phase 3.
+          OUTCOME_UI: skipped
+        run: npm run report
+
+      # Advisory only: appends "Analisis AI" to pr-comment.md and scorecard.html,
+      # never touches the verdict (QD-30).
+      - name: AI review
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ vars.AI_BASE_URL }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+          QA_GIT_RANGE: ${{ github.base_ref && format('origin/{0}..HEAD', github.base_ref) || 'origin/develop..HEAD' }}
+        run: npm run ai-review
+
+      - name: Environment logs on failure
+        if: ${{ always() && steps.env.outcome == 'failure' }}
+        run: tail -n 100 reports/env.log || true
+
+      - name: Stop environment
+        if: ${{ always() }}
+        run: npm run env:down
+
+      - name: Upload reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-audit-${{ inputs.trigger }}-${{ github.run_attempt }}
+          path: qa-audit/reports
+          retention-days: ${{ inputs.retention-days }}
+
+      # One comment per PR, edited in place on every run (marker in pr-comment.md).
+      - name: PR comment
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          [ -f reports/pr-comment.md ] || exit 0
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- qa-audit -->")) | .id' | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@reports/pr-comment.md > /dev/null
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@reports/pr-comment.md > /dev/null
+          fi

@@ -26,7 +26,7 @@ export const getDashboardSummary = (db: Db = prisma): RequestHandler => async (r
   const q = req.valid!.query as z.infer<typeof dashboardQuery>;
   const scope = kitchenScope(req.user!, q.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 
@@ -43,7 +43,7 @@ export const getDashboardSummary = (db: Db = prisma): RequestHandler => async (r
       _count: { _all: true },
     }),
     db.kitchen.count({
-      where: { status: ActiveStatus.ACTIVE, ...(scope.kitchenId && { id: scope.kitchenId }) },
+      where: { status: ActiveStatus.ACTIVE, ...(scope.kitchenIds && { id: { in: scope.kitchenIds } }) },
     }),
     db.dailyKitchen.findFirst({
       where,

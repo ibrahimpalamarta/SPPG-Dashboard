@@ -4,13 +4,18 @@ import type { z } from 'zod';
 import { Prisma, UploadStatus } from '@prisma/client';
 import { prisma, type Db } from '../../db.js';
 import { sendError } from '../../middleware/error-handler.js';
-import { sendJson, serialize } from '../../lib/serialize.js';
+import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
 import { kitchenScope, kitchenWhere } from '../../lib/scope.js';
-import { parseMenuWorkbook } from '../../lib/menu-workbook.js';
-import { XLSX_MIME, putObject, type PutObject } from '../../lib/s3.js';
+import { CSV_MIME, XLSX_MIME, putObject, type PutObject } from '../../lib/s3.js';
 import { dateFilter } from '../../schemas/common.js';
 import { writeAuditLog } from '../../auth/audit.js';
+import { trackEvent } from '../../lib/events.js';
+import { canTransition } from '../../lib/upload-status.js';
+import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
+import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
+import type { ColumnDiff } from '../../lib/mapping/detect.js';
+import { InMemoryStagingRepository, stagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
 import type {
   uploadBatchCreate,
   uploadBatchCreateQuery,
@@ -22,7 +27,7 @@ import type {
  * table; the raw uploader_id would force the client into a second request. */
 const withUploader = {
   uploader: { select: { id: true, email: true, fullName: true } },
-  kitchen: { select: { id: true, name: true } },
+  kitchen: { select: { id: true, code: true, name: true } },
 } satisfies Prisma.UploadBatchInclude;
 
 /** SCRUM-7: upload history. */
@@ -30,7 +35,7 @@ export const listUploadBatches = (db: Db = prisma): RequestHandler => async (req
   const q = req.valid!.query as z.infer<typeof uploadBatchListQuery>;
   const scope = kitchenScope(req.user!, q.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
 
@@ -38,6 +43,7 @@ export const listUploadBatches = (db: Db = prisma): RequestHandler => async (req
   const where: Prisma.UploadBatchWhereInput = {
     ...kitchenWhere(scope),
     ...(q.status && { status: q.status }),
+    ...(q.domain && { domain: q.domain }),
     ...(uploadDate && { uploadDate }),
   };
 
@@ -65,7 +71,7 @@ export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, r
   // which kitchen it belongs to. A cross-tenant read still returns 403.
   const scope = kitchenScope(req.user!, row.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
   sendJson(res, row);
@@ -75,137 +81,260 @@ export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, r
 const PREVIEW_ROWS = 50;
 
 /**
- * ponytail: the S3 key is derived from the hash rather than stored in a column,
- * so `upload_batches` needs no new field and the same bytes can only ever
- * occupy one object. Add a `storage_key` column if the layout ever has to
- * change without re-uploading.
+ * The S3 key is built from the batch's public id, never from the original file
+ * name (SCRUM-22 security note): one object per attempt, nothing user-supplied
+ * in the path.
  */
-export const uploadKey = (fileHash: string): string => `upload-batches/${fileHash}.xlsx`;
+export const uploadKey = (publicId: string, fileName = ''): string =>
+  `upload-batches/${publicId}${isCsv(fileName) ? '.csv' : '.xlsx'}`;
+
+/** PRD §9 copy for a file no mapping profile recognises, plus what is missing (SCRUM-94). */
+const notRecognised = (diff: ColumnDiff[]) => {
+  const missing = [...new Set(diff.flatMap((d) => d.missing))];
+  return `Format file belum dikenali untuk kitchen/source ini. File belum dipublish.${missing.length ? ` Kolom tidak ditemukan: ${missing.join(', ')}.` : ''}`;
+};
 
 /**
- * SCRUM-5 + SCRUM-6. Takes the workbook itself (multipart, field `file`) and
- * does the whole job in one request: hash, dedup, parse, store, import.
+ * SCRUM-22/37 + SCRUM-24. Takes the workbook (multipart, field `file`), opens
+ * a batch, stores the original and parses every sheet into staging. Nothing
+ * is published or written to canonical tables here.
  *
- * Three outcomes, all of them recorded:
+ *   - every attempt is its own batch, failed ones included; an identical
+ *     earlier file for the same kitchen + domain only adds a `warning`
+ *     (duplicates are stopped at publish, not at upload)
+ *   - a file that is not the container its extension promises (renamed or
+ *     password-protected .xlsx, binary .csv) is
+ *     FAILED and never stored; a corrupt or empty workbook is FAILED with no
+ *     staged rows left behind
+ *   - a parsed file is NEEDS_REVIEW when a mapping profile recognises it
+ *     (SCRUM-39), else NEEDS_MAPPING_UPDATE with the column diff — never
+ *     READY, so nothing publishes without a reviewer
+ *   - `replaces` closes the quarantined batch it re-uploads: FAILED +
+ *     REPLACED ("Diganti", SCRUM-124) once the new file has parsed
+ *   - a storage failure marks the batch FAILED instead of leaving it PROCESSING
  *
- *   - the file was seen before  → 409 with the existing batch (SCRUM-6 AC3;
- *     `file_hash` is UNIQUE, so this is enforced by the database)
- *   - the file parsed badly     → a DITOLAK batch row + 422. The rejection is
- *     history, not just an error code — SCRUM-5 AC3 wants it in the list
- *   - the file parsed cleanly   → a DITERIMA batch and its menu_plans, written
- *     as one nested create so the import is all-or-nothing (SCRUM-6 AC2)
+ * ponytail: synchronous within the request, like the rest of the repo; the
+ * UPLOAD_MAX_BYTES cap (10 MB) keeps that bounded. Move to a queue if real
+ * files start timing out the ALB.
  */
 export const createUploadBatch =
-  (db: Db = prisma, put: PutObject = putObject): RequestHandler =>
+  (db: Db = prisma, put: PutObject = putObject, staging: StagingRepository = stagingRepository): RequestHandler =>
   async (req, res) => {
+    const started = Date.now();
     const body = req.valid!.body as z.infer<typeof uploadBatchCreate>;
     const { dryRun } = req.valid!.query as z.infer<typeof uploadBatchCreateQuery>;
     const scope = kitchenScope(req.user!, body.kitchenId);
     if (!scope.ok) {
-      sendError(res, 'FORBIDDEN');
+      sendError(res, 'FORBIDDEN_KITCHEN');
       return;
     }
 
-    const { buffer, originalname } = req.file!;
+    const { buffer, originalname, size } = req.file!;
     const fileHash = createHash('sha256').update(buffer).digest('hex');
 
-    const existing = await db.uploadBatch.findUnique({
-      where: { fileHash },
-      include: withUploader,
+    const context = (uploadBatchId: string, kitchenCode: string) => ({
+      uploadBatchId,
+      kitchenCode,
+      domain: body.domain,
+      sourceSystem: body.sourceSystem,
+      sourceFileName: originalname,
+      fileHash,
+      loadedAt: new Date(),
     });
-    if (existing) {
-      sendError(res, 'CONFLICT', { field: 'fileHash', batch: serialize(existing) });
-      return;
-    }
 
-    const { columns, rows, errors } = await parseMenuWorkbook(buffer);
-
-    // SCRUM-6 AC1: same parse, same validation, nothing written.
+    // SCRUM-6 AC1: parse and report, nothing written. Same parser as a real
+    // upload (SCRUM-36), into a throwaway repository.
     if (dryRun) {
+      const parsed = await parseToStaging(buffer, context('dry-run', String(body.kitchenId)), new InMemoryStagingRepository());
+      if (!parsed.ok) {
+        sendError(res, 'VALIDATION_ERROR', { fields: { file: [parsed.errorSummary] } });
+        return;
+      }
       sendJson(res, {
         fileName: originalname,
         fileHash,
-        columns,
-        rowCount: rows.length,
-        errors,
-        rows: rows.slice(0, PREVIEW_ROWS),
+        sheets: parsed.batch.sheets,
+        rowCount: parsed.batch.rows.length,
+        rows: parsed.batch.rows.slice(0, PREVIEW_ROWS),
       });
       return;
     }
 
-    const base = {
-      kitchenId: body.kitchenId,
-      uploaderId: req.user!.id,
-      fileName: originalname,
-      fileHash,
+    const kitchen = await db.kitchen.findUnique({ where: { id: body.kitchenId } });
+    if (!kitchen) {
+      sendError(res, 'VALIDATION_ERROR', { fields: { kitchenId: ['no kitchen with that id'] } });
+      return;
+    }
+
+    const replaced = body.replaces ? await db.uploadBatch.findUnique({ where: { publicId: body.replaces } }) : null;
+    if (
+      body.replaces &&
+      (!replaced || replaced.kitchenId !== body.kitchenId || replaced.domain !== body.domain || !canTransition(replaced.status, UploadStatus.FAILED))
+    ) {
+      sendError(res, 'VALIDATION_ERROR', { fields: { replaces: ['not an open batch of this kitchen and domain'] } });
+      return;
+    }
+
+    const duplicate = await db.uploadBatch.findFirst({
+      where: { kitchenId: body.kitchenId, domain: body.domain, fileHash },
+      orderBy: { uploadDate: 'desc' },
+      select: { publicId: true },
+    });
+
+    const event = {
+      user_role: req.user!.role,
+      kitchen_id: String(body.kitchenId),
+      domain: body.domain,
     };
+    trackEvent('upload_started', event);
 
-    try {
-      if (errors.length > 0) {
-        const rejected = await db.uploadBatch.create({
-          data: {
-            ...base,
-            rowCount: rows.length,
-            status: UploadStatus.DITOLAK,
-            notes: errors.join('; ').slice(0, 2000),
-          },
-          include: withUploader,
-        });
-        await writeAuditLog(db, {
-          userId: req.user!.id,
-          action: 'upload_batch.rejected',
-          entity: 'upload_batches',
-          entityId: rejected.id,
-          metadata: { fileName: originalname, errorCount: errors.length },
-        });
-        sendError(res, 'UNPROCESSABLE', { errors, batch: serialize(rejected) });
-        return;
-      }
+    const batch = await db.uploadBatch.create({
+      data: {
+        kitchenId: body.kitchenId,
+        uploaderId: req.user!.id,
+        domain: body.domain,
+        sourceSystem: body.sourceSystem,
+        period: body.period ?? null,
+        fileName: originalname,
+        fileHash,
+        fileSize: size,
+        notes: body.notes ?? null,
+      },
+    });
+    const done = { ...event, batch_id: batch.publicId };
 
-      // Stored before the insert on purpose: an orphaned object costs pennies
-      // and is overwritten by the retry, whereas a committed batch with no file
-      // behind it is a hole in the audit trail.
-      await put(uploadKey(fileHash), buffer, XLSX_MIME);
-
-      const row = await db.uploadBatch.create({
-        data: {
-          ...base,
-          rowCount: rows.length,
-          status: UploadStatus.DITERIMA,
-          notes: body.notes ?? null,
-          // Nested createMany runs inside the same transaction as its parent,
-          // which is what makes the import atomic without a $transaction block.
-          menuPlans: {
-            createMany: { data: rows.map((r) => ({ ...r, kitchenId: body.kitchenId })) },
-          },
-        },
+    const finish = (data: Prisma.UploadBatchUncheckedUpdateInput) =>
+      db.uploadBatch.update({
+        where: { id: batch.id },
+        data: { ...data, durationMs: Date.now() - started },
         include: withUploader,
       });
 
+    let sheets: unknown[] = [];
+    let columnDiff: ColumnDiff[] = [];
+    let mapping: MappingSummary | null = null;
+    const ingest = async () => {
+      try {
+        assertReadable(buffer, originalname);
+      } catch (err) {
+        if (!(err instanceof WorkbookError)) throw err;
+        // Not stored: a renamed or encrypted file has no business in the bucket.
+        return finish({ status: UploadStatus.FAILED, errorCode: err.code, errorSummary: err.message });
+      }
+
+      const storageKey = uploadKey(batch.publicId, originalname);
+      try {
+        await put(storageKey, buffer, isCsv(originalname) ? CSV_MIME : XLSX_MIME);
+      } catch (err) {
+        await finish({
+          status: UploadStatus.FAILED,
+          errorCode: 'STORAGE_FAILED',
+          errorSummary: 'File gagal disimpan. Silakan upload ulang.',
+        });
+        trackEvent('upload_failed', { ...done, status: UploadStatus.FAILED, error_code: 'STORAGE_FAILED' });
+        throw err;
+      }
+
+      // Turen has no code yet (B-TUREN); its numeric id is just as stable.
+      const parsed = await parseToStaging(buffer, context(batch.publicId, kitchen.code ?? String(kitchen.id)), staging);
+      if (!parsed.ok) {
+        return finish({ storageKey, status: UploadStatus.FAILED, errorCode: parsed.errorCode, errorSummary: parsed.errorSummary });
+      }
+
+      sheets = parsed.batch.sheets;
+      const rowCount = parsed.batch.rows.length;
+      const { detection } = parsed;
+      if (!detection.ok) {
+        columnDiff = detection.diff;
+        return finish({
+          storageKey,
+          rowCount,
+          status: UploadStatus.NEEDS_MAPPING_UPDATE,
+          errorCode: detection.errorCode,
+          errorSummary: notRecognised(detection.diff),
+        });
+      }
+      mapping = parsed.mapping;
+      return finish({
+        storageKey,
+        rowCount,
+        status: UploadStatus.NEEDS_REVIEW,
+        mappingProfileId: detection.profile.id,
+        templateVersion: detection.profile.version,
+      });
+    };
+    const row = await ingest();
+
+    await writeAuditLog(db, {
+      userId: req.user!.id,
+      action: 'upload_batch.created',
+      entity: 'upload_batches',
+      entityId: row.id,
+      metadata: {
+        fileName: row.fileName,
+        kitchenId: String(row.kitchenId),
+        domain: row.domain,
+        status: row.status,
+        ...(replaced && { replaces: replaced.publicId }),
+      },
+    });
+    if (row.mappingProfileId) {
       await writeAuditLog(db, {
         userId: req.user!.id,
-        action: 'upload_batch.imported',
+        action: 'upload_batch.profile_detected',
         entity: 'upload_batches',
         entityId: row.id,
-        metadata: {
-          fileName: row.fileName,
-          kitchenId: String(row.kitchenId),
-          rowCount: row.rowCount,
-        },
+        metadata: { mappingProfileId: row.mappingProfileId, templateVersion: row.templateVersion },
       });
-      sendJson(res, row, 201);
-    } catch (err) {
-      // The findUnique above catches the ordinary case; this is the race
-      // between two identical uploads landing at once.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        sendError(res, 'CONFLICT', { field: 'fileHash' });
-        return;
-      }
-      throw err;
     }
+    // A re-upload that did not even parse leaves the old batch where it was.
+    if (replaced && row.status !== UploadStatus.FAILED) {
+      await db.uploadBatch.update({
+        where: { id: replaced.id },
+        data: { status: UploadStatus.FAILED, errorCode: 'REPLACED', errorSummary: `Diganti oleh batch ${row.publicId}.` },
+      });
+      await writeAuditLog(db, {
+        userId: req.user!.id,
+        action: 'upload_batch.replaced',
+        entity: 'upload_batches',
+        entityId: replaced.id,
+        metadata: { from: replaced.status, to: UploadStatus.FAILED, replacedBy: row.publicId },
+      });
+    }
+    trackEvent(row.status === UploadStatus.FAILED ? 'upload_failed' : 'upload_completed', {
+      ...done,
+      rows: row.rowCount,
+      duration: row.durationMs,
+      status: row.status,
+      error_code: row.errorCode,
+    });
+
+    // `sheets`, `columnDiff` and `mapping` are not persisted yet (B-SCHEMA,
+    // B-MAPOUT); they ride on the response so the upload page can show them.
+    sendJson(
+      res,
+      {
+        ...row,
+        sheets,
+        columnDiff,
+        mapping,
+        ...(duplicate && {
+          warning: {
+            code: 'DUPLICATE_FILE',
+            message: `File identik sudah pernah diupload (batch ${duplicate.publicId}).`,
+            duplicateOf: duplicate.publicId,
+          },
+        }),
+      },
+      201,
+    );
   };
 
-/** SCRUM-5: record the verification outcome (diterima / ditolak + reason). */
+/**
+ * Review step: move a batch along the state machine (SCRUM-22). Only the
+ * transitions in `upload-status.ts` are accepted; PUBLISHED is not reachable
+ * from here — that belongs to the publish flow (SCRUM-95).
+ */
 export const updateUploadBatch = (db: Db = prisma): RequestHandler => async (req, res) => {
   const { id } = req.valid!.params as { id: bigint };
   const body = req.valid!.body as z.infer<typeof uploadBatchUpdate>;
@@ -217,7 +346,11 @@ export const updateUploadBatch = (db: Db = prisma): RequestHandler => async (req
   }
   const scope = kitchenScope(req.user!, current.kitchenId);
   if (!scope.ok) {
-    sendError(res, 'FORBIDDEN');
+    sendError(res, 'FORBIDDEN_KITCHEN');
+    return;
+  }
+  if (body.status && !canTransition(current.status, body.status)) {
+    sendError(res, 'INVALID_TRANSITION', { from: current.status, to: body.status });
     return;
   }
 

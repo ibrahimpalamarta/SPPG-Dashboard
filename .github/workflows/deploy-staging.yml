@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -103,10 +103,7 @@ jobs:
             -target=module.compute.aws_lb_listener.http \
             -target=module.compute.aws_ecs_task_definition.migrate \
             -var="aws_region=${{ vars.AWS_REGION }}" \
-            -var="backend_image_tag=${{ github.sha }}" \
-            -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
-            -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
-            -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+            -var="backend_image_tag=${{ github.sha }}"
           echo "ECR_BACKEND_URL=$(terraform output -raw ecr_backend_repository_url)" >> "$GITHUB_ENV"
           echo "ECR_FRONTEND_ADMIN_URL=$(terraform output -raw ecr_frontend_admin_repository_url)" >> "$GITHUB_ENV"
           echo "ECR_FRONTEND_PUBLIC_URL=$(terraform output -raw ecr_frontend_public_repository_url)" >> "$GITHUB_ENV"
@@ -201,10 +198,7 @@ jobs:
           terraform apply -auto-approve \
             -var="aws_region=${{ vars.AWS_REGION }}" \
             -var="backend_image_tag=${{ github.sha }}" \
-            -var="frontend_image_tag=${{ github.sha }}" \
-            -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
-            -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
-            -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+            -var="frontend_image_tag=${{ github.sha }}"
 
       # Terraform no longer manages desired_count — the off-hours scheduler owns
       # it for all three services — so an apply alone will not bring them back

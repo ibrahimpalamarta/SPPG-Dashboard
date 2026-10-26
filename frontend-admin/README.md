@@ -1,13 +1,26 @@
-# SPPG Dashboard — Frontend Admin (Fase 0: Coming Soon)
+# SPPG Dashboard — Frontend Admin
 
-Next.js (App Router) + TypeScript. Nantinya menampung Backoffice (Data Admin,
-CMS Admin) dan Internal Dashboard (Internal User) — role-gated, di belakang Auth0.
+Next.js 16 (App Router) + TypeScript + Tailwind 4. Backoffice + Dashboard Internal
+di belakang login internal (SCRUM-21; mekanismenya di `backend/docs/AUTH.md`).
 
-Fase ini **hanya** fondasi deployment: satu halaman statis "Segera Hadir", tanpa
-data fetching, tanpa integrasi Auth0, tanpa RBAC, tanpa design system. Desain
-UI/UX masih berjalan. Yang sudah jadi dan tidak perlu disentuh lagi saat
-membangun halaman: struktur folder, Docker build, provisioning Terraform, dan
-pipeline CI/CD ke staging.
+- `proxy.ts` (Next 16: pengganti middleware) mengirim siapa pun tanpa cookie sesi
+  ke `/login`. Cookie `sppg_session` (httpOnly) hanya memegang token sesi dari
+  backend; sesi yang sudah mati ditolak backend di request API pertama dan
+  diarahkan ke `/sesi-berakhir`. Browser tidak pernah memanggil backend langsung —
+  semua lewat server (`lib/api.ts`, server action).
+- `lib/nav.ts` = tujuh halaman PRD §5 + permission tiap halaman. Daftar ini dipakai
+  sidebar (menu disembunyikan) **dan** `requirePage()` (deep-link → 403).
+- `lib/me.ts` memanggil `GET /api/me` dengan token sesi. Backend tetap
+  memeriksa permission + scope dapur di setiap request; frontend hanya menggambar.
+- Halaman tanpa fitur menampilkan `EmptyState` ("belum tersedia"), tidak pernah angka palsu.
+
+Halaman auth: `/login` (+ langkah MFA), `/reset-password/<token>` (set/reset
+password dari link admin), `/keamanan` (ubah password, MFA, sesi aktif), serta
+administrasi `/anggota` dan `/peran` yang menu-nya hanya muncul untuk izin
+`users:read` / `settings:manage`.
+
+Variabel lingkungan: lihat `.env.example` (salin ke `.env.local`) — hanya
+`API_BASE_URL`.
 
 ---
 
@@ -21,8 +34,8 @@ npm run dev     # http://localhost:3000/admin  <- perhatikan prefix-nya
 App ini memakai `basePath: "/admin"`, jadi root (`/`) memang 404 — termasuk di
 lokal. Itu perilaku yang benar, bukan bug.
 
-`npm run build` sekaligus jadi type-check (`next build` menjalankan tsc), sama
-seperti backend. Belum ada linter maupun test — repo ini belum punya keduanya.
+`npm run build` sekaligus jadi type-check (`next build` menjalankan tsc). Lint:
+`npm run lint`, kode mati: `npm run knip`. Belum ada test runner.
 
 ## Docker
 
