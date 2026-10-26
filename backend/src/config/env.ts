@@ -24,6 +24,9 @@ const schema = z.object({
   // Required in production; falls back to the main client elsewhere so a fresh
   // clone still runs without provisioning a second role first.
   DATABASE_URL_PUBLIC: z.string().min(1).optional(),
+  // Staging-only opt-out of the production check below, until the sppg_public
+  // role is provisioned there. Never set in the production environment.
+  ALLOW_SHARED_PUBLIC_DB: z.enum(['true']).optional(),
 
   // S3 assets bucket (Terraform output `bucket_name`). Credentials come from
   // the ECS task role — the app configures nothing beyond bucket and region.
@@ -138,7 +141,7 @@ if (!env.DATABASE_URL) {
 // The whole point of the restricted role is that production cannot serve the
 // public dashboard through a connection that is able to read menu_costs. A
 // missing URL there is a silent downgrade, so refuse to boot instead.
-if (env.NODE_ENV === 'production' && !env.DATABASE_URL_PUBLIC) {
+if (env.NODE_ENV === 'production' && !env.DATABASE_URL_PUBLIC && !env.ALLOW_SHARED_PUBLIC_DB) {
   throw new Error(
     'Set DATABASE_URL_PUBLIC (role sppg_public). See scripts/grant-public-role.ts.',
   );
