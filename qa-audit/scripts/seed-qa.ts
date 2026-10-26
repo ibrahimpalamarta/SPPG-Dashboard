@@ -9,6 +9,8 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { hashPassword } from '../../backend/src/auth/password.js';
+import { issueResetToken } from '../../backend/src/auth/reset.js';
+import { env } from '../../backend/src/config/env.js';
 import { prisma } from '../../backend/src/db.js';
 import { AUTH, writeJson } from './lib.js';
 
@@ -53,6 +55,23 @@ for (const a of ACCOUNTS) {
   await prisma.userKitchenScope.createMany({ data: scoped.map((k) => ({ userId: user.id, kitchenId: k.id })) });
   credentials[a.key] = { email, password };
 }
+
+// Single-use links for the account flows (tests/e2e/akun.spec.ts). The emailed link cannot be
+// read in QA (no SES), so the token is minted here, the same way the backend does it.
+const reset = await prisma.user.upsert({
+  where: { email: 'qa.reset@qa-audit.test' },
+  create: { email: 'qa.reset@qa-audit.test', fullName: 'QA Reset', role: 'INTERNAL', passwordHash },
+  update: { passwordHash },
+});
+const invited = await prisma.user.upsert({
+  where: { email: 'qa.undangan@qa-audit.test' },
+  create: { email: 'qa.undangan@qa-audit.test', fullName: 'QA Anggota Baru', role: 'DATA_ADMIN' },
+  update: { passwordHash: null },
+});
+writeJson(join(AUTH, 'tokens.json'), {
+  reset: { email: reset.email, token: (await issueResetToken(reset.id, prisma)).token },
+  invite: { email: invited.email, token: (await issueResetToken(invited.id, prisma, env.INVITE_TTL_HOURS * 60)).token },
+});
 
 writeJson(join(AUTH, 'accounts.json'), credentials);
 console.log(`seeded ${ACCOUNTS.length} QA accounts`);
