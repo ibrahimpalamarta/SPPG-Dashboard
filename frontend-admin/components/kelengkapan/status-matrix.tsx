@@ -1,3 +1,4 @@
+import { StatusLabel } from "@/components/kelengkapan/status-label";
 import { Badge } from "@/components/ui/badge";
 import { columns, legend, matrix } from "@/lib/mock/kelengkapan-data";
 
@@ -6,9 +7,9 @@ export function StatusMatrix() {
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">Status per kitchen &amp; jenis data</h2>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
           {legend.map(({ label, tone }) => (
-            <Badge key={label} tone={tone}>{label}</Badge>
+            <StatusLabel key={label} tone={tone}>{label}</StatusLabel>
           ))}
         </div>
       </div>
@@ -24,17 +25,26 @@ export function StatusMatrix() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {matrix.map(({ code, name, note, cells, active }) => (
+            {matrix.map(({ code, name, note, cells, active, phase }) => (
               <tr key={code} className={active ? "bg-emerald-50/60" : "hover:bg-slate-50"}>
                 <td className="px-4 py-3">
-                  <p className="font-semibold text-slate-800">{code} · {name}</p>
+                  <p className="flex items-center gap-2 font-semibold text-slate-800">
+                    {code} · {name}
+                    {phase && <Badge tone="slate">{phase}</Badge>}
+                  </p>
                   <p className="text-xs text-slate-500">{note}</p>
                 </td>
-                {cells.map(({ label, tone }, index) => (
-                  <td key={columns[index]} className="px-3 py-3 text-center">
-                    <Badge tone={tone}>{label}</Badge>
+                {phase ? (
+                  <td colSpan={columns.length} className="px-3 py-3 text-center text-xs text-slate-400">
+                    Akan tersedia pada {phase}
                   </td>
-                ))}
+                ) : (
+                  cells.map(({ label, tone }, index) => (
+                    <td key={columns[index]} className="px-3 py-3 text-center">
+                      <StatusLabel tone={tone}>{label}</StatusLabel>
+                    </td>
+                  ))
+                )}
               </tr>
             ))}
           </tbody>
