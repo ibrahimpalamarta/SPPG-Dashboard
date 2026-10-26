@@ -1,10 +1,14 @@
-import { Bell, Building2, Send } from "lucide-react";
+import { ArrowRight, Bell, Building2, Send } from "lucide-react";
+import { StatusLabel } from "@/components/kelengkapan/status-label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { deliveries, detail } from "@/lib/mock/kelengkapan-data";
 
 const actionButton =
   "inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600";
+
+const iconButton =
+  "inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600";
 
 export function KitchenDetail() {
   return (
@@ -40,14 +44,18 @@ export function KitchenDetail() {
                     {type}
                   </span>
                 </td>
-                <td className="px-4 py-3"><Badge tone={status.tone}>{status.label}</Badge></td>
+                <td className="px-4 py-3"><StatusLabel tone={status.tone}>{status.label}</StatusLabel></td>
                 <td className="px-4 py-3">{issue ? <Badge tone={issue.tone}>{issue.label}</Badge> : <span className="text-slate-400">Tidak ada</span>}</td>
                 <td className="px-4 py-3 font-mono text-xs text-slate-600">{approvedAt ?? "—"}</td>
                 <td className="px-4 py-3">
-                  {action ? (
-                    <button className={actionButton}>
-                      {action === "Ingatkan" && <Bell className="size-4" aria-hidden="true" />}
-                      {action}
+                  {action === "Ingatkan" ? (
+                    <button aria-label={`Ingatkan ${type}`} title="Ingatkan" className={iconButton}>
+                      <Bell className="size-4" aria-hidden="true" />
+                    </button>
+                  ) : action === "Buka" ? (
+                    <button className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+                      Buka
+                      <ArrowRight className="size-3.5" aria-hidden="true" />
                     </button>
                   ) : (
                     <span className="text-slate-400">—</span>
@@ -74,10 +82,10 @@ export function SipgnStatus() {
           <div key={title} className="rounded-xl border border-slate-200 p-4">
             <div className="flex items-start justify-between gap-3">
               <p className="font-semibold text-slate-800">{title}</p>
-              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{code}</span>
             </div>
+            <p className="text-xs text-slate-500">Kitchen {code}</p>
             <p className="mt-2 text-sm text-slate-500">{note}</p>
-            <div className="mt-3"><Badge tone={status.tone}>{status.label}</Badge></div>
+            <div className="mt-3"><StatusLabel tone={status.tone}>{status.label}</StatusLabel></div>
           </div>
         ))}
       </div>

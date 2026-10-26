@@ -5,7 +5,7 @@ import type { Tone } from "@/components/ui/badge";
 type Status = { label: string; tone: Tone };
 
 type Stat = { icon: LucideIcon; label: string; value: string; valueClass?: string };
-type MatrixRow = { code: string; name: string; note: string; cells: Status[]; active?: boolean };
+type MatrixRow = { code: string; name: string; note: string; cells: Status[]; active?: boolean; phase?: string };
 type DetailRow = { icon: LucideIcon; type: string; status: Status; issue?: Status; approvedAt?: string; action?: "Ingatkan" | "Buka" };
 type Delivery = { title: string; code: string; note: string; status: Status };
 
@@ -31,15 +31,13 @@ export const legend: Status[] = [entered, sent, checking, draft, missing, failed
 
 export const columns = ["Cashflow", "RAB", "Purchase Order", "Pembayaran Supplier", "Jumlah Penerima Manfaat", "Saldo Rekening", "Master Menu *", "Penerimaan Barang *", "Status Kirim SIPGN/BGN"];
 
-const phase = (label: string) => Array.from({ length: columns.length }, () => s(label, "slate"));
-
 export const matrix: MatrixRow[] = [
   { code: "SKN", name: "Sukun", note: "Pilot Phase 1", active: true, cells: [missing, ready, checking, entered, missing, draft, entered, optional, missing] },
   { code: "LWG", name: "Lawang", note: "Pembanding Phase 1", cells: [failed, s("Tidak ada file", "pending"), sent, s("Belum dipakai", "slate"), sent, draft, entered, optional, missing] },
-  { code: "DNM", name: "Donomulyo", note: "Rollout Phase 2", cells: phase("Phase 2") },
-  { code: "PCK", name: "Poncokusumo", note: "Rollout Phase 2", cells: phase("Phase 2") },
-  { code: "SML", name: "Kahean", note: "Readiness Phase 2b", cells: phase("Phase 2b") },
-  { code: "TRN", name: "Turen", note: "Rollout Phase 2", cells: phase("Phase 2") },
+  { code: "DNM", name: "Donomulyo", note: "Rollout", cells: [], phase: "Phase 2" },
+  { code: "PCK", name: "Poncokusumo", note: "Rollout", cells: [], phase: "Phase 2" },
+  { code: "SML", name: "Kahean", note: "Readiness", cells: [], phase: "Phase 2b" },
+  { code: "TRN", name: "Turen", note: "Rollout", cells: [], phase: "Phase 2" },
 ];
 
 export const detail: DetailRow[] = [
