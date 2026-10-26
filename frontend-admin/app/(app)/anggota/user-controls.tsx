@@ -83,17 +83,16 @@ function InviteSent({ state, onClose }: { state: UserActionState; onClose: () =>
       }
     >
       <p>
-        {state.emailed ? (
-          <>
-            Email undangan dikirim ke <strong>{state.email}</strong> sebagai <strong>{ROLE_LABELS[state.role as keyof typeof ROLE_LABELS]}</strong>.
-          </>
-        ) : (
-          <>
-            Email ke <strong>{state.email}</strong> belum terkirim. Coba lagi lewat tombol Kirim ulang di daftar anggota.
-          </>
-        )}{" "}
-        Link berlaku sampai {until}.
+        {state.emailed ? "Email undangan sudah dikirim. Penerima membuat kata sandi lewat tautan di email itu." : "Email undangan belum terkirim. Coba lagi lewat tombol Kirim ulang di daftar anggota."}
       </p>
+      <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2 rounded-xl bg-slate-50 p-4">
+        <dt className="text-slate-500">Email</dt>
+        <dd className="break-all font-medium text-slate-800">{state.email}</dd>
+        <dt className="text-slate-500">Role</dt>
+        <dd className="font-medium text-slate-800">{ROLE_LABELS[state.role as keyof typeof ROLE_LABELS]}</dd>
+        <dt className="text-slate-500">Berlaku s/d</dt>
+        <dd className="font-medium text-slate-800">{until}</dd>
+      </dl>
     </Modal>
   );
 }
