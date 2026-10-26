@@ -100,7 +100,7 @@ const notRecognised = (diff: ColumnDiff[]) => {
  * is published or written to canonical tables here.
  *
  *   - every attempt is its own batch, failed ones included; an identical
- *     earlier file for the same kitchen + domain only adds a `warning`
+ *     earlier non-FAILED file for the same kitchen + domain only adds a `warning`
  *     (duplicates are stopped at publish, not at upload)
  *   - a file that is not the container its extension promises (renamed or
  *     password-protected .xlsx, binary .csv) is
@@ -176,7 +176,8 @@ export const createUploadBatch =
     }
 
     const duplicate = await db.uploadBatch.findFirst({
-      where: { kitchenId: body.kitchenId, domain: body.domain, fileHash },
+      // FAILED attempts never held the data, so retrying one is not a duplicate.
+      where: { kitchenId: body.kitchenId, domain: body.domain, fileHash, status: { not: UploadStatus.FAILED } },
       orderBy: { uploadDate: 'desc' },
       select: { publicId: true },
     });
