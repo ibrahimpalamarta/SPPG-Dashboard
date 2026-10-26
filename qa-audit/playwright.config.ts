@@ -35,7 +35,8 @@ export default defineConfig({
     locale: 'id-ID',
     timezoneId: 'Asia/Jakarta',
     trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+    // 'on': screenshots of passing tests are the Jira evidence (QD-34).
+    screenshot: 'on',
   },
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
