@@ -58,7 +58,15 @@ menjawab `401` yang sama.
 **Logout** — `POST /api/auth/logout` mencabut sesi saat ini.
 `GET/DELETE /api/auth/sessions[/:id]` daftar dan cabut sesi sendiri.
 
-**Pemulihan password** — tidak ada email dulu (lihat Keterbatasan). Super Admin
+**Lupa kata sandi (mandiri)** — `POST /api/auth/forgot-password {email}` selalu
+menjawab `204` (tidak membocorkan ada/tidaknya akun). Akun `ACTIVE` yang sudah
+punya password dikirimi email SES berisi link `ADMIN_BASE_URL/reset-password/<token>`
+(token sama dengan reset admin: sekali pakai, `PASSWORD_RESET_TTL_MINUTES`,
+audit `auth.password.forgot`). `EMAIL_FROM` (identitas SES terverifikasi) dan
+`ADMIN_BASE_URL` harus diisi; kosong = tidak ada yang dikirim. Task role ECS
+butuh `ses:SendEmail`.
+
+**Pemulihan password oleh admin** — Super Admin
 membuat link sekali pakai: `POST /api/admin/users/:id/password-reset` →
 `{resetToken}` (hanya sekali tampil; DB menyimpan hash-nya, berlaku
 `PASSWORD_RESET_TTL_MINUTES` = 60). Pemilik akun membuka
@@ -216,8 +224,8 @@ Rate limiter Express (`express-rate-limit`) tidak diuji unit — diuji manual.
 
 ## Keterbatasan yang diketahui
 
-- **Tanpa email.** Undangan dan reset berupa link yang diserahkan admin secara
-  manual. "Lupa password" mandiri menunggu pengirim email (mis. SES).
+- **Undangan tanpa email.** Link undangan dan reset buatan admin diserahkan
+  manual; hanya "Lupa kata sandi?" mandiri yang dikirim lewat SES.
 - **Kode TOTP bisa dipakai ulang dalam jendela 30 detik** (tidak ada pelacakan
   langkah terakhir). Dibatasi lockout 5 percobaan.
 - **MFA tanpa QR code** — pengguna memasukkan secret / membuka tautan otpauth.

@@ -8,6 +8,8 @@ const code = z.string().trim().min(6).max(32);
 // to try its (possibly weaker) password and get a plain "invalid credentials".
 export const loginBody = z.object({ email, password: z.string().min(1).max(128) });
 
+export const forgotPasswordBody = z.object({ email });
+
 export const mfaVerifyBody = z.object({ mfaToken: z.string().min(1).max(200), code });
 
 const resetToken = z.string().min(20).max(100);

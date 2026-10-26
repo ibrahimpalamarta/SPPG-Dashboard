@@ -9,8 +9,11 @@ import { hashPassword, verifyDummy, verifyPassword } from '../../auth/password.j
 import { createSession, listSessions, revokeSession, revokeUserSessions } from '../../auth/session.js';
 import { checkTotp, consumeRecoveryCode, isTotpShaped, newRecoveryCodes, newTotpSecret } from '../../auth/mfa.js';
 import { writeAuditLog } from '../../auth/audit.js';
+import { issueResetToken } from '../../auth/reset.js';
+import { sendMail, type SendMail } from '../../lib/mailer.js';
 import type {
   changePasswordBody,
+  forgotPasswordBody,
   invitationParam,
   loginBody,
   mfaDisableBody,
@@ -188,6 +191,29 @@ export const resetPassword = (db: Db = prisma): RequestHandler => async (req, re
     return;
   }
   await audit(db, req, row.userId, 'auth.password.reset');
+  res.status(204).end();
+};
+
+/**
+ * Self-service "forgot password". Always the same 204, whether or not the
+ * email belongs to an account, so it cannot be used to probe for accounts.
+ * Only an active account that already has a password gets a link: a pending
+ * invitation is re-sent by an admin, not by this form. The email goes out in
+ * the background so response time does not tell the two cases apart.
+ */
+export const forgotPassword = (db: Db = prisma, send: SendMail = sendMail): RequestHandler => async (req, res) => {
+  const { email } = req.valid!.body as z.infer<typeof forgotPasswordBody>;
+  const user = await db.user.findUnique({ where: { email } });
+
+  if (user?.status === 'ACTIVE' && user.passwordHash && user.email && env.EMAIL_FROM && env.ADMIN_BASE_URL) {
+    const { token } = await issueResetToken(user.id, db);
+    const link = `${env.ADMIN_BASE_URL.replace(/\/$/, '')}/reset-password/${token}`;
+    const text = `Kami menerima permintaan reset kata sandi akun SPPG Internal Anda.\n\n${link}\n\nLink berlaku ${env.PASSWORD_RESET_TTL_MINUTES} menit dan hanya bisa dipakai sekali. Abaikan email ini jika bukan Anda yang meminta.`;
+    send(user.email, 'Reset kata sandi SPPG Internal', text).catch((err: unknown) =>
+      console.error('forgot-password email failed', { error: String(err) }),
+    );
+    await audit(db, req, user.id, 'auth.password.forgot');
+  }
   res.status(204).end();
 };
 
