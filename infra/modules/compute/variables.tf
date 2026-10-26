@@ -191,3 +191,9 @@ variable "mfa_required_roles" {
   type        = string
   default     = ""
 }
+
+variable "email_from" {
+  description = "Verified SES identity the backend sends invitation and reset email from. Empty leaves email off (the admin hands the link over)."
+  type        = string
+  default     = ""
+}

@@ -320,6 +320,21 @@ resource "aws_iam_role" "ecs_task" {
   }
 }
 
+# Invitation and password-reset email (backend/src/lib/mailer.ts).
+resource "aws_iam_role_policy" "ecs_task_ses" {
+  name = "${local.prefix}-ecs-task-ses"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ses:SendEmail"]
+      Resource = "*"
+    }]
+  })
+}
+
 resource "aws_iam_role_policy" "ecs_task_assets" {
   name = "${local.prefix}-ecs-task-assets"
   role = aws_iam_role.ecs_task.id
@@ -430,7 +445,7 @@ resource "aws_ecs_task_definition" "backend" {
         containerPort = var.backend_container_port
         protocol      = "tcp"
       }]
-      environment = [
+      environment = concat([
         { name = "NODE_ENV", value = "production" },
         { name = "PORT", value = tostring(var.backend_container_port) },
         { name = "DB_HOST", value = var.db_endpoint },
@@ -445,7 +460,12 @@ resource "aws_ecs_task_definition" "backend" {
         # every object URL, and access comes from the task role, not from a key.
         { name = "S3_BUCKET", value = var.assets_bucket_name },
         { name = "AWS_REGION", value = var.aws_region },
-      ]
+        # Activation and reset links point at the admin app, which shares the
+        # API's origin (ALB, or the certificate's domain).
+        { name = "ADMIN_BASE_URL", value = var.frontend_api_base_url != "" ? var.frontend_api_base_url : "http://${aws_lb.this.dns_name}" },
+        ],
+        var.email_from == "" ? [] : [{ name = "EMAIL_FROM", value = var.email_from }],
+      )
       # DATABASE_URL_PUBLIC is appended only once the key exists in the secret,
       # so enabling SCRUM-13's restricted role is a deliberate second step and
       # never a deploy that cannot start. See variable public_db_secret_key.
