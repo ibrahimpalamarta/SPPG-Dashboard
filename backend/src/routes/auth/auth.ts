@@ -9,6 +9,7 @@ import { wrap } from '../../lib/wrap.js';
 import { idParam } from '../../schemas/common.js';
 import {
   changePasswordBody,
+  forgotPasswordBody,
   invitationParam,
   loginBody,
   mfaDisableBody,
@@ -18,6 +19,7 @@ import {
 } from '../../schemas/auth.js';
 import {
   changePassword,
+  forgotPassword,
   getInvitation,
   login,
   logout,
@@ -40,7 +42,7 @@ const credentialLimiter = rateLimit({
 });
 
 /**
- * Mounted before the authenticated API in app.ts. The first four routes are
+ * Mounted before the authenticated API in app.ts. The first five routes are
  * the ones that run without a session; everything after `requireAuth` needs
  * one, and the MFA/logout routes accept a not-yet-enrolled session so a role
  * that must use MFA can enrol.
@@ -49,6 +51,8 @@ export const authRouter = Router();
 
 authRouter.post('/login', credentialLimiter, validate({ body: loginBody }), wrap(login()));
 authRouter.post('/mfa/verify', credentialLimiter, validate({ body: mfaVerifyBody }), wrap(verifyMfa()));
+authRouter.post('/forgot-password', credentialLimiter, validate({ body: forgotPasswordBody }), wrap(forgotPassword()));
+authRouter.post('/forgot-password', credentialLimiter, validate({ body: forgotPasswordBody }), wrap(forgotPassword()));
 authRouter.post('/reset-password', credentialLimiter, validate({ body: resetPasswordBody }), wrap(resetPassword()));
 authRouter.get('/invitations/:token', credentialLimiter, validate({ params: invitationParam }), wrap(getInvitation()));
 
