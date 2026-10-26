@@ -7,10 +7,10 @@ const VIEW = ['Overview', 'Unggah Data', 'Mapping & Validasi', 'Finance & Cost',
 const ADMIN_ONLY = ['Anggota', 'Peran & Izin'];
 
 const CASES: { role: RoleKey; menu: string[]; hidden: string[]; kitchens: 'all' | string }[] = [
-  { role: 'management', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'all' },
-  { role: 'finance', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'all' },
-  { role: 'kepala-kitchen-skn', menu: VIEW, hidden: ['Manual / Quick Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'Pilot Sukun' },
-  { role: 'data-steward', menu: [...VIEW, 'Manual / Quick Entry', 'Inbox'], hidden: ADMIN_ONLY, kitchens: 'all' },
+  { role: 'management', menu: VIEW, hidden: ['Manual Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'all' },
+  { role: 'finance', menu: VIEW, hidden: ['Manual Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'all' },
+  { role: 'kepala-kitchen-skn', menu: VIEW, hidden: ['Manual Entry', 'Inbox', ...ADMIN_ONLY], kitchens: 'Pilot Sukun' },
+  { role: 'data-steward', menu: [...VIEW, 'Manual Entry', 'Inbox'], hidden: ADMIN_ONLY, kitchens: 'all' },
 ];
 
 for (const c of CASES) {
