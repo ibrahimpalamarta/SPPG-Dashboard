@@ -8,14 +8,14 @@ import { env } from '../config/env.js';
  */
 const client = new SESv2Client({ region: env.AWS_REGION });
 
-export type SendMail = (to: string, subject: string, text: string) => Promise<void>;
+export type SendMail = (to: string, subject: string, text: string, html?: string) => Promise<void>;
 
-export const sendMail: SendMail = async (to, subject, text) => {
+export const sendMail: SendMail = async (to, subject, text, html) => {
   await client.send(
     new SendEmailCommand({
       FromEmailAddress: env.EMAIL_FROM,
       Destination: { ToAddresses: [to] },
-      Content: { Simple: { Subject: { Data: subject }, Body: { Text: { Data: text } } } },
+      Content: { Simple: { Subject: { Data: subject }, Body: { Text: { Data: text }, ...(html && { Html: { Data: html } }) } } },
     }),
   );
 };
