@@ -10,19 +10,21 @@ import type { Permission } from "@/lib/roles";
  * component references cannot cross the server/client boundary.
  */
 export const NAV = [
-  { href: "/overview", label: "Overview", icon: "LayoutDashboard", permission: "dashboard:view" },
-  { href: "/unggah-data", label: "Unggah Data", icon: "Upload", permission: "upload:view" },
-  { href: "/mapping-validasi", label: "Mapping & Validasi", icon: "Map", permission: "mapping:view" },
-  { href: "/finance", label: "Finance & Cost", icon: "Wallet", permission: "dashboard:view" },
-  { href: "/kesehatan-data", label: "Data Health", icon: "Activity", permission: "dashboard:view" },
-  { href: "/referensi-data", label: "Data Reference", icon: "BookOpen", permission: "reference:view" },
+  { group: "Dashboard", href: "/overview", label: "Overview", icon: "LayoutDashboard", permission: "dashboard:view" },
+  { group: "Dashboard", href: "/finance", label: "Finance & Cost", icon: "Wallet", permission: "dashboard:view" },
+  { group: "Dashboard", href: "/kesehatan-data", label: "Data Health", icon: "Activity", permission: "dashboard:view" },
+  { group: "Data", href: "/unggah-data", label: "Unggah Data", icon: "Upload", permission: "upload:view" },
+  { group: "Data", href: "/mapping-validasi", label: "Mapping & Validasi", icon: "Map", permission: "mapping:view" },
+  { group: "Data", href: "/referensi-data", label: "Data Reference", icon: "BookOpen", permission: "reference:view" },
   // Fallback terkontrol (PRD §4.2); the form itself is SCRUM-108.
-  { href: "/input-manual", label: "Manual / Quick Entry", icon: "PenLine", permission: "upload:create" },
+  { group: "Data", href: "/input-manual", label: "Manual Entry", icon: "PenLine", permission: "upload:create" },
   // Tugas review/dikembalikan untuk yang memasukkan data dan PM (isinya SCRUM-117).
-  { href: "/inbox", label: "Inbox", icon: "Inbox", permission: "upload:create" },
+  { group: "Data", href: "/inbox", label: "Inbox", icon: "Inbox", permission: "upload:create" },
   // Administrasi akun; hanya muncul bagi peran yang diberi izinnya.
-  { href: "/anggota", label: "Anggota", icon: "Users", permission: "users:read" },
-  { href: "/peran", label: "Peran & Izin", icon: "ShieldCheck", permission: "settings:manage" },
-] as const satisfies readonly { href: string; label: string; icon: string; permission: Permission }[];
+  { group: "Tools", href: "/anggota", label: "Anggota", icon: "Users", permission: "users:read" },
+  { group: "Tools", href: "/peran", label: "Peran & Izin", icon: "ShieldCheck", permission: "settings:manage" },
+  // Phase 1 hanya membaca upload/export; API dua arah di luar lingkup (OS1, OD-08).
+  { group: "Tools", href: "/integrasi", label: "Integrasi", icon: "Plug", permission: "dashboard:view" },
+] as const satisfies readonly { group: string; href: string; label: string; icon: string; permission: Permission }[];
 
 export type NavHref = (typeof NAV)[number]["href"];
