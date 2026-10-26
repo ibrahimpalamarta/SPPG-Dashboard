@@ -61,7 +61,7 @@ test('[SCRUM-122] aktivasi: email, nama, dan peran tampil, password pertama memb
   const password = newPassword();
   await page.getByLabel('Password baru').fill(password);
   await page.getByLabel('Ulangi password').fill(password);
-  await page.getByRole('button', { name: 'Simpan password' }).click();
+  await page.getByRole('button', { name: 'Aktifkan & masuk' }).click();
   await expect(page).toHaveURL(/\/admin\/overview$/);
 
   // An accepted invitation cannot be opened again.
