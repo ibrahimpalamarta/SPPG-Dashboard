@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, Minus } from "lucide-react";
 import { apiGet } from "@/lib/api";
-import { Badge, type Tone } from "@/components/ui/badge";
 import { requirePage } from "@/lib/guard";
 import { PERMISSIONS, ROLE_LABELS, type Permission, type Role } from "@/lib/roles";
 import type { Kitchen } from "@/lib/me";
@@ -15,11 +14,11 @@ type Status = UserRow["memberStatus"];
 
 const card = "space-y-3 rounded-xl border border-slate-200 bg-white p-5";
 
-const STATUS: Record<Status, [string, Tone]> = {
-  PENDING: ["Menunggu aktivasi", "amber"],
-  ACTIVE: ["Aktif", "green"],
-  EXPIRED: ["Kedaluwarsa", "red"],
-  INACTIVE: ["Nonaktif", "slate"],
+const STATUS: Record<Status, [string, string]> = {
+  PENDING: ["Menunggu aktivasi", "bg-amber-400"],
+  ACTIVE: ["Aktif", "bg-emerald-500"],
+  EXPIRED: ["Kedaluwarsa", "bg-red-500"],
+  INACTIVE: ["Nonaktif", "bg-slate-400"],
 };
 
 const TABS: { key: Status | "ALL"; label: string }[] = [
@@ -69,7 +68,10 @@ const PERMISSION_LABELS: Record<Permission, string> = {
 
 const lastLogin = (iso: string | null) => (iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "Belum pernah login");
 const initials = (u: UserRow) => (u.fullName ?? u.email ?? "?").split(/[\s@]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
-const roleTone = (role: Role): Tone => (role === "SUPER_ADMIN" ? "violet" : "blue");
+
+// A handful of muted tones, picked deterministically from the name so avatars aren't all the same color.
+const AVATAR_TONES = ["bg-rose-100 text-rose-700", "bg-amber-100 text-amber-700", "bg-emerald-100 text-emerald-700", "bg-sky-100 text-sky-700", "bg-violet-100 text-violet-700", "bg-slate-200 text-slate-700"];
+const avatarTone = (u: UserRow) => AVATAR_TONES[(u.fullName ?? u.email ?? "?").charCodeAt(0) % AVATAR_TONES.length];
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const [me, params] = await Promise.all([requirePage("/anggota"), searchParams]);
@@ -147,7 +149,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
               <tr>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800" aria-hidden="true">
+                    <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarTone(u)}`} aria-hidden="true">
                       {initials(u)}
                     </span>
                     <span>
@@ -157,12 +159,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-3">
-                  <Badge tone={roleTone(u.role)}>{ROLE_LABELS[u.role]}</Badge>
-                </td>
+                <td className="px-4 py-3 text-slate-700">{ROLE_LABELS[u.role]}</td>
                 <td className="px-4 py-3">{u.kitchenScopes.map((s) => s.kitchen.code ?? s.kitchen.name).join(", ") || "Semua dapur"}</td>
                 <td className="px-4 py-3">
-                  <Badge tone={STATUS[u.memberStatus][1]}>{STATUS[u.memberStatus][0]}</Badge>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className={`size-1.5 rounded-full ${STATUS[u.memberStatus][1]}`} aria-hidden="true" />
+                    {STATUS[u.memberStatus][0]}
+                  </span>
                 </td>
                 <td className="px-4 py-3">
                   {lastLogin(u.lastLoginAt)}
