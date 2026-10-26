@@ -143,3 +143,9 @@ variable "db_backup_retention_period" {
   type    = number
   default = 1
 }
+
+variable "email_from" {
+  description = "Verified SES identity used as the sender of invitation and reset email."
+  type        = string
+  default     = "ibrahimpalamarta@gmail.com"
+}
