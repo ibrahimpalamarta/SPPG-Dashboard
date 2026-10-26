@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Plus, Send, Users, X } from "lucide-react";
+import { Eye, Lock, Plus, Send, Users, X } from "lucide-react";
 import { createContext, use, useActionState, useEffect, useState, type ReactNode } from "react";
 import { createUser, saveUser, type UserActionState } from "./actions";
 import { Field, FormMessage, field, primaryButton, secondaryButton } from "@/components/ui/form";
@@ -70,30 +70,42 @@ export function CreateUserForm({ kitchens }: { kitchens: Kitchen[] }) {
 function InviteSent({ state, onClose }: { state: UserActionState; onClose: () => void }) {
   const until = state.expiresAt ? new Date(state.expiresAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "—";
   return (
-    <Modal
-      open
+    <dialog
+      ref={(d) => {
+        if (d && !d.open) d.showModal();
+      }}
       onClose={onClose}
-      icon={<Send className="size-5" />}
-      title="Undangan terkirim"
-      subtitle={state.email ?? ""}
-      footer={
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-800 shadow-xl backdrop:bg-slate-900/50"
+    >
+      <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600" aria-hidden="true">
+        <Send className="size-7" />
+      </span>
+      <h2 className="mt-5 text-xl font-semibold">Undangan terkirim</h2>
+      <p className="mt-3 text-sm leading-relaxed text-slate-600">
+        {state.emailed ? (
+          <>
+            Email undangan dikirim ke <strong className="text-slate-800">{state.email}</strong> sebagai <strong className="text-slate-800">{ROLE_LABELS[state.role as keyof typeof ROLE_LABELS]}</strong>.
+          </>
+        ) : (
+          <>
+            Email ke <strong className="text-slate-800">{state.email}</strong> belum terkirim. Coba lagi lewat tombol Kirim ulang di daftar anggota.
+          </>
+        )}{" "}
+        Link berlaku sampai {until}.
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+        <a href={`/aktivasi/${state.token}`} target="_blank" rel="noreferrer" className={`${secondaryButton} inline-flex h-10 items-center gap-2 px-4`}>
+          <Eye className="size-4" aria-hidden="true" />
+          Pratinjau halaman aktivasi
+        </a>
         <button type="button" onClick={onClose} className={primaryButton}>
           Selesai
         </button>
-      }
-    >
-      <p>
-        {state.emailed ? "Email undangan sudah dikirim. Penerima membuat kata sandi lewat tautan di email itu." : "Email undangan belum terkirim. Coba lagi lewat tombol Kirim ulang di daftar anggota."}
-      </p>
-      <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2 rounded-xl bg-slate-50 p-4">
-        <dt className="text-slate-500">Email</dt>
-        <dd className="break-all font-medium text-slate-800">{state.email}</dd>
-        <dt className="text-slate-500">Role</dt>
-        <dd className="font-medium text-slate-800">{ROLE_LABELS[state.role as keyof typeof ROLE_LABELS]}</dd>
-        <dt className="text-slate-500">Berlaku s/d</dt>
-        <dd className="font-medium text-slate-800">{until}</dd>
-      </dl>
-    </Modal>
+      </div>
+    </dialog>
   );
 }
 
