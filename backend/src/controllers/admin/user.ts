@@ -14,6 +14,7 @@ import { permissionsFor, setRolePermissions } from '../../auth/rbac-store.js';
 import { listSessions, revokeUserSessions } from '../../auth/session.js';
 import { ROLES } from '../../auth/roles.js';
 import { env } from '../../config/env.js';
+import { renderMail } from '../../lib/mail-template.js';
 import { sendMail, type SendMail } from '../../lib/mailer.js';
 import type {
   auditLogListQuery,
@@ -37,10 +38,15 @@ const INVITE_TTL_MINUTES = () => env.INVITE_TTL_HOURS * 60;
 async function sendInvite(send: SendMail, to: string | null, token: string, message?: string): Promise<boolean> {
   if (!to || !env.EMAIL_FROM || !env.ADMIN_BASE_URL) return false;
   const link = `${env.ADMIN_BASE_URL.replace(/\/$/, '')}/aktivasi/${token}`;
-  const note = message ? `\n\nPesan dari pengundang:\n${message}` : '';
-  const text = `Anda diundang ke SPPG Internal. Buat kata sandi untuk mengaktifkan akun:\n\n${link}${note}\n\nLink berlaku ${env.INVITE_TTL_HOURS} jam dan hanya bisa dipakai sekali.`;
   try {
-    await send(to, 'Undangan SPPG Internal', text);
+    const mail = renderMail({
+      title: 'Anda diundang ke SPPG Internal',
+      intro: 'Buat kata sandi untuk mengaktifkan akun Anda.',
+      quote: message,
+      button: { label: 'Buat kata sandi', url: link },
+      note: `Tautan berlaku ${env.INVITE_TTL_HOURS} jam dan hanya bisa dipakai sekali.`,
+    });
+    await send(to, 'Undangan SPPG Internal', mail.text, mail.html);
     return true;
   } catch (err) {
     console.error('invitation email failed', { error: String(err) });

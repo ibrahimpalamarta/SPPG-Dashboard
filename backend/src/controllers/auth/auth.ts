@@ -10,6 +10,7 @@ import { createSession, listSessions, revokeSession, revokeUserSessions } from '
 import { checkTotp, consumeRecoveryCode, isTotpShaped, newRecoveryCodes, newTotpSecret } from '../../auth/mfa.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import { issueResetToken } from '../../auth/reset.js';
+import { renderMail } from '../../lib/mail-template.js';
 import { sendMail, type SendMail } from '../../lib/mailer.js';
 import type {
   changePasswordBody,
@@ -208,8 +209,13 @@ export const forgotPassword = (db: Db = prisma, send: SendMail = sendMail): Requ
   if (user?.status === 'ACTIVE' && user.passwordHash && user.email && env.EMAIL_FROM && env.ADMIN_BASE_URL) {
     const { token } = await issueResetToken(user.id, db);
     const link = `${env.ADMIN_BASE_URL.replace(/\/$/, '')}/reset-password/${token}`;
-    const text = `Kami menerima permintaan reset kata sandi akun SPPG Internal Anda.\n\n${link}\n\nLink berlaku ${env.PASSWORD_RESET_TTL_MINUTES} menit dan hanya bisa dipakai sekali. Abaikan email ini jika bukan Anda yang meminta.`;
-    send(user.email, 'Reset kata sandi SPPG Internal', text).catch((err: unknown) =>
+    const mail = renderMail({
+      title: 'Reset kata sandi',
+      intro: 'Kami menerima permintaan reset kata sandi akun SPPG Internal Anda.',
+      button: { label: 'Atur kata sandi baru', url: link },
+      note: `Tautan berlaku ${env.PASSWORD_RESET_TTL_MINUTES} menit dan hanya bisa dipakai sekali. Abaikan email ini jika bukan Anda yang meminta.`,
+    });
+    send(user.email, 'Reset kata sandi SPPG Internal', mail.text, mail.html).catch((err: unknown) =>
       console.error('forgot-password email failed', { error: String(err) }),
     );
     await audit(db, req, user.id, 'auth.password.forgot');
