@@ -3,7 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { apiSend } from "@/lib/api";
 
-export type UserActionState = { message?: string; ok?: boolean; resetPath?: string };
+export type UserActionState = {
+  message?: string;
+  ok?: boolean;
+  resetPath?: string;
+  email?: string;
+  role?: string;
+  emailed?: boolean;
+  expiresAt?: string;
+};
 
 const text = (form: FormData, key: string) => (typeof form.get(key) === "string" ? (form.get(key) as string) : "");
 const ids = (form: FormData) => form.getAll("kitchenIds").filter((v): v is string => typeof v === "string" && v !== "");
@@ -24,16 +32,19 @@ function failure(res: Awaited<ReturnType<typeof apiSend>>): UserActionState {
 }
 
 export async function createUser(_prev: UserActionState, form: FormData): Promise<UserActionState> {
+  const email = text(form, "email");
+  const role = text(form, "role");
   const res = await apiSend("/admin/users", "POST", {
-    email: text(form, "email"),
+    email,
     fullName: text(form, "fullName"),
-    role: text(form, "role"),
+    role,
     kitchenIds: ids(form),
     message: text(form, "message") || undefined,
   });
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
-  return invited(res.data, "Undangan dibuat");
+  const data = res.data as Record<string, unknown>;
+  return { ok: true, email, role, emailed: Boolean(data.emailed), expiresAt: String(data.resetTokenExpiresAt), resetPath: activationPath(data.resetToken) };
 }
 
 export async function saveUser(id: string, _prev: UserActionState, form: FormData): Promise<UserActionState> {
@@ -55,24 +66,18 @@ export async function setStatus(id: string, status: "ACTIVE" | "INACTIVE"): Prom
   return { ok: true, message: status === "ACTIVE" ? "Akun diaktifkan." : "Akun dinonaktifkan." };
 }
 
-/** SES sent the email: no link to show. Otherwise the admin hands the one-time link over themselves. */
-function invited(data: Record<string, unknown>, what: string): UserActionState {
-  const until = `berlaku s/d ${untilDate(data.resetTokenExpiresAt)}`;
-  if (data.emailed) return { ok: true, message: `${what} · email terkirim · ${until}.` };
-  return { ok: true, message: `${what} · ${until}. Email belum terkirim; kirim tautan ini (sekali pakai, tidak ditampilkan lagi):`, resetPath: activationPath(data.resetToken) };
-}
-
 /** For an account that never activated this is "kirim ulang undangan"; the backend gives it the invitation lifetime. */
 export async function issueReset(id: string): Promise<UserActionState> {
   const res = await apiSend(`/admin/users/${id}/password-reset`, "POST");
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
-  return invited(res.data, "Undangan dibuat ulang");
+  const until = `berlaku s/d ${untilDate(res.data.resetTokenExpiresAt)}`;
+  return { ok: true, message: `Undangan dibuat ulang · email terkirim · ${until}.` };
 }
 
-export async function cancelInvite(id: string): Promise<UserActionState> {
+export async function cancelInvite(id: string, email: string | null): Promise<UserActionState> {
   const res = await apiSend(`/admin/users/${id}/invite-cancel`, "POST");
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
-  return { ok: true, message: "Undangan dibatalkan." };
+  return { ok: true, message: `Undangan untuk ${email ?? "akun ini"} dibatalkan · link tidak berlaku.` };
 }

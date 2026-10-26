@@ -81,8 +81,8 @@ undangan: akun lahir tanpa password.
 link terakhirnya masih berlaku, selain itu Kedaluwarsa. `POST
 /api/admin/users/:id/password-reset` pada akun tanpa password = kirim ulang
 undangan (TTL undangan, audit `user.invite_resent`). `POST
-/api/admin/users/:id/invite-cancel` membatalkan undangan: semua link void, akun
-nonaktif. Halaman `/admin/aktivasi/<token>` memanggil `GET
+/api/admin/users/:id/invite-cancel` membatalkan undangan: akun tanpa password itu
+dihapus (link ikut hilang), email bisa diundang ulang. Halaman `/admin/aktivasi/<token>` memanggil `GET
 /api/auth/invitations/:token` (email, nama, role; link terpakai/kedaluwarsa/
 dibatalkan → `400 invalid_reset_token`), lalu `POST /api/auth/reset-password`;
 untuk password pertama endpoint itu menjawab seperti login (`{status:"ok",

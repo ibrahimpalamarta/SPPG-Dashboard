@@ -33,6 +33,7 @@ function setup(targets: Record<string, Target> = {}, { otherSuperAdmins = 1 } = 
     sessionsRevoked: [] as unknown[],
     audit: [] as unknown[],
     updated: [] as unknown[],
+    deleted: [] as unknown[],
     created: [] as unknown[],
     setPerms: [] as unknown[],
   };
@@ -46,6 +47,7 @@ function setup(targets: Record<string, Target> = {}, { otherSuperAdmins = 1 } = 
         calls.updated.push(args);
         return { id: args.where.id, ...targets[String(args.where.id)] };
       },
+      delete: async (args: unknown) => calls.deleted.push(args),
       create: async ({ data }: { data: { role: Role } }) => {
         calls.created.push(data);
         return { id: 99n, ...data };
@@ -290,22 +292,20 @@ describe('SCRUM-121: members and invitations', () => {
     assert.equal((calls.audit.at(-1) as { action: string }).action, 'user.password_reset_issued');
   });
 
-  test('cancelling an invitation deactivates the account and is audited', async () => {
+  test('cancelling an invitation deletes the account and is audited', async () => {
     const { db, calls } = setup({ '5': { role: 'INTERNAL', passwordHash: null } });
     const out = await call(cancelInvite(db), { user: SUPER, valid: { params: { id: 5n } } });
     assert.equal(out.status, 204);
-    assert.deepEqual((calls.updated[0] as { data: unknown }).data, { status: 'INACTIVE' });
+    assert.deepEqual((calls.deleted[0] as { where: unknown }).where, { id: 5n });
     assert.equal((calls.audit[0] as { action: string }).action, 'user.invite_cancelled');
   });
 
-  test('only an open invitation can be cancelled, and not by someone below its role', async () => {
+  test('only an account without a password can be cancelled, and not by someone below its role', async () => {
     const active = setup({ '5': { role: 'INTERNAL', passwordHash: 'h' } });
     assert.equal((await call(cancelInvite(active.db), { user: SUPER, valid: { params: { id: 5n } } })).status, 409);
-    const cancelled = setup({ '5': { role: 'INTERNAL', passwordHash: null, status: 'INACTIVE' } });
-    assert.equal((await call(cancelInvite(cancelled.db), { user: SUPER, valid: { params: { id: 5n } } })).status, 409);
     const pm = setup({ '5': { role: 'SUPER_ADMIN', passwordHash: null } });
     assert.equal((await call(cancelInvite(pm.db), { user: MANAGER, valid: { params: { id: 5n } } })).status, 403);
-    assert.equal(active.calls.updated.length + cancelled.calls.updated.length + pm.calls.updated.length, 0);
+    assert.equal(active.calls.deleted.length + pm.calls.deleted.length, 0);
   });
 
   test('the last active PM MBG can be neither deactivated nor demoted', async () => {
