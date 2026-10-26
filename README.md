@@ -56,7 +56,7 @@ satu fitur.
 
 | Branch | Workflow | Efek |
 |---|---|---|
-| PR ke `develop`/`staging`/`main`, push ke `develop` | `ci.yml` | Build+test backend, build kedua frontend, `terraform fmt`/`validate`. Tanpa kredensial AWS. |
+| PR ke `develop`/`staging`/`main` | `qa-pr.yml` → `qa-audit.yml` | Satu check `qa-audit / audit`: build+test backend, build frontend-public, `terraform fmt`/`validate`, lalu audit kode/logic/E2E. Tanpa kredensial AWS. |
 | push ke `staging` | `deploy-staging.yml` | Build+push 3 image, migrasi DB, `terraform apply`, tunggu ketiga service stabil. |
 | push ke `main` atau tag `v*` | `deploy-prod.yml` | Sama, di belakang approval manual. Frontend belum di-deploy ke production. |
 
