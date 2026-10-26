@@ -47,7 +47,16 @@ runs:
         # npx playwright needs qa-audit's own dependencies first. On a cache hit only the OS libraries are missing.
         (
           cd qa-audit && npm ci --no-audit --no-fund
-          if [ "$PLAYWRIGHT_CACHED" = true ]; then npx playwright install-deps chromium; else npx playwright install --with-deps chromium; fi
+          # A slow apt mirror once stalled this for 11 minutes and composite steps have no
+          # timeout-minutes, so cap each attempt with timeout(1) and retry.
+          echo 'Acquire::Retries "5"; Acquire::http::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
+          if [ "$PLAYWRIGHT_CACHED" = true ]; then pw='install-deps chromium'; else pw='install --with-deps chromium'; fi
+          for attempt in 1 2 3; do
+            # shellcheck disable=SC2086
+            timeout 5m npx playwright $pw && exit 0
+            echo "playwright $pw failed (attempt $attempt)"
+          done
+          exit 1
         ) & pids+=($!)
         fail=0
         for pid in "${pids[@]}"; do wait "$pid" || fail=1; done

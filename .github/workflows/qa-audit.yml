@@ -71,6 +71,7 @@ jobs:
           key: terraform-${{ runner.os }}-${{ hashFiles('infra/**/.terraform.lock.hcl') }}
 
       - name: Setup
+        timeout-minutes: 15
         uses: ./.github/actions/qa-setup
 
       - name: Setup Terraform
