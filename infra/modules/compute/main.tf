@@ -465,6 +465,9 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "ADMIN_BASE_URL", value = var.frontend_api_base_url != "" ? var.frontend_api_base_url : "http://${aws_lb.this.dns_name}" },
         ],
         var.email_from == "" ? [] : [{ name = "EMAIL_FROM", value = var.email_from }],
+        # Staging has no sppg_public role while the public dashboard is parked;
+        # see ALLOW_SHARED_PUBLIC_DB in backend env.ts. Production never gets it.
+        var.env == "staging" ? [{ name = "ALLOW_SHARED_PUBLIC_DB", value = "true" }] : [],
       )
       # DATABASE_URL_PUBLIC is appended only once the key exists in the secret,
       # so enabling SCRUM-13's restricted role is a deliberate second step and
