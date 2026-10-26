@@ -26,9 +26,6 @@ function Result({ state }: { state: UserActionState }) {
   return (
     <div className="space-y-1">
       <FormMessage tone={state.ok ? "ok" : "error"}>{state.message}</FormMessage>
-      {state.resetPath && (
-        <input readOnly value={`${window.location.origin}${state.resetPath}`} onFocus={(e) => e.currentTarget.select()} aria-label="Tautan atur password" className={`${field} font-mono text-xs`} />
-      )}
     </div>
   );
 }
@@ -80,14 +77,9 @@ function InviteSent({ state, onClose }: { state: UserActionState; onClose: () =>
       title="Undangan terkirim"
       subtitle={state.email ?? ""}
       footer={
-        <>
-          <a href={state.resetPath} target="_blank" rel="noreferrer" className={secondaryButton}>
-            Pratinjau halaman aktivasi
-          </a>
-          <button type="button" onClick={onClose} className={primaryButton}>
-            Selesai
-          </button>
-        </>
+        <button type="button" onClick={onClose} className={primaryButton}>
+          Selesai
+        </button>
       }
     >
       <p>
@@ -97,14 +89,11 @@ function InviteSent({ state, onClose }: { state: UserActionState; onClose: () =>
           </>
         ) : (
           <>
-            Email belum terkirim. Salin tautan aktivasi di bawah dan kirim manual ke <strong>{state.email}</strong>.
+            Email ke <strong>{state.email}</strong> belum terkirim. Coba lagi lewat tombol Kirim ulang di daftar anggota.
           </>
         )}{" "}
         Link berlaku sampai {until}.
       </p>
-      {!state.emailed && state.resetPath && (
-        <input readOnly value={`${window.location.origin}${state.resetPath}`} onFocus={(e) => e.currentTarget.select()} aria-label="Tautan aktivasi" className={`${field} font-mono text-xs`} />
-      )}
     </Modal>
   );
 }
