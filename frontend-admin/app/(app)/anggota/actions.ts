@@ -42,7 +42,6 @@ export async function saveUser(id: string, _prev: UserActionState, form: FormDat
     fullName: text(form, "fullName") || undefined,
     role: text(form, "role") || undefined,
     status: text(form, "status") || undefined,
-    kitchenIds: ids(form),
   });
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
