@@ -22,8 +22,12 @@ export type CashflowTxn = {
   description: string | null;
   txn_total: number | null;
   review_status: string | null;
+  review_note: string | null;
+  confidence: string | null;
   lines: CashflowLine[];
 };
+
+const REQUIRED = ['txn_date', 'txn_type', 'direction', 'category', 'description', 'counterparty', 'review_status'] as const;
 
 const upper = (s: string | null) => s && s.toUpperCase();
 const rupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
@@ -45,7 +49,7 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
     const id = row.sourceRecordId;
     const txnId = text(f.txn_id);
     if (!txnId) {
-      issues.push({ code: 'NO_TXN_ID', sourceRecordId: id, message: `Baris ${row.sourceRowNumber} tanpa txn_id, tidak bisa dikelompokkan.` });
+      issues.push({ code: 'NO_TXN_ID', rule: 'DQ-001', sourceRecordId: id, message: `Baris ${row.sourceRowNumber} tanpa txn_id, tidak bisa dikelompokkan.` });
       continue;
     }
     const line: CashflowLine = {
@@ -59,12 +63,23 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
       line_amount: parseNumber(f.line_amount, true),
     };
     if (line.qty === null || line.unit_price === null || line.line_amount === null) {
-      issues.push({ code: 'MISSING_AMOUNT', sourceRecordId: id, message: `${txnId} baris ${row.sourceRowNumber}: qty, harga satuan atau jumlah baris kosong/tidak terbaca.` });
+      issues.push({ code: 'MISSING_AMOUNT', rule: 'DQ-019', sourceRecordId: id, message: `${txnId} baris ${row.sourceRowNumber}: qty, harga satuan atau jumlah baris kosong/tidak terbaca.` });
+    }
+
+    // DQ-005: same half-rupiah rounding tolerance as the total check below.
+    if (line.qty !== null && line.unit_price !== null && line.line_amount !== null && Math.abs(line.qty * line.unit_price - line.line_amount) > 0.5) {
+      issues.push({ code: 'LINE_AMOUNT_MISMATCH', rule: 'DQ-005', sourceRecordId: id, message: `${txnId} baris ${row.sourceRowNumber}: qty × harga satuan ≠ jumlah baris.` });
     }
 
     const total = parseNumber(f.txn_total, true);
     let txn = txns.get(txnId);
     if (!txn) {
+      // Contract "Yes" columns (13_Upload_Contract); a gap is reported, never filled in (DQ-019).
+      const missing: string[] = REQUIRED.filter((k) => (k === 'txn_date' ? parseDate(f[k]) : text(f[k])) === null);
+      if (total === null) missing.push('txn_total');
+      if (missing.length) {
+        issues.push({ code: 'MISSING_REQUIRED', rule: 'DQ-019', sourceRecordId: id, message: `${txnId} baris ${row.sourceRowNumber}: ${missing.join(', ')} kosong/tidak terbaca.` });
+      }
       txn = {
         txn_id: txnId,
         txn_date: parseDate(f.txn_date),
@@ -74,6 +89,8 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
         description: text(f.description),
         txn_total: total,
         review_status: upper(text(f.review_status)),
+        review_note: text(f.review_note),
+        confidence: text(f.confidence)?.toLowerCase() ?? null,
         lines: [],
       };
       txns.set(txnId, txn);
@@ -86,12 +103,16 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
   const totals: Record<string, number> = {};
   for (const txn of txns.values()) {
     if (totalsSeen.get(txn.txn_id)!.size > 1) {
-      issues.push({ code: 'TOTAL_INCONSISTENT', message: `${txn.txn_id}: nilai total berbeda antar baris.` });
+      issues.push({ code: 'TOTAL_INCONSISTENT', rule: 'DQ-004', message: `${txn.txn_id}: nilai total berbeda antar baris.` });
     }
     const sum = txn.lines.reduce((n, l) => n + (l.line_amount ?? 0), 0);
     // Half a rupiah covers spreadsheet rounding of qty × price.
     if (txn.txn_total !== null && Math.abs(sum - txn.txn_total) > 0.5) {
-      issues.push({ code: 'LINES_NOT_TOTAL', message: `${txn.txn_id}: jumlah baris ${rupiah(sum)} ≠ total ${rupiah(txn.txn_total)}.` });
+      issues.push({ code: 'LINES_NOT_TOTAL', rule: 'DQ-004', message: `${txn.txn_id}: jumlah baris ${rupiah(sum)} ≠ total ${rupiah(txn.txn_total)}.` });
+    }
+    // DQ-025: not eligible for KPIs until a reviewer confirms it.
+    if (txn.review_status !== null && txn.review_status !== 'TERKONFIRMASI') {
+      issues.push({ code: 'NEEDS_REVIEW', rule: 'DQ-025', message: `${txn.txn_id}: status_review ${txn.review_status}, ditahan sampai TERKONFIRMASI.${txn.review_note ? ` Catatan: ${txn.review_note}` : ''}` });
     }
     const key = txn.direction ?? 'TANPA_ARAH';
     totals[key] = (totals[key] ?? 0) + (txn.txn_total ?? 0);
