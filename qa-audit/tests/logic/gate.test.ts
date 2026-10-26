@@ -130,7 +130,7 @@ describe('gate', () => {
     expect(md).toContain('1 Blocker (1 keamanan) harus diperbaiki');
     expect(md).toMatch(/\| 🔒 \| \*\*semgrep\*\* `gcm-no-tag-length`<br>a \\\| b \| `backend\/src\/lib\/crypto\.ts:23` \|/);
     expect(md).toContain('<summary>⚠️ Warning (1)');
-    expect(md).toContain('<summary>Tahap: 1/7 lulus');
+    expect(md).toContain('<summary>Tahap: 1/2 lulus');
     expect(md).not.toContain('baris dua');
     expect(prComment({ ...run({}), meta: { commit: 'abc', duration: '1 dtk', runUrl: '' }, stages: {} })).toContain('Aman di-merge');
   });

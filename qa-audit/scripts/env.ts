@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } 
 import { join } from 'node:path';
 import EmbeddedPostgres from 'embedded-postgres';
 import { assertSafeTarget } from './guard.js';
-import { PORTS, QA, REPO, REPORTS, run } from './lib.js';
+import { PORTS, QA, REPO, REPORTS, run, runAsync } from './lib.js';
 
 const PID = join(REPORTS, 'env.pid');
 const LOG = join(REPORTS, 'env.log');
@@ -42,7 +42,7 @@ async function up() {
       console.log(`environment ready: ${backendUrl}, ${adminUrl}`);
       return;
     }
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 1000));
   }
   console.error(`environment not ready (${exited ? 'serve exited' : 'timeout'}). Tail of ${LOG}:`);
   console.error(readFileSync(LOG, 'utf8').split('\n').slice(-40).join('\n'));
@@ -58,6 +58,21 @@ function step(name: string, r: ReturnType<typeof run>) {
 let pg: EmbeddedPostgres | undefined;
 
 async function serve() {
+  // Neither build needs the database, so they start first and overlap Postgres,
+  // migrate and the seeds; everything is joined before a server starts.
+  // tsc, not `npm run build`: its prebuild re-runs prisma generate, which stage 1
+  // already did and which fails on Windows while a dev server holds the engine.
+  const adminEnv = { NODE_ENV: 'production', API_BASE_URL: backendUrl };
+  const builds = Promise.all(
+    process.env.QA_SKIP_BUILD === '1'
+      ? []
+      : [
+          runAsync('npx', ['tsc', '-p', 'tsconfig.json'], backend).then((r) => step('backend build', r)),
+          runAsync('npx', ['next', 'build'], admin, adminEnv).then((r) => step('admin build', r)),
+        ],
+  );
+  builds.catch(() => undefined); // surfaced where awaited below; an early failure must not crash as unhandled
+
   let dbUrl = process.env.QA_DATABASE_URL;
   if (dbUrl) {
     assertSafeTarget(dbUrl);
@@ -89,15 +104,10 @@ async function serve() {
   // The seed runner refuses NODE_ENV=production, which this database is not.
   const seedEnv = { ...env, NODE_ENV: 'test' };
 
-  const build = process.env.QA_SKIP_BUILD !== '1';
-  step('migrate', run('npx', ['prisma', 'migrate', 'deploy'], backend, env));
-  // tsc, not `npm run build`: its prebuild re-runs prisma generate, which stage 1
-  // already did and which fails on Windows while a dev server holds the engine.
-  if (build) step('backend build', run('npx', ['tsc', '-p', 'tsconfig.json'], backend, env));
-  step('seed', run(process.execPath, ['--import', 'tsx', 'prisma/seed.ts'], backend, seedEnv));
-  step('seed qa', run(process.execPath, [tsxCli, 'scripts/seed-qa.ts'], QA, seedEnv));
-  const adminEnv = { NODE_ENV: 'production', API_BASE_URL: backendUrl };
-  if (build) step('admin build', run('npx', ['next', 'build'], admin, adminEnv));
+  step('migrate', await runAsync('npx', ['prisma', 'migrate', 'deploy'], backend, env));
+  step('seed', await runAsync(process.execPath, ['--import', 'tsx', 'prisma/seed.ts'], backend, seedEnv));
+  step('seed qa', await runAsync(process.execPath, [tsxCli, 'scripts/seed-qa.ts'], QA, seedEnv));
+  await builds;
 
   const children: ChildProcess[] = [
     spawn(process.execPath, ['dist/src/server.js'], { cwd: backend, env: { ...process.env, ...env }, stdio: 'inherit' }),
