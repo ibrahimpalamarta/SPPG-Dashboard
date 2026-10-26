@@ -3,6 +3,7 @@ import { WorkbookError, readWorkbook } from './workbook.js';
 import { stageRows, type DomainParser, type ParseContext, type StagedBatch, type StagingRepository } from './staging.js';
 import { cashflowParser } from './cashflow.js';
 import { menuParser } from './menu.js';
+import { inputMakerParser } from './input-maker.js';
 import { detectProfile, type Detection } from '../mapping/detect.js';
 import type { MappingProfile } from '../mapping/profiles.js';
 import type { Issue } from '../mapping/values.js';
@@ -17,6 +18,7 @@ const rawParser: DomainParser = (sheets, ctx) => stageRows(sheets, ctx);
 const parsers: Partial<Record<UploadDomain, DomainParser>> = {
   CASHFLOW: cashflowParser,
   MENU: menuParser,
+  INPUT_MAKER: inputMakerParser,
 };
 
 /** What the adapter made of the batch. Not stored yet (B-MAPOUT); it rides on the response. */

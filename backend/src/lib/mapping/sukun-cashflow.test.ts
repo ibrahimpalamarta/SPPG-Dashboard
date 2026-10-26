@@ -52,3 +52,12 @@ describe('MAP-SKN-CF-001 adapter (SCRUM-27/55)', () => {
     assert.match(mapping!.issues[1]!.message, /TXN-X2: jumlah baris Rp45\.000 ≠ total Rp50\.000/);
   });
 });
+
+describe('MAP-LWG-CF-001 (SCRUM-32/56)', () => {
+  test('Lawang uses the same canonical columns and is detected by kitchen code', async () => {
+    const { detection, mapping } = await staged(fixture('sukun-cashflow.csv'), 'CASHFLOW', 'LWG');
+    assert.ok(detection.ok);
+    assert.equal(detection.profile.id, 'MAP-LWG-CF-001');
+    assert.equal(mapping?.profileId, 'MAP-LWG-CF-001');
+  });
+});
