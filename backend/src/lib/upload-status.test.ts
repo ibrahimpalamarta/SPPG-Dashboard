@@ -14,6 +14,12 @@ describe('canTransition (SCRUM-22)', () => {
     assert.equal(canTransition('NEEDS_MAPPING_UPDATE', 'PROCESSING'), true);
   });
 
+  test('only a quarantined batch can be superseded, and it is terminal', () => {
+    assert.equal(canTransition('NEEDS_MAPPING_UPDATE', 'SUPERSEDED'), true);
+    assert.equal(canTransition('PUBLISHED', 'SUPERSEDED'), false);
+    assert.equal(canTransition('SUPERSEDED', 'PROCESSING'), false);
+  });
+
   test('FAILED and PUBLISHED are terminal', () => {
     assert.equal(canTransition('FAILED', 'PUBLISHED'), false);
     assert.equal(canTransition('FAILED', 'PROCESSING'), false);

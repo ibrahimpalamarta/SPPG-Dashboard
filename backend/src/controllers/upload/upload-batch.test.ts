@@ -176,7 +176,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     const { db, calls } = fakeDb();
     const { put, puts } = fakePut();
 
-    const out = await run(createUploadBatch(db, put), await withFile());
+    const out = await run(createUploadBatch(db, put, new InMemoryStagingRepository()), await withFile());
 
     assert.equal(out.status, 201);
     const created = calls.created as Record<string, unknown>;
@@ -221,7 +221,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     const { db, calls } = fakeDb({ findFirst: async () => ({ publicId: 'pub-old' }) });
     const { put } = fakePut();
 
-    const out = await run(createUploadBatch(db, put), await withFile());
+    const out = await run(createUploadBatch(db, put, new InMemoryStagingRepository()), await withFile());
 
     assert.equal(out.status, 201);
     assert.ok(calls.created, 'a batch was still created');
@@ -235,7 +235,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     const { db, calls } = fakeDb();
     const { put } = fakePut(true);
 
-    await assert.rejects(run(createUploadBatch(db, put), await withFile()), /s3 down/);
+    await assert.rejects(run(createUploadBatch(db, put, new InMemoryStagingRepository()), await withFile()), /s3 down/);
     const final = calls.updates.at(-1) as Record<string, unknown>;
     assert.equal(final.status, 'FAILED');
     assert.equal(final.errorCode, 'STORAGE_FAILED');
@@ -295,7 +295,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     const { db, calls } = fakeDb({}, { findUnique: async () => null });
     const { put } = fakePut();
 
-    const out = await run(createUploadBatch(db, put), {
+    const out = await run(createUploadBatch(db, put, new InMemoryStagingRepository()), {
       ...(await withFile()),
       user: userWith('SUPER_ADMIN'),
     });
@@ -308,7 +308,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     const { db, calls } = fakeDb();
     const { put, puts } = fakePut();
 
-    const out = await run(createUploadBatch(db, put), await withFile(undefined, true));
+    const out = await run(createUploadBatch(db, put, new InMemoryStagingRepository()), await withFile(undefined, true));
 
     assert.equal(out.status, 200);
     assert.equal(out.body?.rowCount, 1);
@@ -352,19 +352,19 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.equal(out.body?.mapping, null);
   });
 
-  test('a re-upload closes the quarantined batch it replaces as REPLACED (SCRUM-124)', async () => {
+  test('a re-upload closes the quarantined batch it replaces as SUPERSEDED (SCRUM-124)', async () => {
     const old = { id: 7n, publicId: '11111111-1111-4111-8111-111111111111', kitchenId: 3n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' };
     const { db, calls } = fakeDb({ findUnique: async () => old }, skn);
     await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: old.publicId }));
 
-    assert.deepEqual(calls.updates.at(-1), { status: 'FAILED', errorCode: 'REPLACED', errorSummary: 'Diganti oleh batch pub-1.' });
+    assert.deepEqual(calls.updates.at(-1), { status: 'SUPERSEDED', errorCode: 'REPLACED', errorSummary: 'Diganti oleh batch pub-1.' });
     assert.ok(calls.audits.includes('upload_batch.replaced'));
   });
 
   test('replaces must name an open batch of the same kitchen and domain', async () => {
     for (const old of [null, { id: 7n, kitchenId: 4n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'MENU', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'CASHFLOW', status: 'PUBLISHED' }]) {
       const { db, calls } = fakeDb({ findUnique: async () => old }, skn);
-      const out = await run(createUploadBatch(db, fakePut().put), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: '11111111-1111-4111-8111-111111111111' }));
+      const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: '11111111-1111-4111-8111-111111111111' }));
       assert.equal(out.status, 400, JSON.stringify(old, (_k, v) => (typeof v === 'bigint' ? String(v) : v)));
       assert.equal(calls.created, undefined);
     }
@@ -375,7 +375,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     const { put } = fakePut();
     const req = await withFile();
 
-    const out = await run(createUploadBatch(db, put), {
+    const out = await run(createUploadBatch(db, put, new InMemoryStagingRepository()), {
       ...req,
       valid: { body: { ...body, kitchenId: 4n }, query: { dryRun: false } },
     });

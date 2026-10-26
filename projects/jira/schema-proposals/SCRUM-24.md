@@ -1,6 +1,6 @@
 # Usulan skema — SCRUM-24 (staging baris mentah)
 
-Status: **USULAN, tidak dimigrasi.** Sementara `InMemoryStagingRepository` (`backend/src/lib/ingest/staging.ts`): baris staging hilang saat restart dan tidak dibagi antar task ECS. Batch (status, `row_count`) tetap di Postgres, berkas asli tetap di S3.
+Status: **DIMIGRASI (Pilihan A, 2026-10-26, `20261026000000_staging_rows`; `upload_sheets` ditunda).** Teks di bawah = usulan awal. Sementara `InMemoryStagingRepository` (`backend/src/lib/ingest/staging.ts`): baris staging hilang saat restart dan tidak dibagi antar task ECS. Batch (status, `row_count`) tetap di Postgres, berkas asli tetap di S3.
 
 ## Pilihan A (direkomendasikan): satu tabel generik `staging_rows`
 
