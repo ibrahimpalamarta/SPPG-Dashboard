@@ -111,6 +111,7 @@ module "compute" {
   assets_bucket_arn                  = module.storage.bucket_arn
   assets_bucket_name                 = module.storage.bucket_name
   acm_certificate_arn                = var.acm_certificate_arn
+  email_from                         = var.email_from
 }
 
 # Staging only. Production is expected to serve traffic around the clock.
