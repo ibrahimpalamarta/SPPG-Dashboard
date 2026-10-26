@@ -1,4 +1,4 @@
-import type { SourceSystem, UploadDomain } from '@prisma/client';
+import type { Prisma, PrismaClient, SourceSystem, UploadDomain } from '@prisma/client';
 import { DEFAULT_HEADER_OPTIONS, detectHeaderRow, isBlankRow, type RawCell, type RawSheet } from './workbook.js';
 
 /**
@@ -119,13 +119,7 @@ export interface StagingRepository {
   getBatch(uploadBatchId: string): Promise<StagedBatch | undefined>;
 }
 
-/**
- * ponytail: process memory, so staged rows vanish on restart and are not
- * shared between ECS tasks. The batch row (status, counts) is in Postgres and
- * the original file is in S3; only the parsed copy is volatile. Swap for a
- * Prisma implementation once `finance_txn_upload` / `menu_recipe_upload` and
- * the raw columns are approved (projects/jira/schema-proposals/SCRUM-24.md).
- */
+/** Unit tests and dry-run only: rows live in process memory. */
 export class InMemoryStagingRepository implements StagingRepository {
   private readonly batches = new Map<string, StagedBatch>();
 
@@ -142,5 +136,43 @@ export class InMemoryStagingRepository implements StagingRepository {
   }
 }
 
-/** The process-wide instance the upload controller writes to. */
-export const stagingRepository: StagingRepository = new InMemoryStagingRepository();
+// Postgres caps a statement at 65535 bind parameters; 13 columns per row.
+const CHUNK = 2000;
+
+/**
+ * Rows in `staging_rows` (SCRUM-24, B-RAW). Replace is one transaction, so a
+ * re-parse never leaves a half-written batch.
+ *
+ * ponytail: the per-sheet summary (`StagedBatch.sheets`) is not stored (B-MAPOUT);
+ * `getBatch` returns it empty. Add an `upload_sheets` table if something other
+ * than tests needs to read it back.
+ */
+export class PrismaStagingRepository implements StagingRepository {
+  constructor(private readonly db: PrismaClient) {}
+
+  async replaceBatch(uploadBatchId: string, batch: StagedBatch) {
+    await this.db.$transaction(async (tx) => {
+      await tx.stagingRow.deleteMany({ where: { uploadBatchId } });
+      for (let i = 0; i < batch.rows.length; i += CHUNK) {
+        await tx.stagingRow.createMany({
+          data: batch.rows.slice(i, i + CHUNK).map(({ cells, ...r }) => ({ ...r, domain: batch.domain, cells: cells as unknown as Prisma.InputJsonValue })),
+        });
+      }
+    });
+  }
+
+  async deleteBatch(uploadBatchId: string) {
+    await this.db.stagingRow.deleteMany({ where: { uploadBatchId } });
+  }
+
+  async getBatch(uploadBatchId: string) {
+    const rows = await this.db.stagingRow.findMany({ where: { uploadBatchId }, orderBy: { id: 'asc' } });
+    const first = rows[0];
+    if (!first) return undefined;
+    return {
+      domain: first.domain,
+      sheets: [],
+      rows: rows.map(({ id: _id, domain: _d, cells, ...r }) => ({ ...r, cells: cells as unknown as StagingRow['cells'] })),
+    };
+  }
+}

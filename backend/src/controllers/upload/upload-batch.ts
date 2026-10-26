@@ -15,7 +15,7 @@ import { canTransition } from '../../lib/upload-status.js';
 import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
 import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
 import type { ColumnDiff } from '../../lib/mapping/detect.js';
-import { InMemoryStagingRepository, stagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
+import { InMemoryStagingRepository, PrismaStagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
 import type {
   uploadBatchCreate,
   uploadBatchCreateQuery,
@@ -118,7 +118,7 @@ const notRecognised = (diff: ColumnDiff[]) => {
  * files start timing out the ALB.
  */
 export const createUploadBatch =
-  (db: Db = prisma, put: PutObject = putObject, staging: StagingRepository = stagingRepository): RequestHandler =>
+  (db: Db = prisma, put: PutObject = putObject, staging: StagingRepository = new PrismaStagingRepository(prisma)): RequestHandler =>
   async (req, res) => {
     const started = Date.now();
     const body = req.valid!.body as z.infer<typeof uploadBatchCreate>;
@@ -169,7 +169,7 @@ export const createUploadBatch =
     const replaced = body.replaces ? await db.uploadBatch.findUnique({ where: { publicId: body.replaces } }) : null;
     if (
       body.replaces &&
-      (!replaced || replaced.kitchenId !== body.kitchenId || replaced.domain !== body.domain || !canTransition(replaced.status, UploadStatus.FAILED))
+      (!replaced || replaced.kitchenId !== body.kitchenId || replaced.domain !== body.domain || !canTransition(replaced.status, UploadStatus.SUPERSEDED))
     ) {
       sendError(res, 'VALIDATION_ERROR', { fields: { replaces: ['not an open batch of this kitchen and domain'] } });
       return;
@@ -292,7 +292,7 @@ export const createUploadBatch =
     if (replaced && row.status !== UploadStatus.FAILED) {
       await db.uploadBatch.update({
         where: { id: replaced.id },
-        data: { status: UploadStatus.FAILED, errorCode: 'REPLACED', errorSummary: `Diganti oleh batch ${row.publicId}.` },
+        data: { status: UploadStatus.SUPERSEDED, errorCode: 'REPLACED', errorSummary: `Diganti oleh batch ${row.publicId}.` },
       });
       await writeAuditLog(db, {
         userId: req.user!.id,

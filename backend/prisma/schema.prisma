@@ -60,6 +60,8 @@ enum UploadStatus {
   READY
   PUBLISHED
   FAILED
+  /// Berkas diganti unggah ulang (SCRUM-124).
+  SUPERSEDED
 }
 
 /// Domain berkas yang diunggah (PRD Phase 1).
@@ -456,12 +458,39 @@ model UploadBatch {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  menuPlans MenuPlan[]
+  menuPlans   MenuPlan[]
+  stagingRows StagingRow[]
 
   @@index([kitchenId, uploadDate])
   @@index([kitchenId, domain, uploadDate])
   @@index([fileHash])
   @@map("upload_batches")
+}
+
+/// Baris mentah hasil parse, satu wadah untuk semua domain (SCRUM-24, B-RAW).
+/// `cells` = huruf kolom -> sel persis seperti dibaca. Dihapus bersama batch.
+model StagingRow {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  sourceRecordId   String       @unique @map("source_record_id")
+  /// Kode dapur (atau id numerik bila belum ada kode, B-TUREN).
+  kitchenId        String       @map("kitchen_id")
+  sourceSystem     SourceSystem @map("source_system")
+  sourceFileName   String       @map("source_file_name")
+  templateVersion  String?      @map("template_version")
+  mappingProfileId String?      @map("mapping_profile_id")
+  loadedAt         DateTime     @map("loaded_at")
+  domain           UploadDomain
+
+  sheetName       String @map("sheet_name")
+  sourceRowNumber Int    @map("source_row_number")
+  cells           Json
+
+  @@index([uploadBatchId])
+  @@map("staging_rows")
 }
 
 /// Form perencanaan menu SOP-OPR-001, sudah diratakan menjadi satu baris per

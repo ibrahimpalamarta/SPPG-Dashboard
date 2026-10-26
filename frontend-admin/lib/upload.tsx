@@ -17,16 +17,15 @@ export const STATUS = {
   READY: { label: "Ready", tone: "bg-emerald-100 text-emerald-800" },
   PUBLISHED: { label: "Published", tone: "bg-emerald-700 text-white" },
   FAILED: { label: "Failed", tone: "bg-red-100 text-red-800" },
+  SUPERSEDED: { label: "Diganti", tone: "bg-slate-100 text-slate-700" },
 } as const satisfies Record<string, { label: string; tone: string }>;
 
 /**
  * A few error codes read better than their status: a header-only template is
- * held for re-upload, not broken (SCRUM-131); a quarantined file that was
- * re-uploaded is replaced, not failed (SCRUM-124).
+ * held for re-upload, not broken (SCRUM-131).
  */
 const BY_ERROR_CODE: Record<string, { label: string; tone: string }> = {
   EMPTY_FILE: { label: "Ditahan · file kosong", tone: "bg-amber-100 text-amber-800" },
-  REPLACED: { label: "Diganti", tone: "bg-slate-100 text-slate-700" },
 };
 
 export function StatusBadge({ status, errorCode }: { status: string; errorCode?: string | null }) {
