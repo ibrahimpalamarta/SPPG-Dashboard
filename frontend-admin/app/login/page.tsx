@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
         <section className="p-6 sm:p-10">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Masuk ke dashboard</h1>
-          <p className="mt-2 text-sm text-slate-500">Pilih peran Anda, lalu masuk dengan akun kerja.</p>
+          <p className="mt-2 text-sm text-slate-500">Masuk dengan akun kerja Anda.</p>
           <LoginForm returnTo={typeof returnTo === "string" ? returnTo : undefined} notice={notice} />
         </section>
       </div>
