@@ -56,3 +56,19 @@ describe('parseDate / titleCase', () => {
     assert.equal(titleCase(null), null);
   });
 });
+
+describe('DQ-002/003/010 normalisation', () => {
+  test('accounting negatives in parentheses', () => {
+    assert.equal(parseNumber(s('(Rp1.000)'), true), -1000);
+  });
+
+  test('dd-mm-yyyy and Excel serial dates; typo years are rejected', () => {
+    assert.equal(parseDate(s('22-02-2026')), '2026-02-22');
+    assert.equal(parseDate({ value: 46237, type: 'number' }), '2026-08-03');
+    assert.equal(parseDate(s('03/09/0206')), null);
+  });
+
+  test('multi-word segment keeps each word capitalised', () => {
+    assert.equal(titleCase('BUMIL & busui'), 'Bumil & Busui');
+  });
+});

@@ -21,6 +21,9 @@ const MONEY = ['unit_price', 'line_total'] as const;
 /** Must be filled on every line; the rest (URT, kebutuhan kg vs pax) is either/or. */
 const REQUIRED = ['net_weight_g', 'energy_kcal', 'protein_g', 'fat_g', 'carbohydrate_g', 'beneficiaries', 'unit_price', 'line_total'] as const;
 
+const TEXT_REQUIRED = ['period', 'menu_type', 'portion_segment', 'menu_name', 'ingredient'] as const;
+const NUTRIENTS = ['energy_kcal', 'protein_g', 'fat_g', 'carbohydrate_g', 'fiber_g'] as const;
+
 type Numeric = (typeof NUMBERS)[number] | (typeof MONEY)[number];
 
 export type MenuRecipeLine = {
@@ -70,18 +73,32 @@ export function applySukunMenu(sheets: StagedSheet[], rows: StagingRow[], profil
     } as MenuRecipeLine;
 
     if (!line.serving_date) {
-      issues.push({ code: 'INVALID_DATE', sourceRecordId: id, message: `${at}: tanggal kosong/tidak terbaca.` });
+      issues.push({ code: 'INVALID_DATE', rule: 'DQ-002', sourceRecordId: id, message: `${at}: tanggal kosong/tidak terbaca.` });
     } else if (line.day_name && DAYS[new Date(line.serving_date).getUTCDay()] !== line.day_name) {
       issues.push({ code: 'DAY_MISMATCH', sourceRecordId: id, message: `${at}: ${line.serving_date} bukan hari ${line.day_name}.` });
     }
     const missing = REQUIRED.filter((k) => line[k] === null);
     if (missing.length) {
-      issues.push({ code: 'MISSING_VALUE', sourceRecordId: id, message: `${at}: ${missing.join(', ')} kosong/tidak terbaca.` });
+      issues.push({ code: 'MISSING_VALUE', rule: 'DQ-019', sourceRecordId: id, message: `${at}: ${missing.join(', ')} kosong/tidak terbaca.` });
+    }
+    // Contract "Yes" text columns (13_Upload_Contract); PCK has no Periode, so its batch metadata must supply it (DQ-008).
+    const blank = TEXT_REQUIRED.filter((k) => line[k] === null);
+    if (blank.length) {
+      issues.push({ code: 'MISSING_REQUIRED', rule: 'DQ-008', sourceRecordId: id, message: `${at}: ${blank.join(', ')} kosong.` });
+    }
+    // DQ-028: flagged for review, never corrected.
+    const implausible = [...NUTRIENTS, 'edible_portion_pct' as const].filter((k) => (line[k] ?? 0) < 0 || (k === 'edible_portion_pct' && (line[k] ?? 0) > 100));
+    if (implausible.length) {
+      issues.push({ code: 'IMPLAUSIBLE_VALUE', rule: 'DQ-028', sourceRecordId: id, message: `${at}: ${implausible.join(', ')} negatif atau di luar 0-100.` });
+    }
+    // DQ-011: kept raw, mapping to ingredient master is a separate step.
+    if (line.ingredient?.includes(',')) {
+      issues.push({ code: 'INGREDIENT_NEEDS_REVIEW', rule: 'DQ-011', sourceRecordId: id, message: `${at}: kolom Bahan berisi lebih dari satu bahan.` });
     }
 
     const key = [line.serving_date, line.portion_segment, line.menu_name, line.ingredient].map((v) => v?.toLowerCase()).join('|');
     if (seen.has(key)) {
-      issues.push({ code: 'DUPLICATE_LINE', sourceRecordId: id, message: `${at}: duplikat ${line.menu_name} / ${line.ingredient}, baris pertama dipakai.` });
+      issues.push({ code: 'DUPLICATE_LINE', rule: 'DQ-031', sourceRecordId: id, message: `${at}: duplikat ${line.menu_name} / ${line.ingredient}, baris pertama dipakai.` });
       continue;
     }
     seen.add(key);

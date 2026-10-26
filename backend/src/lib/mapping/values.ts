@@ -3,7 +3,7 @@ import { loose, type StagedSheet, type StagingRow } from '../ingest/staging.js';
 import type { MappingProfile } from './profiles.js';
 
 /** One thing an adapter noticed and did not fix. The raw row stays in staging. */
-export type Issue = { code: string; sourceRecordId?: string; message: string };
+export type Issue = { code: string; /** Data Quality rule id (08_Data_Quality_Rules), so Jira and reviewers see which rule fired. */ rule?: string; sourceRecordId?: string; message: string };
 
 /**
  * Canonical field → cell of one staged row, found through the profile's
@@ -22,8 +22,8 @@ export const text = (cell: RawCell | undefined): string | null => {
   return s === '' ? null : s;
 };
 
-/** "kecil", "Besar " → "Kecil", "Besar". */
-export const titleCase = (s: string | null) => s && s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+/** "kecil", "Besar ", "BUMIL & busui" → "Kecil", "Besar", "Bumil & Busui" (DQ-010). */
+export const titleCase = (s: string | null) => s && s.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 
 /**
  * Indonesian and English separators both appear in the same file
@@ -37,7 +37,10 @@ export const titleCase = (s: string | null) => s && s.charAt(0).toUpperCase() + 
  */
 export function parseNumber(cell: RawCell | undefined, money = false): number | null {
   if (typeof cell?.value === 'number') return cell.value;
-  const s = (text(cell) ?? '').replace(/rp\.?|\s/gi, '');
+  const raw = (text(cell) ?? '').replace(/rp\.?|\s/gi, '');
+  // Accounting negatives in parentheses, "(1.000)" → -1000 (DQ-003).
+  const negative = /^\(.*\)$/.test(raw);
+  const s = negative ? raw.slice(1, -1) : raw;
   if (!/^-?\d[\d.,]*$/.test(s)) return null;
 
   const dot = s.lastIndexOf('.');
@@ -52,14 +55,22 @@ export function parseNumber(cell: RawCell | undefined, money = false): number | 
 
   const digits = decimal === '.' ? s.replace(/,/g, '') : decimal === ',' ? s.replace(/\./g, '').replace(',', '.') : s.replace(/[.,]/g, '');
   const n = Number(digits);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) ? (negative ? -n : n) : null;
 }
 
-/** dd/mm/yyyy (the Sukun exports) or an xlsx date cell → "YYYY-MM-DD". */
+const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
+/** Earlier years are typos ("03/09/0206", DQ-002/016), not data. */
+const MIN_YEAR = 2000;
+
+/** dd/mm/yyyy, dd-mm-yyyy, an Excel serial or an xlsx date cell → "YYYY-MM-DD" (DQ-002). */
 export function parseDate(cell: RawCell | undefined): string | null {
   if (cell?.type === 'date') return String(cell.value).slice(0, 10);
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text(cell) ?? '');
-  if (!m) return null;
+  if (cell?.type === 'number' && typeof cell.value === 'number') {
+    const iso = new Date(EXCEL_EPOCH + Math.floor(cell.value) * 864e5).toISOString().slice(0, 10);
+    return Number(iso.slice(0, 4)) >= MIN_YEAR ? iso : null;
+  }
+  const m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(text(cell) ?? '');
+  if (!m || Number(m[3]) < MIN_YEAR) return null;
   const [, d = '', mo = '', y = ''] = m;
   const iso = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
   // Round-trip, because Date rolls 31/02 over into March instead of refusing it.
