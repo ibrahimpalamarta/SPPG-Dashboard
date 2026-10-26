@@ -1,7 +1,7 @@
 "use client";
 
 import { Lock, Plus, Send, Users, X } from "lucide-react";
-import { useActionState, useEffect, useState } from "react";
+import { createContext, use, useActionState, useEffect, useState, type ReactNode } from "react";
 import { createUser, saveUser, type UserActionState } from "./actions";
 import { Field, FormMessage, field, primaryButton, secondaryButton } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
@@ -50,66 +50,117 @@ const RoleCard = ({ option, defaultChecked }: { option: (typeof ROLE_OPTIONS)[nu
 
 export function CreateUserForm({ kitchens }: { kitchens: Kitchen[] }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState<UserActionState, FormData>(async (prev, form) => {
-    const next = await createUser(prev, form);
-    // With a link to hand over the dialog stays open so it can be copied.
-    if (next.ok && !next.resetPath) setOpen(false);
-    return next;
-  }, {});
+  // Remounting on every open resets useActionState so a past invite's success screen doesn't reappear.
+  const [instance, setInstance] = useState(0);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800">
+      <button
+        type="button"
+        onClick={() => {
+          setInstance((n) => n + 1);
+          setOpen(true);
+        }}
+        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800"
+      >
         <Plus className="size-4" aria-hidden="true" />
         Undang anggota
       </button>
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        icon={<Users className="size-5" />}
-        title="Undang anggota"
-        subtitle="Penerima mendapat email untuk membuat kata sandi. Role ditetapkan di sini."
-        footer={
-          <>
-            <button type="button" onClick={() => setOpen(false)} className={secondaryButton}>
-              Batal
-            </button>
-            <button type="submit" form="invite-form" disabled={pending} className={`${primaryButton} inline-flex items-center gap-2`}>
-              <Send className="size-4" aria-hidden="true" />
-              Kirim undangan
-            </button>
-          </>
-        }
-      >
-        <form id="invite-form" action={action} className="space-y-4">
-          <Field label="Nama lengkap">
-            <input name="fullName" required autoFocus className={field} />
-          </Field>
-          <Field label="Email kerja">
-            <input type="email" name="email" required placeholder="nama@instansi.go.id" className={field} />
-          </Field>
-          <fieldset className="space-y-2">
-            <legend className="mb-1 font-medium text-slate-700">Role</legend>
-            {ROLE_OPTIONS.map((o) => (
-              <RoleCard key={o.role} option={o} defaultChecked={o.role === "DATA_ADMIN"} />
-            ))}
-          </fieldset>
-          <Field label="Dapur (wajib untuk Data Operasional)">
-            <select name="kitchenIds" defaultValue="" className={field}>
-              <option value="">Semua dapur</option>
-              {kitchens.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {kitchenLabel(k)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Pesan (opsional)">
-            <textarea name="message" maxLength={500} rows={3} placeholder="Contoh: Untuk membantu upload Cashflow Lawang mulai 23 Nov" className={`${field} h-auto py-2`} />
-          </Field>
-          <Result state={state} />
-        </form>
-      </Modal>
+      <InviteModal key={instance} open={open} onClose={() => setOpen(false)} kitchens={kitchens} />
     </>
+  );
+}
+
+function InviteSent({ state, onClose }: { state: UserActionState; onClose: () => void }) {
+  const until = state.expiresAt ? new Date(state.expiresAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      icon={<Send className="size-5" />}
+      title="Undangan terkirim"
+      subtitle={state.email ?? ""}
+      footer={
+        <>
+          <a href={state.resetPath} target="_blank" rel="noreferrer" className={secondaryButton}>
+            Pratinjau halaman aktivasi
+          </a>
+          <button type="button" onClick={onClose} className={primaryButton}>
+            Selesai
+          </button>
+        </>
+      }
+    >
+      <p>
+        {state.emailed ? (
+          <>
+            Email undangan dikirim ke <strong>{state.email}</strong> sebagai <strong>{ROLE_LABELS[state.role as keyof typeof ROLE_LABELS]}</strong>.
+          </>
+        ) : (
+          <>
+            Email belum terkirim. Salin tautan aktivasi di bawah dan kirim manual ke <strong>{state.email}</strong>.
+          </>
+        )}{" "}
+        Link berlaku sampai {until}.
+      </p>
+      {!state.emailed && state.resetPath && (
+        <input readOnly value={`${window.location.origin}${state.resetPath}`} onFocus={(e) => e.currentTarget.select()} aria-label="Tautan aktivasi" className={`${field} font-mono text-xs`} />
+      )}
+    </Modal>
+  );
+}
+
+function InviteModal({ open, onClose, kitchens }: { open: boolean; onClose: () => void; kitchens: Kitchen[] }) {
+  const [state, action, pending] = useActionState<UserActionState, FormData>(createUser, {});
+  if (!open) return null;
+  if (state.ok) return <InviteSent state={state} onClose={onClose} />;
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      icon={<Users className="size-5" />}
+      title="Undang anggota"
+      subtitle="Penerima mendapat email untuk membuat kata sandi. Role ditetapkan di sini."
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={secondaryButton}>
+            Batal
+          </button>
+          <button type="submit" form="invite-form" disabled={pending} className={`${primaryButton} inline-flex items-center gap-2`}>
+            <Send className="size-4" aria-hidden="true" />
+            Kirim undangan
+          </button>
+        </>
+      }
+    >
+      <form id="invite-form" action={action} className="space-y-4">
+        <Field label="Nama lengkap">
+          <input name="fullName" required autoFocus className={field} />
+        </Field>
+        <Field label="Email kerja">
+          <input type="email" name="email" required placeholder="nama@instansi.go.id" className={field} />
+        </Field>
+        <fieldset className="space-y-2">
+          <legend className="mb-1 font-medium text-slate-700">Role</legend>
+          {ROLE_OPTIONS.map((o) => (
+            <RoleCard key={o.role} option={o} defaultChecked={o.role === "DATA_ADMIN"} />
+          ))}
+        </fieldset>
+        <Field label="Dapur (wajib untuk Data Operasional)">
+          <select name="kitchenIds" defaultValue="" className={field}>
+            <option value="">Semua dapur</option>
+            {kitchens.map((k) => (
+              <option key={k.id} value={k.id}>
+                {kitchenLabel(k)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Pesan (opsional)">
+          <textarea name="message" maxLength={500} rows={3} placeholder="Contoh: Untuk membantu upload Cashflow Lawang mulai 23 Nov" className={`${field} h-auto py-2`} />
+        </Field>
+        <Result state={state} />
+      </form>
+    </Modal>
   );
 }
 
@@ -157,17 +208,44 @@ export function RoleForm({ user }: { user: UserRow }) {
 type Confirm = { title: string; subtitle: string; body: string; label: string };
 
 /** A one-click admin action. Optional confirm dialog first; the result shows as a toast at the bottom (kept open while it carries a link). */
-export function ActionButton({ action, label, confirm }: { action: () => Promise<UserActionState>; label: string; confirm?: Confirm }) {
-  const [state, run, pending] = useActionState<UserActionState>(action, {});
-  const [asking, setAsking] = useState(false);
-  const [seen, setSeen] = useState<UserActionState>();
-  const toast = state.message && seen !== state;
+const ToastContext = createContext<(state: UserActionState) => void>(() => {});
+
+/** Holds the toast above the rows: a finished action re-renders its row into other buttons, which would take a local toast with it. */
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toast, setToast] = useState<UserActionState>();
 
   useEffect(() => {
-    if (!toast || state.resetPath) return;
-    const t = setTimeout(() => setSeen(state), 5000);
+    if (!toast) return;
+    const t = setTimeout(() => setToast(undefined), 5000);
     return () => clearTimeout(t);
-  }, [toast, state]);
+  }, [toast]);
+
+  return (
+    <ToastContext value={setToast}>
+      {children}
+      {toast?.message && (
+        <div role={toast.ok ? "status" : "alert"} className="fixed inset-x-4 bottom-6 z-50 mx-auto flex max-w-md items-start gap-3 rounded-xl bg-slate-800 p-3 text-sm text-white shadow-lg">
+          <Send className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <p className="min-w-0 flex-1">{toast.message}</p>
+          <button type="button" onClick={() => setToast(undefined)} aria-label="Tutup" className="shrink-0 opacity-70 hover:opacity-100">
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </ToastContext>
+  );
+}
+
+export function ActionButton({ action, label, confirm }: { action: () => Promise<UserActionState>; label: string; confirm?: Confirm }) {
+  const showToast = use(ToastContext);
+  const [asking, setAsking] = useState(false);
+  const [, run, pending] = useActionState<UserActionState>(async () => {
+    // Closing on the confirm button's own click would detach it before the form submits, so close from the action.
+    setAsking(false);
+    const result = await action();
+    showToast(result);
+    return result;
+  }, {});
 
   return (
     <form action={run}>
@@ -186,7 +264,7 @@ export function ActionButton({ action, label, confirm }: { action: () => Promise
               <button type="button" onClick={() => setAsking(false)} className={secondaryButton}>
                 Batal
               </button>
-              <button type="submit" onClick={() => setAsking(false)} className="h-9 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-700 hover:bg-red-100">
+              <button type="submit" className="h-9 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-700 hover:bg-red-100">
                 {confirm.label}
               </button>
             </>
@@ -194,20 +272,6 @@ export function ActionButton({ action, label, confirm }: { action: () => Promise
         >
           <p>{confirm.body}</p>
         </Modal>
-      )}
-      {toast && (
-        <div role={state.ok ? "status" : "alert"} className="fixed inset-x-4 bottom-6 z-50 mx-auto flex max-w-md items-start gap-3 rounded-xl bg-slate-800 p-3 text-sm text-white shadow-lg">
-          <Send className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <p>{state.message}</p>
-            {state.resetPath && (
-              <input readOnly value={`${window.location.origin}${state.resetPath}`} onFocus={(e) => e.currentTarget.select()} aria-label="Tautan atur password" className="h-8 w-full rounded-md bg-slate-700 px-2 font-mono text-xs" />
-            )}
-          </div>
-          <button type="button" onClick={() => setSeen(state)} aria-label="Tutup" className="shrink-0 opacity-70 hover:opacity-100">
-            <X className="size-4" aria-hidden="true" />
-          </button>
-        </div>
       )}
     </form>
   );

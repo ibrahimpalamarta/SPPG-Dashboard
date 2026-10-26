@@ -6,7 +6,7 @@ import { requirePage } from "@/lib/guard";
 import { PERMISSIONS, ROLE_LABELS, type Permission, type Role } from "@/lib/roles";
 import type { Kitchen } from "@/lib/me";
 import { cancelInvite, issueReset, setStatus } from "./actions";
-import { ActionButton, CreateUserForm, RoleForm, type UserRow } from "./user-controls";
+import { ActionButton, CreateUserForm, RoleForm, ToastProvider, type UserRow } from "./user-controls";
 
 export const metadata: Metadata = { title: "Anggota · SPPG Internal" };
 
@@ -89,6 +89,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
   const granted = (role: Role) => roles?.find((r) => r.role === role)?.permissions ?? [];
 
   return (
+    <ToastProvider>
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
@@ -179,7 +180,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
                       ) : u.memberStatus === "PENDING" || u.memberStatus === "EXPIRED" ? (
                         <>
                           <ActionButton action={issueReset.bind(null, u.id)} label="Kirim ulang" />
-                          <ActionButton action={cancelInvite.bind(null, u.id)} label="Batalkan" confirm={{ title: `Batalkan undangan ${u.fullName ?? u.email}?`, subtitle: `${ROLE_LABELS[u.role]} · ${u.email}`, body: "Tautan aktivasi langsung tidak berlaku. Akun tidak bisa masuk sampai diaktifkan kembali.", label: "Batalkan undangan" }} />
+                          <ActionButton action={cancelInvite.bind(null, u.id, u.email)} label="Batalkan" confirm={{ title: `Batalkan undangan ${u.fullName ?? u.email}?`, subtitle: `${ROLE_LABELS[u.role]} · ${u.email}`, body: "Tautan aktivasi langsung tidak berlaku dan akun dihapus dari daftar. Untuk mengundang lagi, buat undangan baru.", label: "Batalkan undangan" }} />
                         </>
                       ) : u.memberStatus === "INACTIVE" ? (
                         <ActionButton action={setStatus.bind(null, u.id, "ACTIVE")} label="Aktifkan kembali" />
@@ -253,5 +254,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
         </section>
       )}
     </div>
+    </ToastProvider>
   );
 }

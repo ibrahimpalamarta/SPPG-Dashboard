@@ -313,22 +313,19 @@ export const createPasswordReset = (db: Db = prisma, send: SendMail = sendMail):
 };
 
 /**
- * SCRUM-121: withdraw an invitation that was not accepted yet. Its links stop
- * working and the account is deactivated; reactivating it and sending the
- * invitation again brings it back.
+ * SCRUM-121: withdraw an invitation that was not accepted yet. The account never
+ * had a password, so it is deleted (its links go with it) and the email can be
+ * invited again from scratch.
  */
 export const cancelInvite = (db: Db = prisma): RequestHandler => async (req, res) => {
   const target = await loadManageable(req, res, db);
   if (!target) return;
-  if (target.passwordHash || target.status !== 'ACTIVE') {
+  if (target.passwordHash) {
     sendError(res, 'NOT_AN_INVITATION');
     return;
   }
-  await db.$transaction([
-    db.passwordResetToken.updateMany({ where: { userId: target.id, usedAt: null }, data: { usedAt: new Date() } }),
-    db.user.update({ where: { id: target.id }, data: { status: 'INACTIVE' } }),
-  ]);
-  await writeAuditLog(db, { userId: req.user!.id, action: 'user.invite_cancelled', entity: 'users', entityId: target.id });
+  await db.user.delete({ where: { id: target.id } });
+  await writeAuditLog(db, { userId: req.user!.id, action: 'user.invite_cancelled', entity: 'users', entityId: target.id, metadata: { email: target.email } });
   res.status(204).end();
 };
 
