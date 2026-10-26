@@ -15,6 +15,7 @@
     "env:down": "tsx scripts/env.ts down",
     "report": "tsx scripts/merge-report.ts",
     "ai-review": "tsx scripts/ai-review.ts",
+    "evidence": "tsx scripts/jira-evidence.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
