@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+# Dummy fixture key so unit tests can load src/config/env.ts; not a real secret.
+[[allowlists]]
+description = "backend test env fixture"
+paths = ['''backend/\.env\.test$''']
