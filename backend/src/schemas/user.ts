@@ -45,6 +45,8 @@ export const userCreate = z.object({
   fullName: z.string().trim().min(1).max(160),
   role: z.nativeEnum(Role),
   kitchenIds: kitchenIds.default([]),
+  /** Free text the admin adds to the invitation email. */
+  message: z.string().trim().max(500).optional(),
 });
 
 export const rolePermissionsBody = z.object({

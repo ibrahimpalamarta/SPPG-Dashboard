@@ -6,10 +6,11 @@ import { apiSend } from "@/lib/api";
 export type UserActionState = { message?: string; ok?: boolean; resetPath?: string };
 
 const text = (form: FormData, key: string) => (typeof form.get(key) === "string" ? (form.get(key) as string) : "");
-const ids = (form: FormData) => form.getAll("kitchenIds").filter((v): v is string => typeof v === "string");
+const ids = (form: FormData) => form.getAll("kitchenIds").filter((v): v is string => typeof v === "string" && v !== "");
 
-/** One-time link; the browser adds its own origin. An invitation opens the activation page (SCRUM-122). */
-const resetPath = (token: unknown, invite = false) => `${process.env.NEXT_PUBLIC_BASE_PATH}/${invite ? "aktivasi" : "reset-password"}/${token}`;
+/** One-time activation link (SCRUM-122); the browser adds its own origin. */
+const activationPath = (token: unknown) => `${process.env.NEXT_PUBLIC_BASE_PATH}/aktivasi/${token}`;
+const untilDate = (iso: unknown) => new Date(String(iso)).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
 function failure(res: Awaited<ReturnType<typeof apiSend>>): UserActionState {
   if (res.status === 403) return { message: "Anda tidak berhak melakukan ini pada akun tersebut." };
@@ -28,10 +29,11 @@ export async function createUser(_prev: UserActionState, form: FormData): Promis
     fullName: text(form, "fullName"),
     role: text(form, "role"),
     kitchenIds: ids(form),
+    message: text(form, "message") || undefined,
   });
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
-  return { ok: true, message: "Undangan dibuat. Kirim tautan aktivasi ini ke anggota (berlaku 72 jam, sekali pakai, tidak ditampilkan lagi):", resetPath: resetPath(res.data.resetToken, true) };
+  return invited(res.data, "Undangan dibuat");
 }
 
 export async function saveUser(id: string, _prev: UserActionState, form: FormData): Promise<UserActionState> {
@@ -47,12 +49,26 @@ export async function saveUser(id: string, _prev: UserActionState, form: FormDat
   return { ok: true, message: "Tersimpan." };
 }
 
+export async function setStatus(id: string, status: "ACTIVE" | "INACTIVE"): Promise<UserActionState> {
+  const res = await apiSend(`/admin/users/${id}`, "PATCH", { status });
+  if (!res.ok) return failure(res);
+  revalidatePath("/anggota");
+  return { ok: true, message: status === "ACTIVE" ? "Akun diaktifkan." : "Akun dinonaktifkan." };
+}
+
+/** SES sent the email: no link to show. Otherwise the admin hands the one-time link over themselves. */
+function invited(data: Record<string, unknown>, what: string): UserActionState {
+  const until = `berlaku s/d ${untilDate(data.resetTokenExpiresAt)}`;
+  if (data.emailed) return { ok: true, message: `${what} · email terkirim · ${until}.` };
+  return { ok: true, message: `${what} · ${until}. Email belum terkirim; kirim tautan ini (sekali pakai, tidak ditampilkan lagi):`, resetPath: activationPath(data.resetToken) };
+}
+
 /** For an account that never activated this is "kirim ulang undangan"; the backend gives it the invitation lifetime. */
-export async function issueReset(id: string, invite: boolean): Promise<UserActionState> {
+export async function issueReset(id: string): Promise<UserActionState> {
   const res = await apiSend(`/admin/users/${id}/password-reset`, "POST");
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
-  return { ok: true, message: "Kirim tautan ini ke pemilik akun (sekali pakai, tidak ditampilkan lagi):", resetPath: resetPath(res.data.resetToken, invite) };
+  return invited(res.data, "Undangan dibuat ulang");
 }
 
 export async function cancelInvite(id: string): Promise<UserActionState> {
@@ -60,16 +76,4 @@ export async function cancelInvite(id: string): Promise<UserActionState> {
   if (!res.ok) return failure(res);
   revalidatePath("/anggota");
   return { ok: true, message: "Undangan dibatalkan." };
-}
-
-export async function revokeSessions(id: string): Promise<UserActionState> {
-  const res = await apiSend(`/admin/users/${id}/sessions`, "DELETE");
-  return res.ok ? { ok: true, message: "Semua sesi dicabut." } : failure(res);
-}
-
-export async function resetMfa(id: string): Promise<UserActionState> {
-  const res = await apiSend(`/admin/users/${id}/mfa-reset`, "POST");
-  if (!res.ok) return failure(res);
-  revalidatePath("/anggota");
-  return { ok: true, message: "Verifikasi dua langkah direset." };
 }
