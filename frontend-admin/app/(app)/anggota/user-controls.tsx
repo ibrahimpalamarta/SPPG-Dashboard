@@ -22,22 +22,6 @@ export type UserRow = {
 
 const kitchenLabel = (k: Kitchen) => (k.code ? `${k.code} · ${k.name}` : k.name);
 
-function KitchenChecks({ kitchens, selected }: { kitchens: Kitchen[]; selected: string[] }) {
-  return (
-    <fieldset className="space-y-1 text-sm">
-      <legend className="font-medium text-slate-700">Dapur (wajib untuk Data Admin)</legend>
-      <div className="grid gap-1 sm:grid-cols-2">
-        {kitchens.map((k) => (
-          <label key={k.id} className="flex items-center gap-2 text-slate-700">
-            <input type="checkbox" name="kitchenIds" value={k.id} defaultChecked={selected.includes(k.id)} />
-            {kitchenLabel(k)}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
 function Result({ state }: { state: UserActionState }) {
   return (
     <div className="space-y-1">
@@ -129,7 +113,7 @@ export function CreateUserForm({ kitchens }: { kitchens: Kitchen[] }) {
   );
 }
 
-export function RoleForm({ user, kitchens }: { user: UserRow; kitchens: Kitchen[] }) {
+export function RoleForm({ user }: { user: UserRow }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<UserActionState, FormData>(async (prev, form) => {
     const next = await saveUser(user.id, prev, form);
@@ -162,7 +146,6 @@ export function RoleForm({ user, kitchens }: { user: UserRow; kitchens: Kitchen[
           {ROLE_OPTIONS.map((o) => (
             <RoleCard key={o.role} option={o} defaultChecked={user.role === o.role} />
           ))}
-          <KitchenChecks kitchens={kitchens} selected={user.kitchenScopes.map((s) => s.kitchen.id)} />
           <Result state={state} />
         </form>
         <p className="text-slate-500">Perubahan berlaku pada login berikutnya dan tercatat di audit log.</p>
