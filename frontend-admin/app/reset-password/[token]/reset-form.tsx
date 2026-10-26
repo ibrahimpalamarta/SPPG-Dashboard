@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { resetPassword, type ResetState } from "./actions";
 import { Field, FormMessage, field, primaryButton } from "@/components/ui/form";
 
-export function ResetForm({ token }: { token: string }) {
+export function ResetForm({ token, submitLabel = "Simpan password" }: { token: string; submitLabel?: string }) {
   const [state, action, pending] = useActionState<ResetState, FormData>(resetPassword.bind(null, token), {});
 
   return (
@@ -18,7 +18,7 @@ export function ResetForm({ token }: { token: string }) {
       <p className="text-xs text-slate-500">Minimal 12 karakter, memuat 3 dari: huruf kecil, huruf besar, angka, simbol.</p>
       <FormMessage>{state.message}</FormMessage>
       <button type="submit" disabled={pending} className={`${primaryButton} w-full`}>
-        {pending ? "Menyimpan…" : "Simpan password"}
+        {pending ? "Menyimpan…" : submitLabel}
       </button>
     </form>
   );

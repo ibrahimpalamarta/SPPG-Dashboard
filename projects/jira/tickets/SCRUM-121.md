@@ -11,7 +11,7 @@ Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-EMAIL) | Terakhir diubah: 20
 - [x] Kirim ulang undangan: `POST /admin/users/:id/password-reset` pada akun tanpa password (TTL undangan, audit `user.invite_resent`)
 - [x] Batalkan undangan: `POST /admin/users/:id/invite-cancel` (hanya akun yang belum aktivasi; semua link void, akun nonaktif; audit `user.invite_cancelled`; 409 `not_an_invitation` selainnya)
 - [x] Guard PM terakhir: SUPER_ADMIN aktif berpassword terakhir tidak bisa dinonaktifkan/diturunkan (409 `last_super_admin`)
-- [x] Halaman Anggota: form "Undang anggota" (email, nama, peran, dapur; validasi zod di backend) → tautan aktivasi `/admin/aktivasi/<token>` untuk disalin; badge status 4 nilai; aksi Kirim ulang undangan, Batalkan undangan, ubah peran, Nonaktifkan/Aktifkan (form Kelola akun)
+- [x] Halaman Anggota: form "Undang anggota" (email, nama, peran, dapur; validasi zod di backend) → tautan aktivasi `/admin/aktivasi/<token>` untuk disalin; badge status 4 nilai; kolom Aksi per baris: Kirim ulang + Batalkan (Menunggu aktivasi/Kedaluwarsa), Ubah role + Nonaktifkan (Aktif), Aktifkan kembali (Nonaktif); tanpa panel Kelola akun
 - [x] Anti-eskalasi tetap berlaku untuk semua aksi (`loadManageable`/`mayManageRole`)
 - [x] `backend/docs/AUTH.md` diperbarui
 

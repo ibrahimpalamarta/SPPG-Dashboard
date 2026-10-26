@@ -145,7 +145,7 @@ export const getInvitation = (db: Db = prisma): RequestHandler => async (req, re
     sendError(res, 'INVALID_RESET_TOKEN');
     return;
   }
-  sendJson(res, { email: row.user.email, fullName: row.user.fullName, role: row.user.role });
+  sendJson(res, { email: row.user.email, fullName: row.user.fullName, role: row.user.role, expiresAt: row.expiresAt });
 };
 
 /**
