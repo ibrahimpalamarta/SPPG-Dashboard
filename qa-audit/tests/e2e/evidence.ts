@@ -6,5 +6,5 @@ import sharp from 'sharp';
 export async function shot(target: Page | Locator, ticket: string, n: number, name: string) {
   const dir = `reports/evidence/${ticket}`;
   mkdirSync(dir, { recursive: true });
-  await sharp(await target.screenshot()).avif({ quality: 50 }).toFile(`${dir}/${n}-${name}.avif`);
+  await sharp(await target.screenshot()).avif({ quality: 80, chromaSubsampling: '4:4:4' }).toFile(`${dir}/${n}-${name}.avif`);
 }
