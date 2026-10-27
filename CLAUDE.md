@@ -8,7 +8,7 @@ Instruksi ini berlaku untuk semua sesi Claude Code di repo ini. Ikuti secara ket
 - Database: PostgreSQL (data aplikasi dan akun/sesi/role semuanya di Postgres, tidak ada layanan identitas eksternal)
 - Frontend: dua app Next.js (App Router) terpisah — `frontend-admin/` (Backoffice + Dashboard Internal, di belakang login internal) dan `frontend-public/` (dashboard transparansi publik). Keduanya baru berisi halaman statis "Segera Hadir": fondasi deployment sudah jalan ke staging, tapi desain UI/UX masih berjalan jadi belum ada halaman produk
 - Monorepo tanpa workspace tool: tiap service punya `package.json` + lockfile sendiri, tidak ada root `package.json`
-- RBAC 4 role: Super Admin, Data Admin/entry (per-SPPG Dapur), Internal (view-only), Public (insight visualisasi)
+- RBAC 7 role (PRD Oktober 2026 §3): Super Admin (Admin Sistem/PM MBG), Management, Finance, Data Steward (lintas dapur), Kepala Kitchen, Data Admin/PIC Kitchen, Ahli Gizi (per-SPPG Dapur, tanpa scope = tidak melihat apa pun). Tidak ada role Public/CMS di PRD ini
 - Deployment: AWS ECS + ECR di belakang ALB, RDS, S3 assets bucket, region ap-southeast-3, environment staging & prod, CI/CD via GitHub Actions
 
 ## Prinsip Coding — Presisi & Ramping

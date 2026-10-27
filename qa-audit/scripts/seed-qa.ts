@@ -1,6 +1,6 @@
 /**
- * QA accounts, one per PRD role, mapped onto the roles the code has today
- * (decision QD-03 in docs/decision-log.md). Change the mapping here only.
+ * QA accounts, one per PRD role (decision QD-03 in docs/decision-log.md).
+ * Change the mapping here only.
  *
  * Passwords: QA_SEED_PASSWORD when set, otherwise random per run. They are
  * written to .auth/accounts.json for the Playwright setup project; that folder
@@ -9,18 +9,19 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { hashPassword } from '../../backend/src/auth/password.js';
+import { KITCHEN_SCOPED_ROLES, type Role } from '../../backend/src/auth/roles.js';
 import { issueResetToken } from '../../backend/src/auth/reset.js';
 import { env } from '../../backend/src/config/env.js';
 import { prisma } from '../../backend/src/db.js';
 import { AUTH, writeJson } from './lib.js';
 
-type Account = { key: string; fullName: string; role: 'INTERNAL' | 'DATA_ADMIN'; kitchens: 'all' | string[] };
+type Account = { key: string; fullName: string; role: Role; kitchens: 'all' | string[] };
 
 const ACCOUNTS: Account[] = [
-  { key: 'management', fullName: 'QA Management', role: 'INTERNAL', kitchens: 'all' },
-  { key: 'finance', fullName: 'QA Finance', role: 'INTERNAL', kitchens: 'all' },
-  { key: 'kepala-kitchen-skn', fullName: 'QA Kepala Kitchen SKN', role: 'INTERNAL', kitchens: ['SKN'] },
-  { key: 'data-steward', fullName: 'QA Data Steward', role: 'DATA_ADMIN', kitchens: 'all' },
+  { key: 'management', fullName: 'QA Management', role: 'MANAGEMENT', kitchens: 'all' },
+  { key: 'finance', fullName: 'QA Finance', role: 'FINANCE', kitchens: 'all' },
+  { key: 'kepala-kitchen-skn', fullName: 'QA Kepala Kitchen SKN', role: 'KEPALA_KITCHEN', kitchens: ['SKN'] },
+  { key: 'data-steward', fullName: 'QA Data Steward', role: 'DATA_STEWARD', kitchens: 'all' },
 ];
 
 // Same statement as backend/scripts/grant-public-role.ts, which cannot run as-is:
@@ -44,11 +45,11 @@ for (const a of ACCOUNTS) {
     create: { email, fullName: a.fullName, role: a.role, passwordHash },
     update: { fullName: a.fullName, role: a.role, passwordHash, status: 'ACTIVE', failedLoginCount: 0, lockedUntil: null },
   });
-  // "All kitchens" is no scope rows for INTERNAL, but every row for DATA_ADMIN,
-  // which sees nothing without them (backend/src/auth/guard.ts resolveKitchenIds).
+  // "All kitchens" is no scope rows for a cross-kitchen role, but every row for a
+  // kitchen-scoped one, which sees nothing without them (backend/src/auth/guard.ts resolveKitchenIds).
   const scoped =
     a.kitchens === 'all'
-      ? a.role === 'DATA_ADMIN' ? kitchens : []
+      ? KITCHEN_SCOPED_ROLES.includes(a.role) ? kitchens : []
       : kitchens.filter((k) => k.code && a.kitchens.includes(k.code));
   if (a.kitchens !== 'all' && scoped.length !== a.kitchens.length) throw new Error(`kitchen code missing for ${a.key}`);
   await prisma.userKitchenScope.deleteMany({ where: { userId: user.id } });
@@ -60,7 +61,7 @@ for (const a of ACCOUNTS) {
 // read in QA (no SES), so the token is minted here, the same way the backend does it.
 const reset = await prisma.user.upsert({
   where: { email: 'qa.reset@qa-audit.test' },
-  create: { email: 'qa.reset@qa-audit.test', fullName: 'QA Reset', role: 'INTERNAL', passwordHash },
+  create: { email: 'qa.reset@qa-audit.test', fullName: 'QA Reset', role: 'MANAGEMENT', passwordHash },
   update: { passwordHash },
 });
 const invited = await prisma.user.upsert({

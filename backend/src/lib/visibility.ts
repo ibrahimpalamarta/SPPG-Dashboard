@@ -7,11 +7,17 @@ import type { Role } from '../auth/roles.js';
  * The database half is the two public views (see the reshape migration). This
  * module guards the authenticated routes, which read the base tables directly.
  *
- * A PUBLIC-role token is an authenticated caller with no internal clearance —
- * it is treated exactly like an anonymous visitor here. CMS_ADMIN manages
- * content, not operations, so it gets no cost access either.
+ * Ahli Gizi supports menu mapping, not finance (price basis of Harga Bahan is
+ * still open, PRD OD-05), so it gets no cost access.
  */
-export const COST_ROLES: readonly Role[] = ['SUPER_ADMIN', 'DATA_ADMIN', 'INTERNAL'];
+export const COST_ROLES: readonly Role[] = [
+  'SUPER_ADMIN',
+  'MANAGEMENT',
+  'FINANCE',
+  'KEPALA_KITCHEN',
+  'DATA_ADMIN',
+  'DATA_STEWARD',
+];
 
 export function canSeeCost(role: Role): boolean {
   return COST_ROLES.includes(role);

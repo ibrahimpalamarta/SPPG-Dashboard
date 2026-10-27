@@ -103,9 +103,10 @@ kehilangan perangkat (`POST /api/admin/users/:id/mfa-reset`).
 
 ## Role & permission
 
-Role (enum `Role`, tidak berubah dari sebelum migrasi): `SUPER_ADMIN`,
-`DATA_ADMIN` (discope per dapur lewat `user_kitchen_scopes`), `CMS_ADMIN`,
-`INTERNAL` (read-only), `PUBLIC`.
+Role (enum `Role`, mengikuti PRD Oktober 2026 §3): `SUPER_ADMIN` (Admin Sistem /
+PM MBG), `MANAGEMENT`, `FINANCE`, `DATA_STEWARD` (lintas dapur),
+`KEPALA_KITCHEN`, `DATA_ADMIN` (PIC/Data Admin Kitchen), `AHLI_GIZI` (discope per
+dapur lewat `user_kitchen_scopes`; tanpa scope = tidak melihat dapur mana pun).
 
 Permission (`PERMISSIONS` di `src/auth/roles.ts`):
 `upload:create`, `upload:view`, `batch:review`, `batch:publish`, `mapping:view`,

@@ -8,10 +8,12 @@ import { getMe } from './me.js';
 
 const PERMS: Record<Role, AppUser['permissions']> = {
   SUPER_ADMIN: ['upload:create', 'batch:review'],
+  MANAGEMENT: [],
+  FINANCE: [],
+  KEPALA_KITCHEN: [],
   DATA_ADMIN: ['upload:create', 'mapping:propose'],
-  CMS_ADMIN: [],
-  INTERNAL: [],
-  PUBLIC: [],
+  AHLI_GIZI: [],
+  DATA_STEWARD: [],
 };
 
 const userWith = (role: Role, ...kitchenIds: bigint[]): AppUser => ({

@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { storageState, type RoleKey } from './roles.js';
 
-// PRD §3 roles on today's permission map (migration 20261025000000_internal_auth,
-// decision D-10): INTERNAL is view-only, DATA_ADMIN may also enter data.
+// PRD §3 roles on the permission map seeded by migration 20261027000000_rbac_prd_oktober:
+// Management, Finance and Kepala Kitchen are view-only, Data Steward may also upload.
 const VIEW = ['Overview', 'Unggah Data', 'Mapping & Validasi', 'Finance & Cost', 'Data Health', 'Data Reference'];
 const ADMIN_ONLY = ['Anggota', 'Peran & Izin'];
 

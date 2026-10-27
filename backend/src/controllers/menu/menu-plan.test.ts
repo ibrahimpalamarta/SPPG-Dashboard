@@ -72,20 +72,20 @@ describe('listMenuPlans (SCRUM-2)', () => {
     assert.equal(status, 403);
   });
 
-  test('SCRUM-13: cost columns reach INTERNAL', async () => {
+  test('SCRUM-13: cost columns reach MANAGEMENT', async () => {
     const { db } = fakeDb();
     const { body } = await run(listMenuPlans(db), {
-      user: userWith('INTERNAL'),
+      user: userWith('MANAGEMENT'),
       valid: { query: { page: 1, pageSize: 25 } },
     });
     assert.equal(firstRow(body).hargaBahan, 12000);
     assert.equal(firstRow(body).totalHarga, 480000);
   });
 
-  test('SCRUM-13: cost columns are stripped for a PUBLIC-role token', async () => {
+  test('SCRUM-13: cost columns are stripped for AHLI_GIZI', async () => {
     const { db } = fakeDb();
     const { body } = await run(listMenuPlans(db), {
-      user: userWith('PUBLIC'),
+      user: userWith('AHLI_GIZI'),
       valid: { query: { page: 1, pageSize: 25 } },
     });
     const row = firstRow(body);

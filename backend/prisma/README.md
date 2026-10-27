@@ -215,9 +215,6 @@ Semua poin di bawah juga ditandai `TODO(catatan):` di `schema.prisma` dan/atau
     satu konvensi dipilih, setiap perhitungan kebutuhan bahan meleset sebesar
     faktor susut.
 
-11. **Urutan CMS_ADMIN vs DATA_ADMIN.** Keduanya sumbu berbeda, bukan tingkatan;
-    CMS_ADMIN ditaruh di bawah DATA_ADMIN hanya agar penggabungan klaim ganda
-    deterministik (`src/auth/roles.ts`).
 
 ## Verifikasi yang sudah dijalankan
 

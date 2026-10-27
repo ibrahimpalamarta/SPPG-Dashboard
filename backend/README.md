@@ -42,15 +42,20 @@ Catatan desain:
 
 ### Role
 
-Lima role di enum `Role`:
+Tujuh role di enum `Role` (PRD Oktober 2026 §3):
 
 | Enum | Akses |
 |---|---|
-| `SUPER_ADMIN` | **PM MBG.** Penuh — kelola akun & role, master data, audit, seluruh data operasional. Selalu memegang semua permission |
-| `DATA_ADMIN` | Data Admin dapur: upload, discope ke satu atau beberapa dapur lewat `user_kitchen_scopes`; melihat kolom biaya |
-| `CMS_ADMIN` | Konten publik (pengumuman, dokumen, galeri) saja — **tidak** melihat biaya |
-| `INTERNAL` | Read-only seluruh dapur, termasuk kolom biaya |
-| `PUBLIC` | Paling terbatas |
+| `SUPER_ADMIN` | **Admin Sistem / PM MBG.** Penuh — kelola akun & role, master data, audit, seluruh data operasional. Selalu memegang semua permission |
+| `MANAGEMENT` | COO/Head of MBG: semua dapur, agregat, read-only, melihat kolom biaya |
+| `FINANCE` | Semua dapur, metrik finansial, read-only, melihat kolom biaya |
+| `DATA_STEWARD` | Analyst pusat, semua dapur: review/publish batch, mapping, referensi, audit; melihat kolom biaya |
+| `KEPALA_KITCHEN` | Dapur sendiri, read-only; melihat kolom biaya |
+| `DATA_ADMIN` | PIC/Data Admin Kitchen: upload untuk dapur sendiri; melihat kolom biaya |
+| `AHLI_GIZI` | Dapur sendiri: dukung mapping menu; **tidak** melihat biaya |
+
+Role per dapur (`KEPALA_KITCHEN`, `DATA_ADMIN`, `AHLI_GIZI`) wajib punya minimal satu
+baris di `user_kitchen_scopes`; tanpa itu mereka tidak melihat dapur mana pun.
 
 Route baru memeriksa **permission**, bukan role: `requirePermission('upload:create')`.
 Pemetaan role → permission ada di tabel `role_permissions` dan diubah lewat
@@ -73,7 +78,7 @@ kitchenRouter.post(
 );
 ```
 
-`INTERNAL`, `CMS_ADMIN`, dan `PUBLIC` jadi read-only atas data operasional bukan
+`MANAGEMENT`, `FINANCE`, dan `KEPALA_KITCHEN` jadi read-only atas data operasional bukan
 lewat flag khusus, tapi karena tidak pernah masuk allow-list route yang
 mengubahnya.
 
@@ -315,8 +320,8 @@ Merutekan pada `publicId` (UUID), tidak pernah pada id berurutan.
 | `GET /api/akg-compliances` | read-only | 8 |
 | `GET /api/menu-costs` | internal-only | 13 |
 | `GET /api/summaries`, `GET /api/dashboard/summary` | read-only | 9, 11 |
-| `/api/cms/announcements` (CRUD, JSON) | SUPER_ADMIN, CMS_ADMIN | 14 |
-| `/api/cms/documents`, `/gallery` (CRUD, multipart) | SUPER_ADMIN, CMS_ADMIN | 14 |
+| `/api/cms/announcements` (CRUD, JSON) | SUPER_ADMIN | 14 |
+| `/api/cms/documents`, `/gallery` (CRUD, multipart) | SUPER_ADMIN | 14 |
 | `/api/admin/users` (daftar, buat, ubah, reset password/MFA, cabut sesi), `/api/admin/roles`, `/api/admin/audit-logs` | `users:read/manage`, `settings:manage`, `audit:read` (default SUPER_ADMIN) | 1 |
 | `/api/auth/*` (logout, sesi, ganti password, MFA) | sesi sendiri | — |
 
@@ -400,7 +405,7 @@ Tiga lapis, semuanya perlu:
   membacanya tanpa perlu akses ke tabel dasarnya.
 - **Layer aplikasi** — `src/lib/visibility.ts`, untuk route **terautentikasi**.
   `menu_plans.hargaBahan`/`totalHarga` dan `daily_kitchens.jumlahPm` dibuang
-  untuk role di luar SUPER_ADMIN/DATA_ADMIN/INTERNAL; `recipe_costings` dan
+  untuk role di luar `COST_ROLES` (semua kecuali AHLI_GIZI); `recipe_costings` dan
   `menu_costs` sensitif seluruhnya sehingga guard menutup resource-nya.
 
 Menyalakannya (sekali per environment, setelah `migrate:deploy`):

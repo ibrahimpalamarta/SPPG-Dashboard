@@ -67,20 +67,15 @@ describe('requireRole', () => {
     assert.equal(nexted, false);
   });
 
-  test('denies INTERNAL on a mutating route (read-only role)', () => {
+  test('denies the view-only roles on a mutating route', () => {
     const mutate = requireRole('SUPER_ADMIN', 'DATA_ADMIN');
-    assert.equal(run(mutate, { user: userWith('INTERNAL') }).status, 403);
-  });
-
-  test('denies PUBLIC on every internal route', () => {
-    const internalOnly = requireRole('SUPER_ADMIN', 'DATA_ADMIN', 'INTERNAL');
-    const { status, nexted } = run(internalOnly, { user: userWith('PUBLIC') });
-    assert.equal(status, 403);
-    assert.equal(nexted, false);
+    for (const role of ['MANAGEMENT', 'FINANCE', 'KEPALA_KITCHEN'] as const) {
+      assert.equal(run(mutate, { user: userWith(role) }).status, 403, role);
+    }
   });
 
   test('returns 401, not 403, when no user was attached', () => {
-    const { status, nexted } = run(requireRole('PUBLIC'), {});
+    const { status, nexted } = run(requireRole('MANAGEMENT'), {});
     assert.equal(status, 401);
     assert.equal(nexted, false);
   });
@@ -99,7 +94,7 @@ describe('requirePermission', () => {
   });
 
   test('least privilege: a user-management permission is not implied by being an admin role', () => {
-    assert.equal(run(requirePermission('users:read'), { user: userWith('CMS_ADMIN') }).status, 403);
+    assert.equal(run(requirePermission('users:read'), { user: userWith('DATA_STEWARD') }).status, 403);
   });
 
   test('returns 401 when no user was attached', () => {
@@ -127,7 +122,7 @@ describe('requireAuth', () => {
 
   /** A db whose only live session is for TOKEN; `patch` bends it into each failure mode. */
   const dbWith = (patch: { revokedAt?: Date; expiresAt?: Date; lastSeenAt?: Date; status?: 'ACTIVE' | 'INACTIVE' } = {}) => {
-    const user = { ...userWith('INTERNAL'), status: patch.status ?? 'ACTIVE' };
+    const user = { ...userWith('MANAGEMENT'), status: patch.status ?? 'ACTIVE' };
     const touched: unknown[] = [];
     const db = {
       session: {
@@ -172,7 +167,7 @@ describe('requireAuth', () => {
   test('a live session attaches the Postgres user and its current permissions', async () => {
     const r = await call(dbWith().db, `Bearer ${TOKEN}`);
     assert.equal(r.nexted, true);
-    assert.equal(r.req.user?.role, 'INTERNAL');
+    assert.equal(r.req.user?.role, 'MANAGEMENT');
     assert.equal(r.req.sessionId, 9n);
     // Retired permission names in the table are dropped, not trusted.
     assert.deepEqual(r.req.user?.permissions, ['upload:view']);
