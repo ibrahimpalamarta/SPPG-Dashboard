@@ -79,14 +79,6 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - name: Cache Next.js build
-        uses: actions/cache@v4
-        with:
-          path: frontend-public/.next/cache
-          key: nextjs-frontend-public-${{ runner.os }}-${{ hashFiles('frontend-public/package-lock.json') }}-${{ hashFiles('frontend-public/**/*.[jt]s', 'frontend-public/**/*.[jt]sx', '!frontend-public/node_modules/**', '!frontend-public/.next/**') }}
-          restore-keys: |
-            nextjs-frontend-public-${{ runner.os }}-${{ hashFiles('frontend-public/package-lock.json') }}-
-
       # Backend build+test, frontend-public build, terraform fmt/validate, so a PR carries one check. Independent of the
       # fail-fast gate; a failure is a Blocker via stageFailedWithoutReport.
       # Three lanes touch disjoint folders, so they run together; each line is
