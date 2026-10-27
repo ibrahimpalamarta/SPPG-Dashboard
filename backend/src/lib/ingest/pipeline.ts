@@ -5,7 +5,7 @@ import { cashflowParser } from './cashflow.js';
 import { menuParser } from './menu.js';
 import { inputMakerParser } from './input-maker.js';
 import { detectProfile, type Detection } from '../mapping/detect.js';
-import type { MappingProfile } from '../mapping/profiles.js';
+import type { MappingOutput, MappingProfile } from '../mapping/profiles.js';
 import type { Issue } from '../mapping/values.js';
 
 /**
@@ -18,10 +18,12 @@ const rawParser: DomainParser = (sheets, ctx) => stageRows(sheets, ctx);
 const parsers: Partial<Record<UploadDomain, DomainParser>> = {
   CASHFLOW: cashflowParser,
   MENU: menuParser,
+  // The RAB is the menu costing sheet (MAP-SKN-RAB-001).
+  RAB: menuParser,
   INPUT_MAKER: inputMakerParser,
 };
 
-/** What the adapter made of the batch. Not stored yet (B-MAPOUT); it rides on the response. */
+/** What the adapter made of the batch. Stored with the staging rows (B-MAPOUT); it also rides on the response. */
 export type MappingSummary = {
   profileId: string;
   version: string;
@@ -59,8 +61,14 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
       }
     }
     const batch = { domain: ctx.domain, ...parsed };
-    await staging.replaceBatch(ctx.uploadBatchId, batch);
-    return { ok: true, batch, detection, mapping: detection.ok ? summarise(batch, detection.profile) : null };
+    if (!detection.ok) {
+      await staging.replaceBatch(ctx.uploadBatchId, batch);
+      return { ok: true, batch, detection, mapping: null };
+    }
+    const { profile } = detection;
+    const out = profile.apply(batch.sheets, batch.rows, profile);
+    await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, domain: profile.domain, records: out.records });
+    return { ok: true, batch, detection, mapping: summarise(profile, out) };
   } catch (err) {
     await staging.deleteBatch(ctx.uploadBatchId);
     if (err instanceof WorkbookError) return { ok: false, errorCode: err.code, errorSummary: err.message };
@@ -68,8 +76,7 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
   }
 }
 
-function summarise(batch: StagedBatch, profile: MappingProfile): MappingSummary {
-  const out = profile.apply(batch.sheets, batch.rows, profile);
+function summarise(profile: MappingProfile, out: MappingOutput): MappingSummary {
   const issueCounts: Record<string, number> = {};
   for (const i of out.issues) issueCounts[i.code] = (issueCounts[i.code] ?? 0) + 1;
   return {

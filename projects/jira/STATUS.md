@@ -31,10 +31,10 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | SCRUM-26 | Mapping Profile Registry | mapping-registry | 3 | IN_PROGRESS (sebagian BLOCKED: B-REG, B-DD) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | `lib/mapping/profiles.ts` (default B-REG: config di repo); MAP-SKN-CF-001 + MAP-SKN-MENU-001 DRAFT |
 | SCRUM-39 | [DATA-005] Detect & apply profile | mapping-registry | 3 | IN_PROGRESS (sebagian BLOCKED: B-TPLVER) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Kitchen+domain+source+header; 1 cocok → NEEDS_REVIEW + audit `upload_batch.profile_detected`; 0/ >1 → karantina |
 | SCRUM-94 | Schema mismatch handling | mapping-mismatch | 3 | IN_PROGRESS | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Diff `missing`/`unexpected` per sheet di response + errorSummary menyebut kolom hilang |
-| SCRUM-55 | [DATA-022] Sukun Cashflow profile | mapping | 3 | IN_PROGRESS (sebagian BLOCKED: B-DD) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Rekonsiliasi baseline asli lokal: 1009 txn, Σ total = sumber (Rp3.707.460.322) |
-| SCRUM-27 | Sukun Cashflow adapter | mapping | 3 | IN_PROGRESS (sebagian BLOCKED: B-MAPOUT) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Grouping per txn_id, Rp/qty/tanggal; issue NO_TXN_ID, MISSING_AMOUNT, LINES_NOT_TOTAL, TOTAL_INCONSISTENT; hasil belum disimpan |
-| SCRUM-44 | [DATA-011] Sukun RAB profile | mapping | 3 | TODO | To Do | — | 2026-10-23 |  |
-| SCRUM-28 | Sukun RAB adapter | mapping | 3 | TODO | To Do | — | 2026-10-23 |  |
+| SCRUM-55 | [DATA-022] Sukun Cashflow profile | mapping | 3 | IN REVIEW (sebagian BLOCKED: B-DD) | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-27 | Rekonsiliasi baseline asli lokal: 1009 txn, Σ total = sumber (Rp3.707.460.322) |
+| SCRUM-27 | Sukun Cashflow adapter | mapping | 3 | IN REVIEW | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-27 | Grouping per txn_id, Rp/qty/tanggal; hasil disimpan saat upload ke `finance_transactions` + `_lines` |
+| SCRUM-44 | [DATA-011] Sukun RAB profile | mapping | 3 | IN REVIEW (sebagian BLOCKED: B-DD) | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-27 | MAP-SKN-RAB-001 DRAFT; sheet "12" Σ planned_cost = Σ Total Harga sumber |
+| SCRUM-28 | Sukun RAB adapter | mapping | 3 | IN REVIEW | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-27 | `rab_daily_budgets` (tanggal+segmen) + `rab_ingredient_budgets` dengan lineage baris sumber |
 | SCRUM-45 | [DATA-012] Sukun PO profile | mapping | 3 | TODO | To Do | — | 2026-10-23 |  |
 | SCRUM-29 | Sukun PO adapter + stable IDs | mapping | 3 | TODO | To Do | — | 2026-10-23 |  |
 | SCRUM-31 | Menu common adapter | menu-mapping | 3 | IN_PROGRESS (sebagian BLOCKED: B-MAPOUT, B-DD) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | MAP-SKN-MENU-001 multi-sheet; hasil belum disimpan |

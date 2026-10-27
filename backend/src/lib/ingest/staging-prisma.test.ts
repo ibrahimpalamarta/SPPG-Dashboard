@@ -64,3 +64,49 @@ describe('PrismaStagingRepository (SCRUM-24)', () => {
     assert.equal(await repo.getBatch('nope'), undefined);
   });
 });
+
+describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
+  const calls: string[] = [];
+  const many = (name: string) => async ({ data }: { data: unknown[] }) => void calls.push(`${name}:${data.length}`);
+  const del = (name: string) => async () => void calls.push(`${name}:delete`);
+  const tx = {
+    stagingRow: { deleteMany: del('staging'), createMany: many('staging') },
+    financeTransaction: { deleteMany: del('txn'), createMany: many('txn') },
+    financeTransactionLine: { createMany: many('line') },
+    rabDailyBudget: {
+      deleteMany: del('day'),
+      createManyAndReturn: async ({ data }: { data: { budgetDate: Date; portionSegment: string }[] }) => {
+        calls.push(`day:${data.length}`);
+        return data.map((d, i) => ({ id: BigInt(i + 1), budgetDate: d.budgetDate, portionSegment: d.portionSegment }));
+      },
+    },
+    rabIngredientBudget: { createMany: async ({ data }: { data: { dailyBudgetId: bigint }[] }) => void calls.push(`ing:${data.map((d) => d.dailyBudgetId).join(',')}`) },
+  };
+  const repo = new PrismaStagingRepository({ $transaction: async (fn: (t: unknown) => Promise<void>) => fn(tx) } as unknown as PrismaClient);
+  const empty: StagedBatch = { domain: 'CASHFLOW', sheets: [], rows: [] };
+
+  test('Cashflow: headers first, then lines, after the old canonical rows are cleared', async () => {
+    calls.length = 0;
+    const line = (id: string) => ({ source_record_id: id, line_id: null, item_name: null, counterparty: null, qty: 1, unit: 'kg', unit_price: 5, line_amount: 5 });
+    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, description: null, txn_total: 10, review_status: null, review_note: null, confidence: null, lines: [line('a'), line('b')] };
+    await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', domain: 'CASHFLOW', records: [txn] });
+    assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'txn:1', 'line:2']);
+  });
+
+  test('RAB: ingredient rows get the id of their (date, segment) budget', async () => {
+    calls.length = 0;
+    const ing = (id: string) => ({ source_record_id: id, menu_type: null, menu_name: null, ingredient: null, unit_price: null, line_total: 1, beneficiaries: null, ingredient_need_kg: null, packaged_need_pax: null });
+    const days = [
+      { budget_date: '2026-02-23', portion_segment: 'Kecil', planned_cost: 2, lines: [ing('a'), ing('b')] },
+      { budget_date: '2026-02-23', portion_segment: 'Besar', planned_cost: 1, lines: [ing('c')] },
+    ];
+    await repo.replaceBatch('b-1', { ...empty, domain: 'RAB' }, { profileId: 'MAP-SKN-RAB-001', domain: 'RAB', records: days });
+    assert.deepEqual(calls.slice(-2), ['day:2', 'ing:1,1,2']);
+  });
+
+  test('no mapped records: only staging is touched', async () => {
+    calls.length = 0;
+    await repo.replaceBatch('b-1', empty);
+    assert.deepEqual(calls, ['staging:delete']);
+  });
+});
