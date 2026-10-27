@@ -1,5 +1,5 @@
 # SCRUM-20: RBAC 2 role
-Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-ROLE) | Terakhir diubah: 2026-10-25
+Fitur: access/rbac | Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-ROLE) | Terakhir diubah: 2026-10-27
 
 ## Kondisi awal (hasil audit kode)
 - Branch `feature/scrum-20-rbac` (commit `3c48256`, 22 Okt, lokal) sudah memuat backend RBAC berbasis permission.
@@ -39,4 +39,4 @@ Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-ROLE) | Terakhir diubah: 202
 - Rute master tulis sudah dipindah ke `reference:edit` (25 Okt).
 
 ## Skema
-- [USULAN, sudah termigrasi] `user_kitchen_scopes`, `kitchens.code` → `schema-proposals/SCRUM-20.md`
+- [USULAN, sudah termigrasi] `user_kitchen_scopes`, `kitchens.code` → `SCRUM-20-schema.md`

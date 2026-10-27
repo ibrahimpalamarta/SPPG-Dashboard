@@ -34,6 +34,6 @@
     { "source": "prd", "id": "OD-02", "priority": "decision", "target": null, "refs": ["AC-DASH-04"], "title": "Official account balance source", "ac": "Owner Finance. Selama open: test fixme, tampil Menunggu keputusan." },
     { "source": "prd", "id": "OD-03", "priority": "decision", "target": null, "refs": ["AC-DASH-05"], "title": "Exact EFI transfer definition", "ac": "Owner Finance/COO. Selama open: test fixme, tampil Menunggu keputusan." },
     { "source": "prd", "id": "OD-04", "priority": "decision", "target": null, "refs": ["AC-DASH-01", "P1-021"], "title": "Planned vs actual cost definition + alokasi large/small", "ac": "Owner Finance + Nutrition + COO. Selama open: test fixme, tampil Menunggu keputusan." },
-    { "source": "jira", "id": "SCRUM-20", "priority": "P0", "target": "2026-11-14", "refs": ["P1-001"], "title": "RBAC 2 role", "ac": "Lihat projects/jira/tickets/SCRUM-20.md." }
+    { "source": "jira", "id": "SCRUM-20", "priority": "P0", "target": "2026-11-14", "refs": ["P1-001"], "title": "RBAC 2 role", "ac": "Lihat projects/jira/tickets/access/rbac/SCRUM-20.md." }
   ]
 }

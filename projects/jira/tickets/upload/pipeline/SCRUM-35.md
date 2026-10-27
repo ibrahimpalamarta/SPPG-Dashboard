@@ -1,5 +1,5 @@
 # SCRUM-35: [DATA-002] Cashflow Upload v1 staging parser
-Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-TPLVER) | Terakhir diubah: 2026-10-23 20:00
+Fitur: upload/pipeline | Tahap: 2 | Status: IN REVIEW (sebagian BLOCKED: B-TPLVER, B-SAMPLE-LWG) | Terakhir diubah: 2026-10-27
 
 ## Kondisi awal (hasil audit kode)
 - Tidak ada parser Cashflow. Pipeline SCRUM-24 menyimpan domain CASHFLOW lewat staging mentah generik.
@@ -21,7 +21,7 @@ Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-TPLVER) | Terakhir
 - [x] Refactor: `stageRows()` + `SheetRule` + `loose()` dipindah ke `staging.ts`; registry menjadi map statis domain → parser (`pipeline.ts`)
 
 ## Sisa pekerjaan
-- [ ] Staging persisten (B-SCHEMA)
+- [x] Staging persisten (`staging_rows`, 6a6d2dc)
 - [ ] Penanda versi template (B-TPLVER → SCRUM-130)
 - [ ] Sampel Lawang untuk alias kolom pertama (B-SAMPLE-LWG). Toleransi header sudah ada (`loose`), tapi belum diuji dengan berkas nyata Lawang
 
@@ -45,7 +45,7 @@ Backend 131/131 lulus, `tsc` bersih.
 
 ## Skema
 - [PRD] `finance_txn_upload` (nama dataset + traceability §7.2) lewat `StagingRow`
-- [USULAN] wadah fisik → `schema-proposals/SCRUM-24.md`
+- [USULAN, sudah termigrasi] wadah fisik `staging_rows` → `SCRUM-24-schema.md`
 
 ## Update 2026-10-25 — baseline Sukun (`feature/tahap2-upload-parsers`)
 - Baseline asli `CASHFLOW_SUKUN` sheet `Transaksi_Kas` berlayout **flat** (17 kolom, sama dengan layout DNM K-05): `id, txn_id, tanggal, tipe, arah, kategori, uraian, nama_barang, nama_penerima, qty, satuan, harga_satuan, jumlah_baris, total, confidence, status_review, catatan_review`. Satu baris per item; `total` diulang di tiap baris transaksi.

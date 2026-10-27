@@ -1,5 +1,5 @@
 # SCRUM-132: [DATA-052] Dapur reference & rollout-status metadata untuk filter
-Tahap: 3 (ditarik maju) | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-LWG, B-TUREN) | Terakhir diubah: 2026-10-25
+Fitur: access/kitchen-reference | Tahap: 3 (ditarik maju) | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-LWG, B-TUREN) | Terakhir diubah: 2026-10-27
 
 ## Kondisi awal (hasil audit kode)
 - Tabel `kitchens` ada di develop (ERD): name, wilayah, type, status ACTIVE/INACTIVE.
@@ -30,4 +30,4 @@ Tahap: 3 (ditarik maju) | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-LWG
 - B-SCHEMA, B-LWG, B-TUREN
 
 ## Skema
-- [USULAN] `kitchens.bucket`, `kitchens.rollout_status` → `schema-proposals/SCRUM-132.md` (tidak dimigrasi)
+- [USULAN] `kitchens.bucket`, `kitchens.rollout_status` → `SCRUM-132-schema.md` (tidak dimigrasi)

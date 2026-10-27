@@ -1,5 +1,5 @@
 # SCRUM-36: [DATA-003] Menu Upload v1 staging parser
-Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA) | Terakhir diubah: 2026-10-25
+Fitur: upload/pipeline | Tahap: 2 | Status: IN REVIEW | Terakhir diubah: 2026-10-27
 
 ## Kondisi awal (hasil audit kode)
 - `backend/src/lib/menu-workbook.ts` hanya dipakai dryRun MENU, header ditebak dari schema, sheet pertama saja.
@@ -15,7 +15,7 @@ Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA) | Terakhir diubah: 2
 - [x] Fixture anonim `fixtures/sukun-menu.csv` (22 baris).
 
 ## Sisa pekerjaan
-- [ ] Staging persisten (B-SCHEMA)
+- [x] Staging persisten (`staging_rows`, 6a6d2dc)
 - [ ] Transform ke `menu_recipe_line` (SCRUM-31/73)
 
 ## Test

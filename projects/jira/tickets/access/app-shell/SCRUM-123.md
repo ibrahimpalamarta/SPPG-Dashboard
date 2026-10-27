@@ -1,5 +1,5 @@
 # SCRUM-123: Tampilan bersih, data Rencana disembunyikan, Data Reference hanya diubah PM
-Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-PLAN) | Terakhir diubah: 2026-10-25
+Fitur: access/app-shell | Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-PLAN) | Terakhir diubah: 2026-10-27
 
 ## Kondisi awal (hasil audit kode)
 - Subjudul kecil di bawah judul halaman Overview, Finance, Kelengkapan Data, Unggah Data, Peran & Izin.
@@ -13,6 +13,7 @@ Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-PLAN) | Terakhir diubah: 202
 - [x] Tombol **Ubah** per dapur (nama, status) hanya muncul bila role punya `reference:edit` (PM MBG); server action `PATCH /api/kitchens/:id`, backend menolak role lain (403, SCRUM-20)
 - [x] Rencana: tidak ada yang tampil di dashboard; data RAB/penerima rencana di backend tidak disentuh
 - [x] Kartu "Informasi Gizi" berlabel sesuai tiket
+- [x] Halaman Data Reference berisi tab (Kamus data dst., `?tab=`) dengan pencarian; isi kamus dari `lib/mock/referensi-data.ts` (statis, bukan data operasional) (9cbd0f8)
 
 ## Sisa pekerjaan
 - [ ] B-PLAN: konfirmasi Product bahwa "Rencana disembunyikan" mengalahkan PRD AC-DASH-01 (Planned Cost per Portion, SCRUM-64/100). Widget itu belum dibangun; keputusan dibutuhkan sebelum T24.

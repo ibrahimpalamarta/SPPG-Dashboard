@@ -1,5 +1,5 @@
 # SCRUM-131: [DATA-051] Tolak template header-only
-Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-TPLVER) | Terakhir diubah: 2026-10-25
+Fitur: upload/template | Tahap: 2 | Status: IN REVIEW (sebagian BLOCKED: B-TPLVER) | Terakhir diubah: 2026-10-27
 
 ## Yang sudah dikerjakan (`feature/tahap2-upload-parsers`)
 - [x] Berkas dengan header tanpa baris data → `EMPTY_FILE`, staging batch dihapus (pipeline SCRUM-24), tidak ada canonical.
