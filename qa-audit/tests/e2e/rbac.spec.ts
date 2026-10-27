@@ -3,7 +3,7 @@ import { storageState, type RoleKey } from './roles.js';
 
 // PRD §3 roles on today's permission map (migration 20261025000000_internal_auth,
 // decision D-10): INTERNAL is view-only, DATA_ADMIN may also enter data.
-const VIEW = ['Overview', 'Unggah Data', 'Mapping & Validasi', 'Finance & Cost', 'Data Health', 'Data Reference'];
+const VIEW = ['Overview', 'Unggah Data', 'Validasi Data', 'Finance & Cost', 'Kelengkapan Data', 'Data Reference'];
 const ADMIN_ONLY = ['Anggota', 'Peran & Izin'];
 
 // Inbox is open to every role (SCRUM-20); DATA_ADMIN sees Anggota as a read-only list (PRD AC-MEM-01).
