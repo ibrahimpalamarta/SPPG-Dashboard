@@ -38,6 +38,3 @@ export const ROLE_LABELS: Record<Role, string> = {
   AHLI_GIZI: "Ahli Gizi",
   DATA_STEWARD: "Data Steward",
 };
-
-/** Mirrors backend KITCHEN_SCOPED_ROLES: these must be given at least one kitchen. */
-export const KITCHEN_SCOPED_ROLES: readonly Role[] = ["KEPALA_KITCHEN", "DATA_ADMIN", "AHLI_GIZI"];
