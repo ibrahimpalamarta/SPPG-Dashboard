@@ -27,4 +27,23 @@ describe('Input Maker (SCRUM-86/118)', () => {
     assert.equal(first?.request_amount, 1500000);
     assert.equal(first?.checklist, true);
   });
+
+  test('payment_request_id is stable across re-uploads and unique for repeated rows (SCRUM-47)', async () => {
+    const dup = Buffer.from(
+      [
+        'NO,TANGGAL,KETERANGAN,Kategori,Nama Supplier,TAGIHAN,Checklist',
+        '1,05/03/2026,Beras,Bahan Baku,UD Maju,Rp1.500.000,TRUE',
+        '1,05/03/2026,Beras,Bahan Baku,UD Maju,Rp1.500.000,TRUE',
+      ].join('\n'),
+    );
+    const profile = PROFILES.find((p) => p.id === 'MAP-SKN-PAY-001')!;
+    const ids = async () => {
+      const { batch } = await staged(dup, 'INPUT_MAKER');
+      return (profile.apply(batch.sheets, batch.rows, profile).records as InputMakerLine[]).map((l) => l.payment_request_id);
+    };
+    const [a, b] = await ids();
+    assert.match(a!, /^PAY-SKN-[0-9a-f]{12}$/);
+    assert.equal(b, `${a}-2`);
+    assert.deepEqual(await ids(), [a, b]);
+  });
 });

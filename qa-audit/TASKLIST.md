@@ -45,26 +45,26 @@ Setiap tiket dianggap selesai bila semua poin di kolom *Selesai bila* lulus, dan
 | T06 | Excel pipeline + halaman Unggah Data + history/status | 24, 5, 25 | IN_PROGRESS |
 | T07 | Cashflow Upload v1 staging parser | 35 | IN_PROGRESS (B-SCHEMA, B-TPLVER) |
 | T08 | Menu Upload v1 staging parser | 36 | IN_PROGRESS (B-SCHEMA) |
-| T09 | Input Maker Upload v1 + Sukun raw staging | 86, 118 (126 duplikat) | TODO |
-| T10 | Template resmi: generate, tombol download, tolak header-only | 130, 125, 131 | TODO |
+| T09 | Input Maker Upload v1 + Sukun raw staging | 86, 118 (126 duplikat) | IN REVIEW |
+| T10 | Template resmi: generate, tombol download, tolak header-only | 130, 125, 131 | IN REVIEW |
 | **Tahap 3 — Mapping** ||||
 | T11 | Mapping Profile Registry + detect/apply per dapur | 26, 39 | IN_PROGRESS (B-REG default dipakai, B-DD) |
 | T12 | Schema mismatch handling + layar kolom berbeda | 94, 124 | IN_PROGRESS (B-SCHEMA) |
 | T13 | Sukun Cashflow profile/adapter | 27, 55 | IN REVIEW (B-DD) |
-| T14 | Lawang + persiapan DNM/PCK/SML Cashflow | 32, 56, 57 | TODO (B-SAMPLE-LWG/OTHER) |
+| T14 | Lawang + persiapan DNM/PCK/SML Cashflow | 32, 56, 57 | IN REVIEW (B-SAMPLE-LWG/OTHER) |
 | T15 | Menu common adapter + menu_recipe_line + profil 5 dapur | 31, 73, 58 | IN_PROGRESS (B-MAPOUT; T15.3 B-SAMPLE-LWG/OTHER) |
 | **Tahap 4 — Kanonik Finance** ||||
-| T16 | finance_transaction header/line + anti-double-count | 77, 40, 98, 41 | TODO |
-| T17 | Rantai RAB → PO → GR → Payment (Sukun) | 44, 28, 45, 29, 46, 47, 30 | TODO (B-RAW) |
-| T18 | Dataset finance_balance + beneficiary_daily_count + PII | 49, 50, 72 | TODO |
+| T16 | finance_transaction header/line + anti-double-count | 77, 40, 98, 41 | IN REVIEW |
+| T17 | Rantai RAB → PO → GR → Payment (Sukun) | 44, 28, 45, 29, 46, 47, 30 | BLOCKED (B-SRC-SKN) (B-RAW) |
+| T18 | Dataset finance_balance + beneficiary_daily_count + PII | 49, 50, 72 | BLOCKED (B-SRC-SKN) |
 | **Tahap 5 — Validasi & Publish** ||||
-| T19 | Normalisasi bersama (tanggal/mata uang/unit) + missing ≠ 0 | 52, 53 | TODO |
-| T20 | Validation framework + severity & quarantine | 33, 51 | TODO |
-| T21 | Finance DQ: kategori, transfer internal, SLA D0/D+1, rekonsiliasi Ringkasan_Transaksi | 34, 42, 43, 48, 84, 119 (127 duplikat) | TODO |
-| T22 | Menu DQ lintas template dapur | 85, 120 (128 duplikat) | TODO |
-| T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | TODO |
+| T19 | Normalisasi bersama (tanggal/mata uang/unit) + missing ≠ 0 | 52, 53 | BLOCKED (B-SRC-SKN) |
+| T20 | Validation framework + severity & quarantine | 33, 51 | IN REVIEW (link PO/GR: B-SRC-SKN) |
+| T21 | Finance DQ: kategori, transfer internal, SLA D0/D+1, rekonsiliasi Ringkasan_Transaksi | 34, 42, 43, 48, 84, 119 (127 duplikat) | IN REVIEW |
+| T22 | Menu DQ lintas template dapur | 85, 120 (128 duplikat) | BLOCKED (B-SRC-SKN) |
+| T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | BLOCKED (B-SRC-SKN) |
 | **Tahap 6 — KPI & Dashboard** ||||
-| T24 | Widget Finance: Top 5 Supplier, Expense Mix, Planned Cost/Portion, Saldo, EFI Transfer | 62, 97, 63, 99, 64, 100, 65, 101, 66, 102 | TODO |
+| T24 | Widget Finance: Top 5 Supplier, Expense Mix, Planned Cost/Portion, Saldo, EFI Transfer | 62, 97, 63, 99, 64, 100, 65, 101, 66, 102 | BLOCKED (B-SRC-SKN) |
 | T25 | Widget Menu/Gizi/Beneficiary + validasi total tersalurkan | 74, 115, 76, 116, 103, 129 | TODO |
 | T26 | Data Health & traceability | 104, 60, 105, 61, 106, 59, 107, 67, 68 | TODO |
 | **Tahap 7 — Fallback & Foto** ||||

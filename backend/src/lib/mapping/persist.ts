@@ -1,6 +1,7 @@
 import type { Prisma, UploadDomain } from '@prisma/client';
 import type { CashflowTxn } from './sukun-cashflow.js';
 import type { RabDailyBudget } from './sukun-rab.js';
+import type { InputMakerLine } from './input-maker.js';
 
 /** What an adapter produced for a batch, ready to store (B-MAPOUT: stored at upload). */
 export type MappedRecords = {
@@ -21,7 +22,8 @@ async function insertChunked<T>(rows: T[], insert: (chunk: T[]) => Promise<unkno
 
 /**
  * Replaces the canonical rows of one batch: Cashflow → finance_transaction(+_line),
- * RAB → rab_daily_budget + rab_ingredient_budget. Runs inside the staging
+ * RAB → rab_daily_budget + rab_ingredient_budget, Input Maker →
+ * vendor_payment_workflow. Runs inside the staging
  * transaction, so staging and canonical rows are never half-written. Other
  * domains have no canonical table yet.
  */
@@ -29,6 +31,7 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
   // Lines and ingredient budgets go with their parent (ON DELETE CASCADE).
   await tx.financeTransaction.deleteMany({ where: { uploadBatchId } });
   await tx.rabDailyBudget.deleteMany({ where: { uploadBatchId } });
+  await tx.vendorPaymentWorkflow.deleteMany({ where: { uploadBatchId } });
 
   // PRD §7.2 traceability: kitchen_id, source_system and source_file_name are the batch's.
   const batch = await tx.uploadBatch.findUniqueOrThrow({
@@ -83,6 +86,25 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
             lineAmount: l.line_amount,
           })),
         }),
+    );
+  } else if (mapped.domain === 'INPUT_MAKER') {
+    // Workflow times, paid amount and payment reference stay NULL: TAGIHAN/TANGGAL are not evidence of payment (OD-14).
+    await insertChunked(mapped.records as InputMakerLine[], (chunk) =>
+      tx.vendorPaymentWorkflow.createMany({
+        data: chunk.map((l) => ({
+          ...trace,
+          sourceRecordId: l.source_record_id,
+          paymentRequestId: l.payment_request_id,
+          requestDate: l.request_date ? new Date(l.request_date) : null,
+          description: l.description,
+          category: l.category,
+          supplierName: l.supplier,
+          requestAmount: l.request_amount,
+          checklist: l.checklist,
+          supplierInvoiceLink: l.supplier_invoice_link,
+          paymentInvoiceLink: l.payment_invoice_link,
+        })),
+      }),
     );
   } else if (mapped.domain === 'RAB') {
     const days = mapped.records as RabDailyBudget[];

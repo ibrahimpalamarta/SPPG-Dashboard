@@ -321,6 +321,7 @@ model Kitchen {
 
   financeTransactions FinanceTransaction[]
   rabDailyBudgets     RabDailyBudget[]
+  vendorPayments      VendorPaymentWorkflow[]
 
   @@index([status])
   @@map("kitchens")
@@ -465,6 +466,7 @@ model UploadBatch {
   stagingRows         StagingRow[]
   financeTransactions FinanceTransaction[]
   rabDailyBudgets     RabDailyBudget[]
+  vendorPayments      VendorPaymentWorkflow[]
 
   @@index([kitchenId, uploadDate])
   @@index([kitchenId, domain, uploadDate])
@@ -480,7 +482,8 @@ model StagingRow {
   uploadBatchId String      @map("upload_batch_id") @db.Uuid
   uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
 
-  sourceRecordId   String       @unique @map("source_record_id")
+  /// Tidak UNIQUE: id memuat hash berkas, jadi berkas yang sama diunggah ulang (batch baru) menghasilkan id yang sama.
+  sourceRecordId   String       @map("source_record_id")
   /// Kode dapur (atau id numerik bila belum ada kode, B-TUREN).
   kitchenId        String       @map("kitchen_id")
   sourceSystem     SourceSystem @map("source_system")
@@ -494,6 +497,7 @@ model StagingRow {
   sourceRowNumber Int    @map("source_row_number")
   cells           Json
 
+  @@index([sourceRecordId])
   @@index([uploadBatchId])
   @@map("staging_rows")
 }
@@ -629,6 +633,54 @@ model RabIngredientBudget {
   @@index([dailyBudgetId])
   @@index([sourceRecordId])
   @@map("rab_ingredient_budgets")
+}
+
+/// Hasil mapping Input Maker (MAP-SKN-PAY-001, SCRUM-30/47): satu baris per
+/// permintaan bayar. TAGIHAN adalah jumlah yang DIMINTA, bukan yang dibayar
+/// (OD-14); waktu maker/approval/bayar dan status lunas tidak diturunkan dari
+/// TANGGAL/TAGIHAN, jadi NULL sampai ada bukti yang andal. Kolom bank tidak
+/// pernah masuk (restricted). INTERNAL-ONLY (SCRUM-13). Nama field [USULAN] (B-DD).
+/// Constraint di migration: paid_at NOT NULL => payment_reference NOT NULL.
+model VendorPaymentWorkflow {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  /// ID stabil: hash isi baris + sheet, sama untuk berkas yang diunggah ulang.
+  paymentRequestId String @map("payment_request_id")
+
+  /// Field traceability PRD §7.2.
+  mappingProfileId String       @map("mapping_profile_id")
+  kitchenId        BigInt       @map("kitchen_id")
+  kitchen          Kitchen      @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  sourceRecordId   String       @map("source_record_id")
+  sourceSystem     SourceSystem @map("source_system")
+  sourceFileName   String       @map("source_file_name")
+  templateVersion  String?      @map("template_version")
+  loadedAt         DateTime     @map("loaded_at")
+
+  requestDate         DateTime? @map("request_date") @db.Date
+  /// Label mentah dari sumber, dipertahankan apa adanya.
+  description         String?
+  category            String?
+  supplierName        String?   @map("supplier_name")
+  requestAmount       Decimal?  @map("request_amount") @db.Decimal(16, 2)
+  checklist           Boolean?
+  supplierInvoiceLink String?   @map("supplier_invoice_link")
+  paymentInvoiceLink  String?   @map("payment_invoice_link")
+
+  /// Rantai workflow. Semuanya NULL dari Input Maker (tidak ada buktinya di sumber).
+  makerInputAt     DateTime? @map("maker_input_at")
+  approvedAt       DateTime? @map("approved_at")
+  paidAt           DateTime? @map("paid_at")
+  paidAmount       Decimal?  @map("paid_amount") @db.Decimal(16, 2)
+  paymentReference String?   @map("payment_reference")
+
+  @@unique([uploadBatchId, paymentRequestId])
+  @@index([kitchenId, requestDate])
+  @@index([sourceRecordId])
+  @@map("vendor_payment_workflows")
 }
 
 /// Form perencanaan menu SOP-OPR-001, sudah diratakan menjadi satu baris per
