@@ -10,7 +10,7 @@ Tahap: 3 (label Jira: stage-4) | Status: IN REVIEW | Terakhir diubah: 2026-10-28
 
 ## Belum
 - Link ke PO/receipt (SCRUM-47): tidak ada sumber PO/GR Sukun (B-SRC-SKN).
-- Migration belum dijalankan ke Postgres.
+- Migration sudah dijalankan ke Postgres lokal (2026-10-28).
 
 ## Test
 `src/lib/mapping/input-maker.test.ts`, `src/lib/ingest/staging-prisma.test.ts`

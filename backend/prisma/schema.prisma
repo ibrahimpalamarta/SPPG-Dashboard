@@ -482,7 +482,8 @@ model StagingRow {
   uploadBatchId String      @map("upload_batch_id") @db.Uuid
   uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
 
-  sourceRecordId   String       @unique @map("source_record_id")
+  /// Tidak UNIQUE: id memuat hash berkas, jadi berkas yang sama diunggah ulang (batch baru) menghasilkan id yang sama.
+  sourceRecordId   String       @map("source_record_id")
   /// Kode dapur (atau id numerik bila belum ada kode, B-TUREN).
   kitchenId        String       @map("kitchen_id")
   sourceSystem     SourceSystem @map("source_system")
@@ -496,6 +497,7 @@ model StagingRow {
   sourceRowNumber Int    @map("source_row_number")
   cells           Json
 
+  @@index([sourceRecordId])
   @@index([uploadBatchId])
   @@map("staging_rows")
 }
