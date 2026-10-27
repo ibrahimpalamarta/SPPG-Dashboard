@@ -7,7 +7,7 @@ import { InMemoryStagingRepository, sourceRecordId, type ParseContext } from './
 const ctx: ParseContext = {
   uploadBatchId: 'b-1',
   kitchenCode: 'SKN',
-  domain: 'RAB',
+  domain: 'PO',
   sourceSystem: 'INTERNAL',
   sourceFileName: 'rab.xlsx',
   fileHash: 'abcdef0123456789',
@@ -65,8 +65,8 @@ describe('parseToStaging (SCRUM-24)', () => {
     const out = await parseToStaging(await multiSheet(), ctx, new InMemoryStagingRepository());
     assert.ok(out.ok);
     const row = out.batch.rows[0];
-    assert.equal(row.sourceRecordId, 'SKN:RAB:abcdef012345:RAB%20Oktober:3');
-    assert.equal(row.sourceRecordId, sourceRecordId('SKN', 'RAB', ctx.fileHash, 'RAB Oktober', 3));
+    assert.equal(row.sourceRecordId, 'SKN:PO:abcdef012345:RAB%20Oktober:3');
+    assert.equal(row.sourceRecordId, sourceRecordId('SKN', 'PO', ctx.fileHash, 'RAB Oktober', 3));
     assert.equal(row.sourceSystem, 'INTERNAL');
     assert.equal(row.sourceFileName, 'rab.xlsx');
     assert.equal(row.templateVersion, null);

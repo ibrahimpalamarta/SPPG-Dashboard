@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient, SourceSystem, UploadDomain } from '@prisma/client';
+import { writeCanonical, type MappedRecords } from '../mapping/persist.js';
 import { DEFAULT_HEADER_OPTIONS, detectHeaderRow, isBlankRow, type RawCell, type RawSheet } from './workbook.js';
 
 /**
@@ -113,8 +114,11 @@ export function stageRows(sheets: RawSheet[], ctx: ParseContext, rule?: SheetRul
 }
 
 export interface StagingRepository {
-  /** Delete-then-insert for one batch, so a re-parse never leaves stale rows. */
-  replaceBatch(uploadBatchId: string, batch: StagedBatch): Promise<void>;
+  /**
+   * Delete-then-insert for one batch, so a re-parse never leaves stale rows.
+   * `mapped` (the adapter's output) is stored with it, in the same transaction.
+   */
+  replaceBatch(uploadBatchId: string, batch: StagedBatch, mapped?: MappedRecords): Promise<void>;
   deleteBatch(uploadBatchId: string): Promise<void>;
   getBatch(uploadBatchId: string): Promise<StagedBatch | undefined>;
 }
@@ -122,13 +126,17 @@ export interface StagingRepository {
 /** Unit tests and dry-run only: rows live in process memory. */
 export class InMemoryStagingRepository implements StagingRepository {
   private readonly batches = new Map<string, StagedBatch>();
+  readonly mapped = new Map<string, MappedRecords>();
 
-  async replaceBatch(uploadBatchId: string, batch: StagedBatch) {
+  async replaceBatch(uploadBatchId: string, batch: StagedBatch, mapped?: MappedRecords) {
     this.batches.set(uploadBatchId, batch);
+    if (mapped) this.mapped.set(uploadBatchId, mapped);
+    else this.mapped.delete(uploadBatchId);
   }
 
   async deleteBatch(uploadBatchId: string) {
     this.batches.delete(uploadBatchId);
+    this.mapped.delete(uploadBatchId);
   }
 
   async getBatch(uploadBatchId: string) {
@@ -150,7 +158,7 @@ const CHUNK = 2000;
 export class PrismaStagingRepository implements StagingRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async replaceBatch(uploadBatchId: string, batch: StagedBatch) {
+  async replaceBatch(uploadBatchId: string, batch: StagedBatch, mapped?: MappedRecords) {
     await this.db.$transaction(async (tx) => {
       await tx.stagingRow.deleteMany({ where: { uploadBatchId } });
       for (let i = 0; i < batch.rows.length; i += CHUNK) {
@@ -158,6 +166,7 @@ export class PrismaStagingRepository implements StagingRepository {
           data: batch.rows.slice(i, i + CHUNK).map(({ cells, ...r }) => ({ ...r, domain: batch.domain, cells: cells as unknown as Prisma.InputJsonValue })),
         });
       }
+      if (mapped) await writeCanonical(tx, uploadBatchId, mapped);
     });
   }
 

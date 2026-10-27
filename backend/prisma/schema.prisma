@@ -319,6 +319,9 @@ model Kitchen {
   menuCosts      MenuCost[]
   userScopes     UserKitchenScope[]
 
+  financeTransactions FinanceTransaction[]
+  rabDailyBudgets     RabDailyBudget[]
+
   @@index([status])
   @@map("kitchens")
 }
@@ -458,8 +461,10 @@ model UploadBatch {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  menuPlans   MenuPlan[]
-  stagingRows StagingRow[]
+  menuPlans           MenuPlan[]
+  stagingRows         StagingRow[]
+  financeTransactions FinanceTransaction[]
+  rabDailyBudgets     RabDailyBudget[]
 
   @@index([kitchenId, uploadDate])
   @@index([kitchenId, domain, uploadDate])
@@ -491,6 +496,139 @@ model StagingRow {
 
   @@index([uploadBatchId])
   @@map("staging_rows")
+}
+
+/// Hasil mapping Cashflow (MAP-SKN-CF-001, SCRUM-27/55/98): satu baris per
+/// transaksi. `txn_total` hidup di sini dan TIDAK di baris line, supaya total
+/// tidak pernah terjumlah per baris (anti-double-count). Ikut hilang bersama
+/// batch (cascade). INTERNAL-ONLY (SCRUM-13). Nama field [USULAN] (B-DD).
+model FinanceTransaction {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  mappingProfileId String @map("mapping_profile_id")
+
+  /// Field traceability PRD §7.2: upload_batch_id di atas, mapping_profile_id,
+  /// kitchen_id, source_system, source_file_name, template_version, loaded_at.
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+
+  sourceRecordId  String       @map("source_record_id")
+  sourceSystem    SourceSystem @map("source_system")
+  sourceFileName  String       @map("source_file_name")
+  templateVersion String?      @map("template_version")
+  loadedAt        DateTime     @map("loaded_at")
+
+  txnId        String    @map("txn_id")
+  txnDate      DateTime? @map("txn_date") @db.Date
+  txnType      String?   @map("txn_type")
+  direction    String?
+  category     String?
+  description  String?
+  txnTotal     Decimal?  @map("txn_total") @db.Decimal(14, 2)
+  reviewStatus String?   @map("review_status")
+  reviewNote   String?   @map("review_note")
+  confidence   String?
+
+  /// DQ PRD §7.4: petty cash dan transfer internal bukan pengeluaran eksternal
+  /// (Top 5 Supplier / Expense Mix hanya menjumlah yang true). TODO(B-DD): aturan
+  /// klasifikasi final; sementara arah KELUAR.
+  isExternalSpend Boolean @map("is_external_spend")
+
+  lines FinanceTransactionLine[]
+
+  @@unique([uploadBatchId, txnId])
+  @@index([kitchenId, txnDate])
+  @@index([sourceRecordId])
+  @@map("finance_transactions")
+}
+
+/// Baris item satu transaksi Cashflow. `sourceRecordId` menunjuk baris mentah
+/// di staging_rows. Tidak UNIQUE: berkas yang sama diunggah ulang menghasilkan id
+/// yang sama; penggandaan dicegah saat publish (SCRUM-22).
+model FinanceTransactionLine {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String             @map("upload_batch_id") @db.Uuid
+  txnId         String             @map("txn_id")
+  transaction   FinanceTransaction @relation(fields: [uploadBatchId, txnId], references: [uploadBatchId, txnId], onDelete: Cascade)
+
+  sourceRecordId String   @map("source_record_id")
+  lineId         String?  @map("line_id")
+  itemName       String?  @map("item_name")
+  counterparty   String?
+  qty            Decimal? @db.Decimal(14, 3)
+  unit           String?
+  unitPrice      Decimal? @map("unit_price") @db.Decimal(14, 2)
+  lineAmount     Decimal? @map("line_amount") @db.Decimal(14, 2)
+
+  @@index([uploadBatchId, txnId])
+  @@index([sourceRecordId])
+  @@map("finance_transaction_lines")
+}
+
+/// Hasil mapping RAB (MAP-SKN-RAB-001, SCRUM-44/28): anggaran satu hari untuk
+/// satu segmen porsi, dijumlah dari baris bahan. INTERNAL-ONLY (SCRUM-13).
+/// Nama field [USULAN] (B-DD).
+model RabDailyBudget {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  mappingProfileId String @map("mapping_profile_id")
+
+  /// Field traceability PRD §7.2: upload_batch_id di atas, mapping_profile_id,
+  /// kitchen_id, source_system, source_file_name, template_version, loaded_at.
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+
+  sourceRecordId  String       @map("source_record_id")
+  sourceSystem    SourceSystem @map("source_system")
+  sourceFileName  String       @map("source_file_name")
+  templateVersion String?      @map("template_version")
+  loadedAt        DateTime     @map("loaded_at")
+
+  budgetDate     DateTime @map("budget_date") @db.Date
+  portionSegment String   @map("portion_segment")
+  plannedCost    Decimal  @map("planned_cost") @db.Decimal(16, 2)
+
+  /// Jumlah paket/porsi rencana hari itu (PRD §7.1 "package count"): terbesar
+  /// dari "Kebutuhan Makanan Kemasan (pax)"; NULL bila tidak ada baris yang
+  /// mengisinya. Bukan jumlah Penerima Manfaat: itu `beneficiaries` per baris.
+  packageCount Decimal? @map("package_count") @db.Decimal(14, 2)
+
+  ingredients RabIngredientBudget[]
+
+  @@unique([uploadBatchId, budgetDate, portionSegment])
+  @@index([sourceRecordId])
+  @@map("rab_daily_budgets")
+}
+
+/// Satu baris bahan RAB. `sourceRecordId` = baris sumber tempat biaya
+/// rencana berasal (AC SCRUM-44). Angka porsi disimpan mentah; aturan porsi
+/// rencana ada di SCRUM-64.
+model RabIngredientBudget {
+  id BigInt @id @default(autoincrement())
+
+  dailyBudgetId BigInt         @map("daily_budget_id")
+  dailyBudget   RabDailyBudget @relation(fields: [dailyBudgetId], references: [id], onDelete: Cascade)
+
+  sourceRecordId   String   @map("source_record_id")
+  menuType         String?  @map("menu_type")
+  menuName         String?  @map("menu_name")
+  ingredient       String?
+  unitPrice        Decimal? @map("unit_price") @db.Decimal(14, 2)
+  lineTotal        Decimal? @map("line_total") @db.Decimal(16, 2)
+  beneficiaries    Decimal? @db.Decimal(14, 2)
+  ingredientNeedKg Decimal? @map("ingredient_need_kg") @db.Decimal(14, 3)
+  packagedNeedPax  Decimal? @map("packaged_need_pax") @db.Decimal(14, 2)
+
+  @@index([dailyBudgetId])
+  @@index([sourceRecordId])
+  @@map("rab_ingredient_budgets")
 }
 
 /// Form perencanaan menu SOP-OPR-001, sudah diratakan menjadi satu baris per
