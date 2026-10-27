@@ -30,5 +30,5 @@ const BY_ERROR_CODE: Record<string, { label: string; tone: string }> = {
 
 export function StatusBadge({ status, errorCode }: { status: string; errorCode?: string | null }) {
   const s = (errorCode && BY_ERROR_CODE[errorCode]) || STATUS[status as keyof typeof STATUS] || { label: status, tone: "bg-slate-100 text-slate-700" };
-  return <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${s.tone}`}>{s.label}</span>;
+  return <span className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs font-semibold ${s.tone}`}>{s.label}</span>;
 }
