@@ -67,11 +67,19 @@ describe('PrismaStagingRepository (SCRUM-24)', () => {
 
 describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
   const calls: string[] = [];
+  const traced: Record<string, unknown>[] = [];
   const many = (name: string) => async ({ data }: { data: unknown[] }) => void calls.push(`${name}:${data.length}`);
   const del = (name: string) => async () => void calls.push(`${name}:delete`);
   const tx = {
+    uploadBatch: { findUniqueOrThrow: async () => ({ kitchenId: 7n, sourceSystem: 'INTERNAL', fileName: 'cf.xlsx' }) },
     stagingRow: { deleteMany: del('staging'), createMany: many('staging') },
-    financeTransaction: { deleteMany: del('txn'), createMany: many('txn') },
+    financeTransaction: {
+      deleteMany: del('txn'),
+      createMany: async ({ data }: { data: Record<string, unknown>[] }) => {
+        calls.push(`txn:${data.length}`);
+        traced.push(...data);
+      },
+    },
     financeTransactionLine: { createMany: many('line') },
     rabDailyBudget: {
       deleteMany: del('day'),
@@ -84,23 +92,52 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
   };
   const repo = new PrismaStagingRepository({ $transaction: async (fn: (t: unknown) => Promise<void>) => fn(tx) } as unknown as PrismaClient);
   const empty: StagedBatch = { domain: 'CASHFLOW', sheets: [], rows: [] };
+  const loadedAt = new Date('2026-10-27T00:00:00Z');
 
   test('Cashflow: headers first, then lines, after the old canonical rows are cleared', async () => {
     calls.length = 0;
     const line = (id: string) => ({ source_record_id: id, line_id: null, item_name: null, counterparty: null, qty: 1, unit: 'kg', unit_price: 5, line_amount: 5 });
-    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, description: null, txn_total: 10, review_status: null, review_note: null, confidence: null, lines: [line('a'), line('b')] };
-    await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', domain: 'CASHFLOW', records: [txn] });
+    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, description: null, txn_total: 10, is_external_spend: true, review_status: null, review_note: null, confidence: null, lines: [line('a'), line('b')] };
+    await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', templateVersion: '1', loadedAt, domain: 'CASHFLOW', records: [txn] });
     assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'txn:1', 'line:2']);
+  });
+
+  test('every canonical record carries the PRD §7.2 traceability fields', async () => {
+    traced.length = 0;
+    const line = { source_record_id: 'SKN:CASHFLOW:abc:Transaksi_Kas:2', line_id: null, item_name: null, counterparty: null, qty: 1, unit: 'kg', unit_price: 5, line_amount: 5 };
+    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, description: null, txn_total: 5, is_external_spend: true, review_status: null, review_note: null, confidence: null, lines: [line] };
+    await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', templateVersion: '1', loadedAt, domain: 'CASHFLOW', records: [txn] });
+    assert.deepEqual(traced[0], {
+      uploadBatchId: 'b-1',
+      mappingProfileId: 'MAP-SKN-CF-001',
+      kitchenId: 7n,
+      sourceSystem: 'INTERNAL',
+      sourceFileName: 'cf.xlsx',
+      templateVersion: '1',
+      loadedAt,
+      sourceRecordId: 'SKN:CASHFLOW:abc:Transaksi_Kas:2',
+      txnId: 'T1',
+      txnDate: new Date('2026-03-05'),
+      txnType: 'BELANJA',
+      direction: 'KELUAR',
+      category: null,
+      description: null,
+      txnTotal: 5,
+      isExternalSpend: true,
+      reviewStatus: null,
+      reviewNote: null,
+      confidence: null,
+    });
   });
 
   test('RAB: ingredient rows get the id of their (date, segment) budget', async () => {
     calls.length = 0;
     const ing = (id: string) => ({ source_record_id: id, menu_type: null, menu_name: null, ingredient: null, unit_price: null, line_total: 1, beneficiaries: null, ingredient_need_kg: null, packaged_need_pax: null });
     const days = [
-      { budget_date: '2026-02-23', portion_segment: 'Kecil', planned_cost: 2, lines: [ing('a'), ing('b')] },
-      { budget_date: '2026-02-23', portion_segment: 'Besar', planned_cost: 1, lines: [ing('c')] },
+      { budget_date: '2026-02-23', portion_segment: 'Kecil', planned_cost: 2, package_count: 84, lines: [ing('a'), ing('b')] },
+      { budget_date: '2026-02-23', portion_segment: 'Besar', planned_cost: 1, package_count: null, lines: [ing('c')] },
     ];
-    await repo.replaceBatch('b-1', { ...empty, domain: 'RAB' }, { profileId: 'MAP-SKN-RAB-001', domain: 'RAB', records: days });
+    await repo.replaceBatch('b-1', { ...empty, domain: 'RAB' }, { profileId: 'MAP-SKN-RAB-001', templateVersion: '1', loadedAt, domain: 'RAB', records: days });
     assert.deepEqual(calls.slice(-2), ['day:2', 'ing:1,1,2']);
   });
 

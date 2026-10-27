@@ -67,7 +67,7 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
     }
     const { profile } = detection;
     const out = profile.apply(batch.sheets, batch.rows, profile);
-    await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, domain: profile.domain, records: out.records });
+    await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, templateVersion: profile.version, loadedAt: ctx.loadedAt, domain: profile.domain, records: out.records });
     return { ok: true, batch, detection, mapping: summarise(profile, out) };
   } catch (err) {
     await staging.deleteBatch(ctx.uploadBatchId);

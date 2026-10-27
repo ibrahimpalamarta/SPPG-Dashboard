@@ -67,6 +67,20 @@ describe('DQ rule ids on issues', () => {
   });
 });
 
+describe('external spend (PRD §7.4)', () => {
+  test('petty cash coming in is not external spend', async () => {
+    const { batch } = await staged(
+      withRows('sukun-cashflow.csv', [
+        '1,TXN-P1,05/03/2026,PENERIMAAN,MASUK,Operasional,Petty Cash,Petty Cash,Firli,1,pax,Rp2.000.000,Rp2.000.000,Rp2.000.000,high,TERKONFIRMASI,',
+        '2,TXN-B1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Ayam,Ayam,Supplier A,1,kg,Rp40.000,Rp40.000,Rp40.000,high,TERKONFIRMASI,',
+      ]),
+      'CASHFLOW',
+    );
+    const txns = profile.apply(batch.sheets, batch.rows, profile).records as CashflowTxn[];
+    assert.deepEqual(txns.map((x) => [x.txn_id, x.is_external_spend]), [['TXN-P1', false], ['TXN-B1', true]]);
+  });
+});
+
 describe('MAP-LWG-CF-001 (SCRUM-32/56)', () => {
   test('Lawang uses the same canonical columns and is detected by kitchen code', async () => {
     const { detection, mapping } = await staged(fixture('sukun-cashflow.csv'), 'CASHFLOW', 'LWG');

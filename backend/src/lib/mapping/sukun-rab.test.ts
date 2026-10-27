@@ -35,6 +35,7 @@ describe('MAP-SKN-RAB-001 → rab_daily_budget + rab_ingredient_budget (SCRUM-44
         ['2026-02-23', 'Besar', 3125500, 1],
       ],
     );
+    assert.deepEqual(days.map((d) => d.package_count), [84, 893], 'pax column, not Jumlah PM');
     assert.match(days[0]!.lines[0]!.source_record_id, /^SKN:RAB:abcdef123456:/);
     assert.deepEqual(out.issues, []);
   });

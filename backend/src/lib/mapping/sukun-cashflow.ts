@@ -21,6 +21,8 @@ export type CashflowTxn = {
   category: string | null;
   description: string | null;
   txn_total: number | null;
+  /** DQ PRD §7.4: money in (petty cash) is not external spend. TODO(B-DD): final rule. */
+  is_external_spend: boolean;
   review_status: string | null;
   review_note: string | null;
   confidence: string | null;
@@ -88,6 +90,7 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
         category: text(f.category),
         description: text(f.description),
         txn_total: total,
+        is_external_spend: upper(text(f.direction)) === 'KELUAR',
         review_status: upper(text(f.review_status)),
         review_note: text(f.review_note),
         confidence: text(f.confidence)?.toLowerCase() ?? null,

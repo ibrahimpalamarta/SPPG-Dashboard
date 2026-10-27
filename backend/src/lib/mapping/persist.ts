@@ -3,7 +3,14 @@ import type { CashflowTxn } from './sukun-cashflow.js';
 import type { RabDailyBudget } from './sukun-rab.js';
 
 /** What an adapter produced for a batch, ready to store (B-MAPOUT: stored at upload). */
-export type MappedRecords = { profileId: string; domain: UploadDomain; records: unknown[] };
+export type MappedRecords = {
+  profileId: string;
+  /** profile.version, stored as template_version (PRD §7.2). */
+  templateVersion: string;
+  loadedAt: Date;
+  domain: UploadDomain;
+  records: unknown[];
+};
 
 // Postgres caps a statement at 65535 bind parameters; the widest row here has ~13.
 const CHUNK = 2000;
@@ -23,14 +30,28 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
   await tx.financeTransaction.deleteMany({ where: { uploadBatchId } });
   await tx.rabDailyBudget.deleteMany({ where: { uploadBatchId } });
 
-  const { profileId: mappingProfileId } = mapped;
+  // PRD §7.2 traceability: kitchen_id, source_system and source_file_name are the batch's.
+  const batch = await tx.uploadBatch.findUniqueOrThrow({
+    where: { publicId: uploadBatchId },
+    select: { kitchenId: true, sourceSystem: true, fileName: true },
+  });
+  const trace = {
+    uploadBatchId,
+    mappingProfileId: mapped.profileId,
+    kitchenId: batch.kitchenId,
+    sourceSystem: batch.sourceSystem,
+    sourceFileName: batch.fileName,
+    templateVersion: mapped.templateVersion,
+    loadedAt: mapped.loadedAt,
+  };
   if (mapped.domain === 'CASHFLOW') {
     const txns = mapped.records as CashflowTxn[];
     await insertChunked(txns, (chunk) =>
       tx.financeTransaction.createMany({
-        data: chunk.map(({ lines: _lines, txn_date, txn_type, direction, category, description, txn_total, review_status, review_note, confidence, txn_id }) => ({
-          uploadBatchId,
-          mappingProfileId,
+        data: chunk.map(({ lines, txn_date, txn_type, direction, category, description, txn_total, is_external_spend, review_status, review_note, confidence, txn_id }) => ({
+          ...trace,
+          // The transaction is traced to its first source row.
+          sourceRecordId: lines[0]!.source_record_id,
           txnId: txn_id,
           txnDate: txn_date ? new Date(txn_date) : null,
           txnType: txn_type,
@@ -38,6 +59,7 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
           category,
           description,
           txnTotal: txn_total,
+          isExternalSpend: is_external_spend,
           reviewStatus: review_status,
           reviewNote: review_note,
           confidence,
@@ -68,7 +90,14 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
     for (let i = 0; i < days.length; i += CHUNK) {
       const chunk = days.slice(i, i + CHUNK);
       const created = await tx.rabDailyBudget.createManyAndReturn({
-        data: chunk.map((d) => ({ uploadBatchId, mappingProfileId, budgetDate: new Date(d.budget_date), portionSegment: d.portion_segment, plannedCost: d.planned_cost })),
+        data: chunk.map((d) => ({
+          ...trace,
+          sourceRecordId: d.lines[0]!.source_record_id,
+          budgetDate: new Date(d.budget_date),
+          portionSegment: d.portion_segment,
+          plannedCost: d.planned_cost,
+          packageCount: d.package_count,
+        })),
         select: { id: true, budgetDate: true, portionSegment: true },
       });
       const idOf = new Map(created.map((c) => [`${c.budgetDate.toISOString().slice(0, 10)}|${c.portionSegment}`, c.id]));
