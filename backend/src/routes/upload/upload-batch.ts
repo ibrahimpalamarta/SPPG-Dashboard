@@ -4,6 +4,7 @@ import { validate } from '../../middleware/validate.js';
 import { singleFile } from '../../middleware/upload.js';
 import { wrap } from '../../lib/wrap.js';
 import { idParam } from '../../schemas/common.js';
+import { templateParam } from '../../schemas/upload-batch.js';
 import {
   uploadBatchCreate,
   uploadBatchCreateQuery,
@@ -13,6 +14,7 @@ import {
 import {
   createUploadBatch,
   getUploadBatch,
+  downloadTemplate,
   listUploadBatches,
   updateUploadBatch,
 } from '../../controllers/upload/upload-batch.js';
@@ -23,6 +25,7 @@ export const uploadBatchRouter = Router();
 // the caller's dapur.
 uploadBatchRouter.use(requirePermission('upload:view'));
 uploadBatchRouter.get('/', validate({ query: uploadBatchListQuery }), wrap(listUploadBatches()));
+uploadBatchRouter.get('/templates/:kind', validate({ params: templateParam }), wrap(downloadTemplate()));
 uploadBatchRouter.get('/:id', validate({ params: idParam }), wrap(getUploadBatch()));
 
 // SCRUM-20: uploading needs upload:create; changing a batch's verdict is a

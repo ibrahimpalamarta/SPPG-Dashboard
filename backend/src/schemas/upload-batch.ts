@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import { SourceSystem, UploadDomain, UploadStatus } from '@prisma/client';
+import { TEMPLATE_KINDS } from '../lib/templates.js';
 import { pageQuery } from '../lib/pagination.js';
 import { dateRangeFields, optionalBigInt, refineDateRange } from './common.js';
+
+export const templateParam = z.object({ kind: z.enum(TEMPLATE_KINDS) });
 
 export const uploadBatchListQuery = refineDateRange(
   pageQuery.extend({

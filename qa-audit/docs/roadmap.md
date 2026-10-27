@@ -15,7 +15,6 @@
 | O-01 | `backend/scripts/grant-public-role.ts` crash: query laporan grants memilih `information_schema.table_name` (tipe `sql_identifier`) yang tidak bisa dideserialisasi Prisma (P2010), **setelah** `ALTER ROLE` sukses. Perbaikan: `table_name::text`. Sementara seed-qa menjalankan `ALTER ROLE` sendiri | backend | Ditemukan qa-audit 25 Okt |
 | O-02 | `jsx-a11y` aktif tapi hanya 6 rule bawaan `eslint-config-next`. Usulan: tambah `jsx-a11y` `recommended` di `frontend-admin/eslint.config.mjs` | front-end | qa-audit tidak mengubah config app |
 | O-03 | Backend dan frontend-public tidak punya ESLint | backend / front-end | Hanya tsc + Semgrep untuk backend |
-| O-04 | Upload E2E butuh S3. Environment QA memakai bucket palsu; perlu S3 lokal (mis. emulator) atau mode storage lokal di backend | backend + QA | Menentukan cakupan AC-UP-01 di fase 2 |
 | O-05 | Root `README.md`/`CLAUDE.md` masih menyebut Auth0 dan frontend "Segera Hadir" | maintainer | Di luar scope qa-audit |
 | O-06 | Kontrak `data-testid` belum disepakati | front-end | [data-testid.md](data-testid.md) |
 | O-07 | Selesai untuk CI: `qa-setup` Node 24 (QD-29). Sisa: `engines`, `@types/node`, Vitest 5 | QA | – |

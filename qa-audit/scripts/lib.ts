@@ -13,7 +13,7 @@ export const AUTH = join(QA, '.auth');
 // Optional local overrides (see .env.example); real environment variables win.
 if (existsSync(join(QA, '.env'))) process.loadEnvFile(join(QA, '.env'));
 
-export const PORTS = { db: 15432, backend: 18080, admin: 13000 } as const;
+export const PORTS = { db: 15432, backend: 18080, admin: 13000, s3: 19000 } as const;
 
 export type RunResult = { code: number; out: string; missing: boolean };
 
