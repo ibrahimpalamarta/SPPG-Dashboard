@@ -11,8 +11,8 @@ export type Role = (typeof ROLES)[number];
  *   settings:manage             peta role -> permission
  *   audit:read                  audit trail
  *
- * SUPER_ADMIN (Project Manager MBG) always holds all of them and is not stored
- * in the table. CMS_ADMIN and PUBLIC hold none by default: CMS routes still
+ * SUPER_ADMIN (Project Manager MBG) always holds all of them except
+ * MAKER_PERMISSIONS and is not stored in the table. CMS_ADMIN and PUBLIC hold none by default: CMS routes still
  * gate on requireRole.
  */
 export const PERMISSIONS = [
@@ -31,3 +31,6 @@ export const PERMISSIONS = [
   'audit:read',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
+
+/** Four-eyes (PRD AC-ROLE-02): the reviewer never holds the maker's permissions. */
+export const MAKER_PERMISSIONS: readonly Permission[] = ['upload:create', 'mapping:propose'];

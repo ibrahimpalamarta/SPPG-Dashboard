@@ -1,10 +1,12 @@
 import type { Db } from '../db.js';
-import { PERMISSIONS, type Permission, type Role } from './roles.js';
+import { MAKER_PERMISSIONS, PERMISSIONS, type Permission, type Role } from './roles.js';
 
 const TTL_MS = 30_000;
 const cache = new Map<Role, { permissions: readonly Permission[]; at: number }>();
 
-const known = (p: string): p is Permission => (PERMISSIONS as readonly string[]).includes(p);
+const REVIEWER_PERMISSIONS = PERMISSIONS.filter((p) => !MAKER_PERMISSIONS.includes(p));
+
+const known =(p: string): p is Permission => (PERMISSIONS as readonly string[]).includes(p);
 
 /**
  * What `role` may do right now. Cached per process for a few seconds because
@@ -15,7 +17,7 @@ const known = (p: string): p is Permission => (PERMISSIONS as readonly string[])
  */
 export async function permissionsFor(role: Role, db: Db, now = Date.now()): Promise<readonly Permission[]> {
   // Never read from the table: the one role that must not be lockable-out.
-  if (role === 'SUPER_ADMIN') return PERMISSIONS;
+  if (role === 'SUPER_ADMIN') return REVIEWER_PERMISSIONS;
 
   const hit = cache.get(role);
   if (hit && now - hit.at < TTL_MS) return hit.permissions;

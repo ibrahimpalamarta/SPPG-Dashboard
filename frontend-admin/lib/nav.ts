@@ -19,7 +19,7 @@ export const NAV = [
   // Fallback terkontrol (PRD §4.2); the form itself is SCRUM-108.
   { group: "Data", href: "/input-manual", label: "Manual Entry", icon: "PenLine", permission: "upload:create" },
   // Tugas review/dikembalikan untuk yang memasukkan data dan PM (isinya SCRUM-117).
-  { group: "Data", href: "/inbox", label: "Inbox", icon: "Inbox", permission: "upload:create" },
+  { group: "Data", href: "/inbox", label: "Inbox", icon: "Inbox", permission: "dashboard:view" },
   // Administrasi akun; hanya muncul bagi peran yang diberi izinnya.
   { group: "Tools", href: "/anggota", label: "Anggota", icon: "Users", permission: "users:read" },
   { group: "Tools", href: "/peran", label: "Peran & Izin", icon: "ShieldCheck", permission: "settings:manage" },

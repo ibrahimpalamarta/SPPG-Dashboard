@@ -2,7 +2,7 @@ import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
 import { requireAuth, requireRole, requirePermission, resolveKitchenIds } from './guard.js';
-import { clearPermissionCache } from './rbac-store.js';
+import { clearPermissionCache, permissionsFor } from './rbac-store.js';
 import { sha256 } from '../lib/crypto.js';
 import type { Permission, Role } from './roles.js';
 import type { AppUser } from './user.js';
@@ -213,5 +213,13 @@ describe('requireAuth', () => {
     const older = dbWith({ lastSeenAt: new Date(now - 5 * 60_000) });
     await call(older.db, `Bearer ${TOKEN}`);
     assert.equal(older.touched.length, 1);
+  });
+});
+
+describe('SUPER_ADMIN permissions (four-eyes)', () => {
+  test('reviewer holds publish and review but not the maker permissions', async () => {
+    const granted = await permissionsFor('SUPER_ADMIN', {} as Db);
+    assert.ok(granted.includes('batch:publish') && granted.includes('users:manage'));
+    assert.ok(!granted.includes('upload:create') && !granted.includes('mapping:propose'));
   });
 });

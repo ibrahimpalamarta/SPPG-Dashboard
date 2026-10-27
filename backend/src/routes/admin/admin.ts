@@ -47,7 +47,7 @@ adminRouter.post(
 );
 adminRouter.post('/users/:id/invite-cancel', requirePermission('users:manage'), validate({ params: idParam }), wrap(cancelInvite()));
 adminRouter.post('/users/:id/mfa-reset', requirePermission('users:manage'), validate({ params: idParam }), wrap(resetUserMfa()));
-adminRouter.get('/users/:id/sessions', requirePermission('users:read'), validate({ params: idParam }), wrap(listUserSessions()));
+adminRouter.get('/users/:id/sessions', requirePermission('users:manage'), validate({ params: idParam }), wrap(listUserSessions()));
 adminRouter.delete(
   '/users/:id/sessions',
   requirePermission('users:manage'),
