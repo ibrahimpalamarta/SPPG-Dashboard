@@ -88,6 +88,13 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
         return data.map((d, i) => ({ id: BigInt(i + 1), budgetDate: d.budgetDate, portionSegment: d.portionSegment }));
       },
     },
+    vendorPaymentWorkflow: {
+      deleteMany: del('pay'),
+      createMany: async ({ data }: { data: Record<string, unknown>[] }) => {
+        calls.push(`pay:${data.length}`);
+        traced.push(...data);
+      },
+    },
     rabIngredientBudget: { createMany: async ({ data }: { data: { dailyBudgetId: bigint }[] }) => void calls.push(`ing:${data.map((d) => d.dailyBudgetId).join(',')}`) },
   };
   const repo = new PrismaStagingRepository({ $transaction: async (fn: (t: unknown) => Promise<void>) => fn(tx) } as unknown as PrismaClient);
@@ -99,7 +106,7 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
     const line = (id: string) => ({ source_record_id: id, line_id: null, item_name: null, counterparty: null, qty: 1, unit: 'kg', unit_price: 5, line_amount: 5 });
     const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, description: null, txn_total: 10, is_external_spend: true, review_status: null, review_note: null, confidence: null, lines: [line('a'), line('b')] };
     await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', templateVersion: '1', loadedAt, domain: 'CASHFLOW', records: [txn] });
-    assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'txn:1', 'line:2']);
+    assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'pay:delete', 'txn:1', 'line:2']);
   });
 
   test('every canonical record carries the PRD §7.2 traceability fields', async () => {
@@ -145,5 +152,18 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
     calls.length = 0;
     await repo.replaceBatch('b-1', empty);
     assert.deepEqual(calls, ['staging:delete']);
+  });
+
+  test('Input Maker: requests are stored with no paid state or workflow times (OD-14)', async () => {
+    calls.length = 0;
+    traced.length = 0;
+    const rec = { source_record_id: 'SKN:INPUT_MAKER:abc:P1:3', payment_request_id: 'PAY-SKN-0123456789ab', line_no: '1', request_date: '2026-03-05', description: 'Beras', category: 'Bahan Baku', supplier: 'UD Maju', request_amount: 1500000, checklist: true, supplier_invoice_link: null, payment_invoice_link: null };
+    await repo.replaceBatch('b-1', { ...empty, domain: 'INPUT_MAKER' }, { profileId: 'MAP-SKN-PAY-001', templateVersion: '1', loadedAt, domain: 'INPUT_MAKER', records: [rec] });
+    assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'pay:delete', 'pay:1']);
+    const [row] = traced;
+    assert.equal(row?.paymentRequestId, 'PAY-SKN-0123456789ab');
+    assert.equal(row?.requestAmount, 1500000);
+    assert.equal(row?.mappingProfileId, 'MAP-SKN-PAY-001');
+    for (const k of ['paidAt', 'paidAmount', 'paymentReference', 'approvedAt', 'makerInputAt']) assert.ok(!(k in row!), k);
   });
 });
