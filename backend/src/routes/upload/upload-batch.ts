@@ -13,6 +13,8 @@ import {
 } from '../../schemas/upload-batch.js';
 import {
   createUploadBatch,
+  deleteUploadBatch,
+  downloadUploadBatchFile,
   getUploadBatch,
   downloadTemplate,
   listUploadBatches,
@@ -27,6 +29,8 @@ uploadBatchRouter.use(requirePermission('upload:view'));
 uploadBatchRouter.get('/', validate({ query: uploadBatchListQuery }), wrap(listUploadBatches()));
 uploadBatchRouter.get('/templates/:kind', validate({ params: templateParam }), wrap(downloadTemplate()));
 uploadBatchRouter.get('/:id', validate({ params: idParam }), wrap(getUploadBatch()));
+uploadBatchRouter.get('/:id/file', validate({ params: idParam }), wrap(downloadUploadBatchFile()));
+uploadBatchRouter.delete('/:id', requirePermission('batch:review'), validate({ params: idParam }), wrap(deleteUploadBatch()));
 
 // SCRUM-20: uploading needs upload:create; changing a batch's verdict is a
 // review (batch:review, PM only).

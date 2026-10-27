@@ -1,11 +1,14 @@
-import { ChevronRight, FileText } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
+import { DeleteBatchButton } from "@/components/unggah/delete-batch-button";
 import { StatusBadge, DOMAINS } from "@/lib/upload";
 import { apiGet } from "@/lib/api";
 
 type Batch = {
+  id: string;
   publicId: string;
+  storageKey: string | null;
   fileName: string;
   domain: string;
   status: string;
@@ -18,12 +21,13 @@ type Batch = {
   uploader: { fullName: string | null; email: string | null } | null;
 };
 
+const actionButton = "inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50";
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
 const when = (iso: string | null) => (iso ? whenOf(iso) : "—");
 const whenOf = (iso: string) => new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
 
 /** Real upload history from GET /api/upload-batches, scoped by the backend to the user's dapur. */
-export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
+export async function UploadHistory({ canOpen, canDelete }: { canOpen: boolean; canDelete: boolean }) {
   const { data } = await apiGet<{ data: Batch[] }>("/upload-batches?pageSize=20");
 
   return (
@@ -42,13 +46,13 @@ export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
               <th className="px-4 py-3 font-medium">Profil mapping</th>
               <th className="px-4 py-3 font-medium">Divalidasi</th>
               <th className="px-4 py-3 font-medium">Dipublish</th>
-              {canOpen && <th className="px-4 py-3 font-medium"><span className="sr-only">Aksi</span></th>}
+              <th className="px-4 py-3 font-medium"><span className="sr-only">Aksi</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
             {data.length === 0 && (
               <tr>
-                <td colSpan={canOpen ? 10 : 9} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-6 text-center text-slate-500">
                   Belum ada unggahan.
                 </td>
               </tr>
@@ -71,15 +75,22 @@ export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
                 <td className="px-4 py-3 text-slate-700">{b.mappingProfileId ?? "—"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-500">{when(b.validatedAt)}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-500">{when(b.publishedAt)}</td>
-                {canOpen && (
-                  <td className="px-4 py-3 text-right">
-                    {b.status !== "FAILED" && b.status !== "SUPERSEDED" && (
-                      <Link href={`/mapping-validasi?batch=${b.publicId}`} aria-label={`Buka ${b.fileName}`} className="inline-flex size-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-emerald-700">
-                        <ChevronRight className="size-4" aria-hidden="true" />
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-2">
+                    {canOpen && b.status !== "FAILED" && b.status !== "SUPERSEDED" && (
+                      <Link href={`/mapping-validasi?batch=${b.publicId}`} aria-label={`Buka ${b.fileName}`} className={actionButton}>
+                        Buka
                       </Link>
                     )}
-                  </td>
-                )}
+                    {b.storageKey && (
+                      <a href={`/unggah-data/batch/${b.id}/file`} aria-label={`Export ${b.fileName}`} className={actionButton}>
+                        <Download className="size-4" aria-hidden="true" />
+                        Export
+                      </a>
+                    )}
+                    {canDelete && b.status !== "PUBLISHED" && <DeleteBatchButton id={b.id} fileName={b.fileName} />}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

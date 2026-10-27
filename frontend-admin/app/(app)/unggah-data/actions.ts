@@ -1,6 +1,7 @@
 "use server";
 
-import { apiFetch } from "@/lib/api";
+import { revalidatePath } from "next/cache";
+import { apiFetch, apiSend } from "@/lib/api";
 
 export type UploadedSheet = { name: string; headerRow: number | null; rowCount: number };
 export type ColumnDiff = { sheet: string; missing: string[]; unexpected: string[] };
@@ -21,6 +22,16 @@ export type UploadResult =
       warning?: string;
     }
   | { ok: false; message: string };
+
+/** Returns an error message, or null once the batch is gone. */
+export async function deleteBatch(id: string): Promise<string | null> {
+  const res = await apiSend(`/upload-batches/${encodeURIComponent(id)}`, "DELETE");
+  if (res.status === 403) return "Anda tidak memiliki akses untuk menghapus batch ini.";
+  if (res.status === 409) return "Batch yang sudah dipublish tidak bisa dihapus.";
+  if (!res.ok && res.status !== 404) return "Gagal menghapus. Coba lagi beberapa saat lagi.";
+  revalidatePath("/unggah-data");
+  return null;
+}
 
 /**
  * Forwards the form to POST /api/upload-batches with the session's token —
