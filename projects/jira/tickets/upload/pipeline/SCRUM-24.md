@@ -1,5 +1,5 @@
 # SCRUM-24: Excel upload pipeline
-Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-RAW) | Terakhir diubah: 2026-10-23 17:00
+Fitur: upload/pipeline | Tahap: 2 | Status: IN REVIEW | Terakhir diubah: 2026-10-27
 
 ## Kondisi awal (hasil audit kode)
 - Ada: endpoint multipart `POST /api/upload-batches` (multer memory, `UPLOAD_MAX_BYTES` 10 MB), cek magic bytes zip, simpan ke S3, pembuatan batch (SCRUM-22).
@@ -21,13 +21,13 @@ Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-RAW) | Terakhir di
 
 ## Sisa pekerjaan
 - [ ] Langkah 4 (asinkron): tetap sinkron dalam request, mengikuti pola repo (batas 10 MB). Ditandai `ponytail:` di controller; pindah ke queue bila berkas nyata timeout di ALB.
-- [ ] Staging persisten setelah skema disetujui (B-SCHEMA, `schema-proposals/SCRUM-24.md`)
+- [x] Staging persisten: tabel generik `staging_rows` (Pilihan A, B-RAW tertutup), `PrismaStagingRepository` di `staging.ts`, ditambah SUPERSEDED (6a6d2dc, 2026-10-26). `upload_sheets` ditunda
 - [ ] `template_version` dibaca dari sel metadata template (SCRUM-130)
 
 ## Acceptance criteria
 - [x] FR-UP-02: xlsx diterima dan disimpan dengan metadata
 - [x] FR-UP-04 / AC-UP-03: schema tidak dikenal tidak di-publish (selalu `NEEDS_MAPPING_UPDATE` sampai SCRUM-39)
-- [ ] Staging menjadi parent baris yang persisten (B-SCHEMA)
+- [x] Staging menjadi parent baris yang persisten (`staging_rows`)
 
 ## Test
 - `src/lib/ingest/pipeline.test.ts`: multi-sheet + baris judul di atas header, nilai mentah ("Rp12,000" utuh, formula, tanggal + serial 46296, merged), kosong ≠ 0, `source_record_id` deterministik, re-parse mengganti, workbook kosong → `EMPTY_FILE`.
@@ -35,11 +35,11 @@ Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-SCHEMA, B-RAW) | Terakhir di
 - Backend 125/125 lulus, `tsc` bersih.
 
 ## Blocker / pertanyaan terbuka
-- B-SCHEMA, B-RAW
+- B-SCHEMA (persetujuan skema `staging_rows`)
 
 ## Skema
 - [PRD] field traceability §7.2 (di `StagingRow`)
-- [USULAN] wadah staging + kolom mentah → `schema-proposals/SCRUM-24.md` (tidak dimigrasi; in-memory)
+- [USULAN, sudah termigrasi] wadah staging `staging_rows` → `SCRUM-24-schema.md`
 
 ## Update 2026-10-25 — CSV (`feature/tahap2-upload-parsers`)
 - [x] `.csv` diterima (`singleFile` + `readWorkbook(buffer, fileName)`): dibaca exceljs dengan map identitas, jadi setiap sel tetap string apa adanya ("Rp1.885.000", "16,45", "22/02/2026"). BOM dibuang; berkas biner/kosong → `CORRUPT_FILE`.

@@ -6,11 +6,11 @@ bersama kode tiketnya.
 
 | Berkas | Isi |
 |---|---|
-| `STATUS.md` | Ringkasan semua tiket Tahap 1–3 |
+| `STATUS.md` | Ringkasan semua tiket Tahap 1–3, dengan kolom Fitur |
 | `blockers.md` | Blocker aktif + riwayat yang sudah selesai |
 | `decisions.md` | Keputusan, asumsi, temuan konflik dokumen |
-| `tickets/SCRUM-xx.md` | Satu berkas per tiket yang sudah disentuh |
-| `schema-proposals/SCRUM-xx.md` | Usulan skema yang belum tertulis di PRD/Data Dictionary |
+| `tickets/<fitur>/<subfitur>/SCRUM-xx.md` | Satu berkas per tiket. `access/` (Tahap 1: `rbac`, `app-shell`, `members`, `kitchen-reference`) dan `upload/` (Tahap 2: `batch`, `pipeline`, `ui`, `template`). Tiket Tahap 3 masih langsung di `tickets/` |
+| `tickets/.../SCRUM-xx-schema.md` | Usulan skema yang belum tertulis di PRD/Data Dictionary, di folder yang sama dengan tiketnya |
 
 ## Legenda status
 
@@ -26,7 +26,7 @@ STATUS menulis keduanya, misalnya `IN_PROGRESS (sebagian BLOCKED: B-SCHEMA)`.
 ## Aturan skema
 
 - **[PRD]**: tertulis di PRD §7 / Data Dictionary v0.2, atau sudah ada di `schema.prisma` di develop. Boleh langsung dimigrasi.
-- **[USULAN]**: selain itu. Tulis proposal di `schema-proposals/`, jangan buat migrasi, dan pakai interface + implementasi in-memory sampai disetujui.
+- **[USULAN]**: selain itu. Tulis proposal sebagai `SCRUM-xx-schema.md` di folder tiketnya, jangan buat migrasi, dan pakai interface + implementasi in-memory sampai disetujui.
 
 ## Kapan diperbarui
 

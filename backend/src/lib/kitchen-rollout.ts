@@ -2,8 +2,8 @@
  * SCRUM-132: bucket and rollout stage per dapur, keyed by `kitchens.code`.
  *
  * Config, not columns: `bucket`/`rollout_status` are not in the PRD's data
- * model, so they wait for schema approval (projects/jira/schema-proposals/
- * SCRUM-132.md). Values follow PRD §14. BRD v2 puts Lawang in Phase 2 instead
+ * model, so they wait for schema approval (projects/jira/tickets/access/
+ * kitchen-reference/SCRUM-132-schema.md). Values follow PRD §14. BRD v2 puts Lawang in Phase 2 instead
  * of "Phase 1 comparison" — OD-01, decisions.md K-01.
  *
  * A dapur without a code (Turen, B-TUREN) has no entry and reports NULL for

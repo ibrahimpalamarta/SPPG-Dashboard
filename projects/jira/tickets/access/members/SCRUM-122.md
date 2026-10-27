@@ -1,5 +1,5 @@
 # SCRUM-122: Halaman aktivasi akun dari link undangan
-Tahap: 1 | Status: IN_PROGRESS (review) | Terakhir diubah: 2026-10-25
+Fitur: access/members | Tahap: 1 | Status: IN_PROGRESS (review) | Terakhir diubah: 2026-10-27
 
 ## Kondisi awal (hasil audit kode)
 - Hanya ada `/reset-password/<token>`: role tidak ditampilkan, setelah sukses diarahkan ke halaman login.

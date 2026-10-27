@@ -15,7 +15,7 @@ Aturan:
   Blocker `B-*` dijelaskan di `projects/jira/blockers.md`.
 - **Duplikat** (SCRUM-126, 127, 128) tidak dikerjakan. Tutup bersama tiket aslinya.
 - Jira tidak diubah oleh dokumen ini. Dasar pengelompokan ada di bagian paling bawah file ini.
-- Saat status tiket berubah, perbarui `projects/jira/STATUS.md` + `projects/jira/tickets/SCRUM-xx.md` dulu, lalu
+- Saat status tiket berubah, perbarui `projects/jira/STATUS.md` + `projects/jira/tickets/<fitur>/<subfitur>/SCRUM-xx.md` dulu, lalu
   kolom status di sini.
 
 ## Cara uji (kolom "Uji")

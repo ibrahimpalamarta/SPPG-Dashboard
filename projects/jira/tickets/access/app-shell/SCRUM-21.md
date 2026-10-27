@@ -1,5 +1,5 @@
 # SCRUM-21: App shell & navigation
-Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-DOCS) | Terakhir diubah: 2026-10-25
+Fitur: access/app-shell | Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-DOCS) | Terakhir diubah: 2026-10-27
 
 ## Kondisi awal (hasil audit kode)
 - `frontend-admin` (Next 16.3, React 19, Tailwind 4, lucide-react). Mockup statis di working tree, belum di-commit: overview/finance/kelengkapan/unggah-data/login.
@@ -21,6 +21,7 @@ Tahap: 1 | Status: IN_PROGRESS (sebagian BLOCKED: B-DOCS) | Terakhir diubah: 202
 - [x] Auth0 diganti login internal (email + password, MFA TOTP, cookie `sppg_session`) di PR #27; B-AUTH0-FE tertutup
 - [x] Halaman **Inbox** (`/inbox`, `upload:create`: Data Operasional + PM; isi tugas menyusul di SCRUM-117) dan **Anggota** (`/anggota`, `users:read`; menggantikan `/pengguna`) — feature/scrum-21-inbox-anggota
 - [x] Tidak ada board Antrian Batch
+- [x] Sidebar dikelompokkan (Dashboard / Data / Tools) dan footer nama pengguna diperbaiki; halaman Peran & Izin, Keamanan, dan Integrasi (read-only, OD-08) ditambahkan (c5a93dc)
 
 ## Sisa pekerjaan
 - [ ] Sesuaikan dengan Clickable Prototype v0.2 bila tersedia (B-DOCS)

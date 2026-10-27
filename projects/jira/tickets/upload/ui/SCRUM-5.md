@@ -1,5 +1,5 @@
 # SCRUM-5: Halaman Upload Data
-Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-AUTH0-FE, B-SCHEMA) | Terakhir diubah: 2026-10-23 18:30
+Fitur: upload/ui | Tahap: 2 | Status: IN REVIEW | Terakhir diubah: 2026-10-27
 
 ## Kondisi awal (hasil audit kode)
 - Backend: `POST /api/upload-batches` lengkap (kitchen, domain, period, file; duplikat → warning).
@@ -14,11 +14,12 @@ Tahap: 2 | Status: IN_PROGRESS (sebagian BLOCKED: B-AUTH0-FE, B-SCHEMA) | Terakh
 - [x] Role tanpa `upload:create` (INTERNAL) melihat "Hanya lihat"; akun tanpa dapur melihat "Belum ada dapur"
 - [x] Batas body Server Action dan proxy 11 MB (backend tetap penegak 10 MB) — `next.config.ts`
 - [x] Label domain/status dan `StatusBadge` bersama — `lib/upload.tsx` (dipakai lagi di SCRUM-25)
+- [x] Halaman dirapikan: dropdown dapur, kartu jenis data yang belum aktif diredupkan, aksi history berupa chevron (ff6e4a2)
 
 ## Sisa pekerjaan
-- [ ] Tautan ke detail batch di history: menunggu SCRUM-25
+- [x] Tautan ke detail batch di history: tersedia di tabel history (SCRUM-25), mengarah ke Mapping & Validasi
 - [ ] Status real-time/polling: tidak diperlukan sekarang karena upload sinkron dan status final ada di respons. Ditambah bila pipeline dipindah ke queue (lihat SCRUM-24).
-- [ ] Login nyata (B-AUTH0-FE)
+- [x] Login nyata: login internal (PR #27), B-AUTH0-FE tertutup
 - [ ] Tombol Download Template: SCRUM-125
 
 ## Acceptance criteria
@@ -34,7 +35,7 @@ Diverifikasi pada build produksi dengan sesi lokal + stub backend:
 - lint / knip / build bersih.
 
 ## Blocker / pertanyaan terbuka
-- B-AUTH0-FE, B-UPLOADER (OD-07)
+- B-UPLOADER (OD-07)
 
 ## Skema
 - Tidak ada baru.

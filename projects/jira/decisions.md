@@ -15,7 +15,7 @@ ditandai **ASUMSI**, dan blocker-nya dirujuk.
 ## Keputusan
 
 **D-01 · 2026-10-23 · Skema yang sudah termigrasi dipertahankan, lalu diusulkan.**
-Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`, dan kolom `upload_batches` di luar daftar [PRD]. Atas keputusan user, migrasi itu dipertahankan. Proposal ditulis setelahnya (`schema-proposals/SCRUM-20.md`, `SCRUM-22.md`), dan branch tidak di-push sampai disetujui (B-SCHEMA). Skema baru mulai tiket berikutnya mengikuti gate: tanpa migrasi, pakai interface + in-memory.
+Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`, dan kolom `upload_batches` di luar daftar [PRD]. Atas keputusan user, migrasi itu dipertahankan. Proposal ditulis setelahnya (`tickets/access/rbac/SCRUM-20-schema.md`, `tickets/upload/batch/SCRUM-22-schema.md`), dan branch tidak di-push sampai disetujui (B-SCHEMA). Skema baru mulai tiket berikutnya mengikuti gate: tanpa migrasi, pakai interface + in-memory.
 
 **D-02 · 2026-10-23 · Branch ditumpuk linear.**
 `projects/jira/` diubah oleh setiap tiket, sehingga branch paralel dari `develop` pasti konflik. Rantainya: `develop → feature/scrum-20-rbac → feature/scrum-22-upload-batch → feature/jira-tracking → feature/scrum-21-app-shell → …`, satu branch per unit sesuai urutan bagian D. PR di-merge berurutan. Ini menyimpang dari CLAUDE.md ("branch dari develop") demi menghindari konflik pelacakan.
