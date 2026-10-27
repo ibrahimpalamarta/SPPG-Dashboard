@@ -2,9 +2,10 @@
  * Screenshots of passing Playwright tests for one Jira ticket, used as proof in
  * the "In Review" comment (QD-34). Reads reports/raw/playwright.json.
  *
- *   jira-evidence SCRUM-20   prints [{ title, screenshot }] as JSON
+ *   jira-evidence SCRUM-20   prints { steps, passing }: step screenshots (.avif, max 3)
+ *   saved by tests under reports/evidence/<ticket>/, and [{ title, screenshot }]
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ids, pwTests, type PwSuite } from './merge-report.js';
@@ -25,5 +26,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const ticket = process.argv[2];
   if (!ticket) throw new Error('usage: npm run evidence -- SCRUM-xx');
   const doc = JSON.parse(readFileSync(join(RAW, 'playwright.json'), 'utf8')) as { suites: PwSuite[] };
-  console.log(JSON.stringify(evidence(doc.suites, ticket), null, 2));
+  const dir = join('reports', 'evidence', ticket);
+  const steps = existsSync(dir) ? readdirSync(dir).sort().map((f) => join(dir, f)) : [];
+  console.log(JSON.stringify({ steps, passing: evidence(doc.suites, ticket) }, null, 2));
 }

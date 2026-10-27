@@ -10,6 +10,7 @@
  * every URL goes through the guard first.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -57,6 +58,12 @@ function step(name: string, r: ReturnType<typeof run>) {
 
 let pg: EmbeddedPostgres | undefined;
 
+/** The backend only PUTs the original file to the assets bucket; this answers 200 and drops the body, so uploads work without AWS. */
+const s3 = createServer((req, res) => {
+  req.resume();
+  req.on('end', () => res.writeHead(200, { ETag: '"qa"' }).end());
+});
+
 async function serve() {
   // Neither build needs the database, so they start first and overlap Postgres,
   // migrate and the seeds; everything is joined before a server starts.
@@ -86,6 +93,8 @@ async function serve() {
     dbUrl = `postgresql://postgres:postgres@localhost:${PORTS.db}/sppg_qa`;
   }
 
+  await new Promise<void>((r) => s3.listen(PORTS.s3, '127.0.0.1', r));
+
   // Generated per run: nothing to leak, nothing to rotate.
   const publicPassword = randomBytes(18).toString('base64url');
   const env = {
@@ -94,7 +103,11 @@ async function serve() {
     DATABASE_URL: dbUrl,
     DATABASE_URL_PUBLIC: dbUrl.replace(/\/\/[^@]+@/, `//sppg_public:${publicPassword}@`),
     PUBLIC_DB_PASSWORD: publicPassword,
-    S3_BUCKET: 'qa-audit-unused',
+    S3_BUCKET: 'qa-audit-fake',
+    // An IP endpoint makes the SDK use path-style URLs; the keys are dummies for the stub above.
+    AWS_ENDPOINT_URL_S3: `http://127.0.0.1:${PORTS.s3}`,
+    AWS_ACCESS_KEY_ID: 'qa',
+    AWS_SECRET_ACCESS_KEY: 'qa',
     MFA_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     MFA_REQUIRED_ROLES: '',
     // Every test logs in from the same IP; the per-IP limit would trip otherwise.
@@ -119,6 +132,7 @@ async function serve() {
   ];
   const stop = async (code: number) => {
     children.forEach((c) => c.kill());
+    s3.close();
     await pg?.stop();
     process.exit(code);
   };

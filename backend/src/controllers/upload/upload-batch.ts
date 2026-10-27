@@ -11,6 +11,7 @@ import { CSV_MIME, XLSX_MIME, putObject, type PutObject } from '../../lib/s3.js'
 import { dateFilter } from '../../schemas/common.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
+import { buildTemplate, type TemplateKind } from '../../lib/templates.js';
 import { canTransition } from '../../lib/upload-status.js';
 import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
 import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
@@ -58,6 +59,14 @@ export const listUploadBatches = (db: Db = prisma): RequestHandler => async (req
   ]);
 
   sendJson(res, paginated(rows, total, q));
+};
+
+/** SCRUM-125: the official empty template; every role that can see uploads may download it. */
+export const downloadTemplate = (): RequestHandler => async (req, res) => {
+  const { kind } = req.valid!.params as { kind: TemplateKind };
+  res.setHeader('Content-Type', XLSX_MIME);
+  res.setHeader('Content-Disposition', `attachment; filename="template-${kind}-v1.xlsx"`);
+  res.send(await buildTemplate(kind));
 };
 
 export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, res) => {

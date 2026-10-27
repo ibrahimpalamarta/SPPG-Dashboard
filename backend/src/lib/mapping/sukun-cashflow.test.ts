@@ -66,3 +66,12 @@ describe('DQ rule ids on issues', () => {
     assert.equal((out.records as CashflowTxn[]).find((t) => t.txn_id === 'TXN-R1')?.confidence, 'high');
   });
 });
+
+describe('MAP-LWG-CF-001 (SCRUM-32/56)', () => {
+  test('Lawang uses the same canonical columns and is detected by kitchen code', async () => {
+    const { detection, mapping } = await staged(fixture('sukun-cashflow.csv'), 'CASHFLOW', 'LWG');
+    assert.ok(detection.ok);
+    assert.equal(detection.profile.id, 'MAP-LWG-CF-001');
+    assert.equal(mapping?.profileId, 'MAP-LWG-CF-001');
+  });
+});

@@ -13,11 +13,15 @@ const primaryButton = "inline-flex h-10 items-center gap-2 rounded-lg bg-emerald
 const choice = (selected: boolean) =>
   `rounded-xl border p-4 text-left disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-40 ${selected ? "border-emerald-600 ring-1 ring-emerald-600" : "border-slate-200 enabled:hover:border-emerald-300"}`;
 
+// Domains with an official empty template (SCRUM-125); the rest upload an ordinary file.
+const TEMPLATES: Record<string, string> = { CASHFLOW: "cashflow", MENU: "menu" };
+
 // `value` mirrors backend UploadDomain; no value = no backend support yet (Manual Entry / not ingested).
 const DOMAIN_CARDS: { value?: string; label: string; note: string; icon: LucideIcon }[] = [
   { value: "CASHFLOW", label: "Cashflow", note: "Catatan uang masuk & keluar", icon: Wallet },
   { value: "RAB", label: "RAB", note: "Rencana anggaran per periode", icon: Utensils },
   { value: "PO", label: "Purchase Order", note: "Daftar pesanan ke supplier", icon: FileText },
+  { value: "INPUT_MAKER", label: "Input Maker", note: "Permintaan bayar ke supplier (tanpa data rekening)", icon: Coins },
   { value: "VENDOR_PAYMENT", label: "Pembayaran Supplier", note: "Bukti bayar ke supplier (Input Maker / EFI)", icon: Coins },
   { value: "MENU", label: "Master Menu", note: "Menu & gizi yang direncanakan", icon: BookOpen },
   { value: "GOODS_RECEIPT", label: "Penerimaan Barang", note: "Barang yang diterima dapur", icon: Package },
@@ -93,6 +97,11 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
               ))}
             </div>
           </fieldset>
+          {TEMPLATES[domain] && (
+            <a href={`unggah-data/template/${TEMPLATES[domain]}`} download className="inline-block text-sm font-medium text-emerald-700 underline">
+              Unduh template kosong resmi
+            </a>
+          )}
 
           <label className="block space-y-2 text-sm">
             <span className="font-semibold text-slate-800">

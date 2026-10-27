@@ -3,6 +3,7 @@ import type { StagedSheet, StagingRow } from '../ingest/staging.js';
 import type { Issue } from './values.js';
 import { applySukunCashflow } from './sukun-cashflow.js';
 import { applySukunMenu } from './sukun-menu.js';
+import { applyInputMaker } from './input-maker.js';
 
 export type MappingOutput = { records: unknown[]; totals: Record<string, number>; issues: Issue[] };
 
@@ -24,6 +25,27 @@ export type MappingProfile = {
   apply: (sheets: StagedSheet[], rows: StagingRow[], profile: MappingProfile) => MappingOutput;
 };
 
+/** CASHFLOW_SUKUN and CASHFLOW LAWANG (sheet Transaksi Kas) share one header row. */
+const CASHFLOW_COLUMNS: Record<string, string> = {
+  line_id: 'id',
+  txn_id: 'txn_id',
+  txn_date: 'tanggal',
+  txn_type: 'tipe',
+  direction: 'arah',
+  category: 'kategori',
+  description: 'uraian',
+  item_name: 'nama_barang',
+  counterparty: 'nama_penerima',
+  qty: 'qty',
+  unit: 'satuan',
+  unit_price: 'harga_satuan',
+  line_amount: 'jumlah_baris',
+  txn_total: 'total',
+  confidence: 'confidence',
+  review_status: 'status_review',
+  review_note: 'catatan_review',
+};
+
 /**
  * The registry (B-REG default: config in the repo, reviewed like code).
  * TODO(B-DD): canonical field names are [USULAN] until the data dictionary is
@@ -38,25 +60,17 @@ export const PROFILES: MappingProfile[] = [
     domain: 'CASHFLOW',
     sourceSystem: 'INTERNAL',
     // CASHFLOW_SUKUN, sheet Transaksi_Kas: one row per item line.
-    columns: {
-      line_id: 'id',
-      txn_id: 'txn_id',
-      txn_date: 'tanggal',
-      txn_type: 'tipe',
-      direction: 'arah',
-      category: 'kategori',
-      description: 'uraian',
-      item_name: 'nama_barang',
-      counterparty: 'nama_penerima',
-      qty: 'qty',
-      unit: 'satuan',
-      unit_price: 'harga_satuan',
-      line_amount: 'jumlah_baris',
-      txn_total: 'total',
-      confidence: 'confidence',
-      review_status: 'status_review',
-      review_note: 'catatan_review',
-    },
+    columns: CASHFLOW_COLUMNS,
+    apply: applySukunCashflow,
+  },
+  {
+    id: 'MAP-LWG-CF-001',
+    version: '1',
+    status: 'DRAFT',
+    kitchenCode: 'LWG',
+    domain: 'CASHFLOW',
+    sourceSystem: 'INTERNAL',
+    columns: CASHFLOW_COLUMNS,
     apply: applySukunCashflow,
   },
   {
@@ -93,5 +107,26 @@ export const PROFILES: MappingProfile[] = [
       line_total: 'Total Harga (Rp)',
     },
     apply: applySukunMenu,
+  },
+  {
+    id: 'MAP-SKN-PAY-001',
+    version: '1',
+    status: 'DRAFT',
+    kitchenCode: 'SKN',
+    domain: 'INPUT_MAKER',
+    sourceSystem: 'INTERNAL',
+    // Input Maker Upload v1 (13_Upload_Contract). Bank columns are in the contract but restricted: not staged, not mapped.
+    columns: {
+      line_no: 'NO',
+      request_date: 'TANGGAL',
+      description: 'KETERANGAN',
+      category: 'Kategori',
+      supplier: 'Nama Supplier',
+      request_amount: 'TAGIHAN',
+      checklist: 'Checklist',
+      supplier_invoice_link: 'Link Invoice Pemasok',
+      payment_invoice_link: 'Link Invoice Pembayaran',
+    },
+    apply: applyInputMaker,
   },
 ];
