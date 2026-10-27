@@ -9,7 +9,7 @@ const iconButton = "inline-flex size-10 items-center justify-center rounded-xl b
 
 export function AppHeader({ items }: { items: readonly NavItem[] }) {
   const pathname = usePathname();
-  const title = items.find((n) => n.href === pathname)?.label ?? (pathname === "/keamanan" ? "Keamanan akun" : undefined);
+  const title = items.find((n) => n.href === pathname)?.label ?? (pathname === "/keamanan" ? "Keamanan akun" : pathname === "/pengaturan" ? "Pengaturan" : undefined);
 
   return (
     <header className="flex min-h-16 items-center gap-4 border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8">
@@ -36,7 +36,7 @@ export function AppHeader({ items }: { items: readonly NavItem[] }) {
       </label>
 
       <div className="flex items-center gap-3">
-        <Link href="/keamanan" aria-label="Pengaturan akun" className={iconButton}>
+        <Link href="/pengaturan" aria-label="Pengaturan" className={iconButton}>
           <Settings className="size-5" aria-hidden="true" />
         </Link>
         <button type="button" disabled title="Segera hadir" aria-label="Notifikasi" className={`${iconButton} disabled:cursor-not-allowed disabled:opacity-60`}>
