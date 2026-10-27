@@ -16,7 +16,29 @@ infra/
 └── README.md
 ```
 
-Kedua environment memakai module yang sama persis (`main.tf`-nya identik); yang membedakan hanya `variables.tf` — `env`, blok CIDR VPC (`staging` 10.10.0.0/16, `production` 10.20.0.0/16, sengaja tidak overlap supaya VPC peering tetap mungkin nanti), dan sizing (staging: 1 task, `db.t4g.micro`, single-AZ; production: 2 task, `db.t4g.small`, multi-AZ).
+Kedua environment memakai module yang sama persis (`main.tf`-nya nyaris identik); yang membedakan hanya `variables.tf` — `env`, blok CIDR VPC (`staging` 10.10.0.0/16, `production` 10.20.0.0/16, sengaja tidak overlap supaya VPC peering tetap mungkin nanti), dan sizing (staging: 1 task, `db.t4g.micro`, single-AZ; production: 2 task, `db.t4g.small`, multi-AZ).
+
+### Tiga service, satu ALB
+
+Stack ini menjalankan tiga ECS service: `backend`, `frontend-admin`, dan `frontend-public`. Ketiganya berbagi satu ALB, satu cluster, satu pasang task role, dan satu security group task (kedua frontend sama-sama listen di port 3000, jadi ingress rule yang ada sudah menutupi keduanya).
+
+Selama `acm_certificate_arn` masih kosong tidak ada domain — artinya tidak ada hostname untuk dirouting, dan pembagian traffic terpaksa lewat path:
+
+```
+listener :80
+ ├─ priority 5    /health            → be-tg    (backend)
+ ├─ priority 10   /api/*             → be-tg    (backend)
+ ├─ priority 20   /admin, /admin/*   → adm-tg   (frontend-admin)
+ └─ default                          → pub-tg   (frontend-public)
+```
+
+Rule priority 20 **berpasangan** dengan `basePath: "/admin"` di `frontend-admin/next.config.ts`: basePath itu yang membuat Next memancarkan seluruh URL aset di bawah `/admin`, sehingga aset ikut tertangkap rule yang sama alih-alih jatuh ke frontend-public. Ubah satu tanpa yang lain dan app-nya rusak. Health check kedua target group juga mengikuti: `/` untuk public, `/admin` untuk admin — health check ALB menembak container langsung, tidak lewat listener rule, dan app admin memang 404 di `/`.
+
+Begitu domain tersedia, isi `acm_certificate_arn` lalu tukar `path_pattern` jadi `host_header` (`admin-staging.<domain>` / `staging.<domain>`) dan lepas `basePath`-nya. Struktur module tidak perlu berubah — listener HTTPS dan duplikat rule-nya sudah ada, tinggal aktif.
+
+Nama target group dibatasi 32 karakter, dan `sppg-dashboard-production` sendiri sudah 25 — karena itu namanya `-adm-tg`/`-pub-tg`, bukan `-frontend-admin-tg`. Memanjangkannya akan gagal di production lebih dulu, bukan di staging.
+
+Production ikut mendapat repository ECR, target group, listener rule, dan kedua service frontend, tapi `frontend_desired_count`-nya dibiarkan di default `0`: `deploy-prod.yml` belum membangun image frontend, jadi task yang jalan hanya akan crash-loop di ImagePullFailure. Tidak ada task = tidak ada biaya, dan menyalakannya nanti cuma satu baris di `environments/production/main.tf` plus dua step build di workflow.
 
 Kenapa OIDC provider dan kedua IAM role dibuat di `backend-bootstrap`, bukan di `environments/*`: OIDC provider adalah resource singleton per AWS account (gagal jika dibuat dua kali), dan GitHub Actions butuh role itu sudah ada sebelum bisa autentikasi — jadi harus diprovision manual, sekali, pakai credential admin lokal. `environments/*` sesudahnya hanya mengelola infrastruktur aplikasi (VPC, ECS, RDS, ECR, S3) dan tidak pernah menyentuh IAM/OIDC.
 
@@ -53,9 +75,9 @@ Prasyarat: AWS CLI ter-konfigurasi dengan **credential admin dari akun AWS perso
    - **Deployment branches** (wajib, ini yang menegakkan pembatasan branch): `staging` → *Selected branches* → `staging`; `production` → `main` + tag `v*`. IAM tidak lagi mengunci branch, karena setiap job deploy memakai `environment:` sehingga GitHub mengirim sub claim `repo:<org>/<repo>:environment:<nama>` — bentuk `ref:refs/heads/<branch>` tidak pernah muncul.
    - **Required reviewers** pada `production` (protection rule) — inilah gate approval manual sebelum deploy prod.
 
-5. PR ke `develop`/`staging`/`main` **dan push langsung ke `develop`** → trigger `ci.yml`: build + test backend, `terraform fmt`/`validate` ketiga root module. Gate saja: tanpa environment GitHub, tanpa credential AWS, tanpa resource yang disentuh. Push ke `develop` ikut digate karena `develop` tidak punya deploy workflow yang akan menangkap error-nya.
+5. PR ke `develop`/`staging`/`main` → trigger `qa-pr.yml` (`qa-audit.yml`): satu check `qa-audit / audit` yang memuat build + test backend dan `terraform fmt`/`validate` ketiga root module. Gate saja: tanpa environment GitHub, tanpa credential AWS. Push langsung ke `develop` tidak lagi dicek (`ci.yml` dihapus).
 
-6. `develop` adalah branch transisi, tidak pernah di-deploy. Naik ke staging lewat PR `develop` → `staging`; merge-nya yang memicu `deploy-staging.yml` (environment `staging`): verifikasi OIDC auth, gate test/build, build+push image, migrasi DB, `terraform apply` dari CI, sampai ECS service healthy.
+6. `develop` adalah branch transisi, tidak pernah di-deploy. Naik ke staging lewat PR `develop` → `staging`; merge-nya yang memicu `deploy-staging.yml` (environment `staging`): verifikasi OIDC auth, gate test/build backend, build+push ketiga image, migrasi DB, `terraform apply` dari CI, sampai ketiga ECS service healthy. Build Docker kedua frontend sengaja ditaruh **sebelum** step migrasi, supaya frontend yang gagal compile menggagalkan job selagi database belum tersentuh — itu juga alasan keduanya tidak di-build ulang di runner sebagai gate terpisah.
 
 7. Push tag `v*` atau merge `staging` ke `main` → trigger `deploy-prod.yml`, approve manual gate di GitHub UI, verifikasi hal yang sama di production.
 
@@ -65,14 +87,13 @@ Buat dengan key yang sama di environment `staging` dan `production`, isi value b
 
 | Variable | Isi |
 |---|---|
-| `AWS_REGION` | `ap-southeast-2` — harus region tempat state bucket & VPC berada |
+| `AWS_REGION` | `ap-southeast-3` — harus region tempat state bucket & VPC berada |
 | `AWS_ROLE_ARN` | ARN role OIDC (dari `backend-bootstrap` output) |
 | `TF_STATE_BUCKET`, `TF_LOCK_TABLE` | Dari `backend-bootstrap` output |
-| `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_ROLES_CLAIM` | Tenant Auth0 environment tsb — bukan rahasia, API hanya memverifikasi token |
 
-Tujuh variable, itu saja. Yang sengaja **tidak** ada di sini:
+Empat variable, itu saja. Yang sengaja **tidak** ada di sini:
 
-- `ECR_BACKEND_URL` / `ECR_FRONTEND_URL` — URL repository ECR sudah jadi `terraform output` di tiap environment, jadi workflow membacanya dari sana. Satu nilai lebih sedikit yang bisa basi saat pindah akun.
+- `ECR_BACKEND_URL` / `ECR_FRONTEND_ADMIN_URL` / `ECR_FRONTEND_PUBLIC_URL` — URL ketiga repository ECR sudah jadi `terraform output` di tiap environment, jadi workflow membacanya dari sana. Tiga nilai lebih sedikit yang bisa basi saat pindah akun.
 - `AWS_ACCOUNT_ID` — hanya dipakai `backend-bootstrap` (untuk menyusun ARN di policy IAM), bukan oleh environment stack.
 - `GITHUB_ORG` / `GITHUB_REPO_NAME` — sama, hanya dipakai `backend-bootstrap`. Lagi pula GitHub **menolak** nama variable/secret berawalan `GITHUB_`, jadi keduanya memang tidak akan pernah bisa dibuat.
 
@@ -80,11 +101,11 @@ Tidak ada AWS secret jangka panjang yang perlu disimpan — OIDC menghilangkan k
 
 ## Checklist Migrasi: Akun Personal → Akun Kantor
 
-1. **Akses akun kantor**: siapkan credential admin/SSO untuk akun AWS kantor, pastikan region `ap-southeast-2` sudah aktif di akun tsb.
+1. **Akses akun kantor**: siapkan credential admin/SSO untuk akun AWS kantor, pastikan region `ap-southeast-3` sudah aktif di akun tsb — Jakarta adalah region *opt-in*, jadi harus di-enable manual lewat Console → Account → AWS Regions sebelum API call apa pun ke sana bisa jalan.
 2. **Re-run `backend-bootstrap`** dengan `account_id` baru di `terraform.tfvars`, jalankan `terraform init && apply` **memakai credential admin akun kantor**. Ini membuat state bucket/lock table/OIDC provider/IAM role baru yang sepenuhnya independen dari akun personal — tidak menyentuh resource lama.
 3. **Putuskan strategi data**: (a) fresh start — provision environment dari nol di akun baru (paling simpel, cocok jika belum ada data produksi nyata), atau (b) migrasi data — RDS snapshot export/import, sync S3, re-push image ke ECR akun baru. Pilih sesuai kondisi saat migrasi.
 4. **Re-run `terraform init -reconfigure` + `apply`** di tiap `environments/<env>` mengarah ke state bucket akun baru (dari output langkah 2). Ini provision VPC/ECS/RDS/ECR/S3 baru di akun kantor.
-5. **Update GitHub Environment variables** (staging & production): `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` (region biasanya tetap `ap-southeast-2`). **Tidak ada perubahan kode/workflow** — inilah inti dari desain ini.
+5. **Update GitHub Environment variables** (staging & production): `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` (region biasanya tetap `ap-southeast-3`). **Tidak ada perubahan kode/workflow** — inilah inti dari desain ini.
 6. **Cutover DNS** (jika sudah ada domain kustom) mengarah ke ALB DNS name akun baru.
 7. **Verifikasi full deploy cycle** di akun kantor (PR `develop` → `staging`, lalu tag rilis prod) sebelum mematikan apa pun di akun personal.
 8. **Decommission akun personal**: `terraform destroy` tiap environment (staging dulu, baru production), lalu hapus resource `backend-bootstrap` (OIDC provider, IAM role, state bucket — setelah yakin tidak ada yang masih butuh histori state-nya; sebaiknya arsipkan dulu file `.tfstate` terakhir sebelum bucket dihapus).
@@ -92,10 +113,11 @@ Tidak ada AWS secret jangka panjang yang perlu disimpan — OIDC menghilangkan k
 
 ## Catatan Desain / Trade-off yang Disengaja
 
-- **1 NAT gateway** per environment (bukan per-AZ) — hemat biaya untuk first pass, tapi jadi single point of failure untuk egress private subnet. Tingkatkan ke NAT per-AZ nanti kalau availability jadi prioritas, terutama untuk production.
+- **NAT gateway hanya di production**, 1 buah (bukan per-AZ) — single point of failure untuk egress private subnet; tingkatkan ke NAT per-AZ nanti kalau availability jadi prioritas. **Staging tidak punya NAT sama sekali** (`enable_nat_gateway = false`): dengan ~$45/bulan hanya untuk memberi egress ke satu task 0.25 vCPU, biayanya tidak sepadan. Staging menjalankan ECS task-nya di public subnet dengan public IP (`task_subnet_ids` + `task_assign_public_ip` di module `compute`). Ini bukan pelonggaran keamanan: security group `ecs-tasks` tetap hanya menerima ingress dari SG ALB, dan RDS tetap di private subnet yang — tanpa NAT — kini benar-benar tidak punya rute keluar sama sekali. Konsekuensinya, task migrasi di workflow staging harus jalan di subnet yang sama dengan `assignPublicIp=ENABLED`, kalau tidak ia tak bisa menarik image dari ECR.
+- **Staging dimatikan di luar jam kerja** (module `scheduler`, staging saja). EventBridge Scheduler memanggil `ecs:UpdateService` dan `rds:Stop/StartDBInstance` langsung lewat universal target — tanpa Lambda, tanpa kode. Default: nyala 07:00–21:00 WIB, Senin–Jumat (cron ditulis dalam `Asia/Jakarta`, jadi tidak perlu hitung UTC). Module-nya menerima **map** `ecs_services` dan membuat sepasang schedule per service (`for_each`), bukan satu service saja: service yang tertinggal dari map akan diam-diam menyala 24/7 dan membatalkan penghematannya — dua task Fargate frontend yang lupa dijadwalkan setara ~$15–20/bulan. Dua konsekuensi yang sudah ditangani: (1) ketiga `aws_ecs_service` memakai `ignore_changes = [desired_count]` supaya Terraform tidak berkelahi dengan scheduler — artinya `var.desired_count`/`var.frontend_desired_count` jadi nilai create-time di **semua** environment, dan perubahan setelahnya harus lewat `aws ecs update-service`; (2) workflow deploy staging punya step "Wake staging database" dan "Scale services up" (ketiganya), supaya deploy di luar jam kerja tidak gagal dengan connection timeout. Storage RDS tetap ditagih saat instance berhenti — yang hemat hanya jam compute-nya.
 - **HTTPS opsional**: listener 443/ACM di ALB dikontrol lewat variable `acm_certificate_arn` (default kosong = HTTP saja). Begitu ada domain, isi variable ini — tidak perlu ubah struktur module.
 - **CloudFront tidak dibuat** di first pass ini (ALB sudah cukup untuk awal, S3 assets bucket tetap private). Tambahkan CloudFront di depan ALB dan/atau S3 nanti kalau kebutuhan caching/TLS-edge/WAF/akses publik ke asset sudah jelas.
-- **`terraform apply` jalan di setiap deploy** (bukan pipeline terpisah untuk "infra" vs "update image"), dengan image tag (commit SHA) sebagai variable yang memicu perubahan task definition. Ini menghindari state drift dari dua jalur deploy yang terpisah; ketika hanya image yang berubah, apply hampir no-op karena cuma 2 resource yang berubah (task definition + service).
+- **`terraform apply` jalan di setiap deploy** (bukan pipeline terpisah untuk "infra" vs "update image"), dengan image tag (commit SHA) sebagai variable yang memicu perubahan task definition. Ini menghindari state drift dari dua jalur deploy yang terpisah; ketika hanya image yang berubah, apply hampir no-op karena cuma task definition + service yang berubah. Satu apply itu memegang **semua** image tag sekaligus — sebabnya tidak ada workflow deploy per-service meski path filter terlihat menggoda: apply kedua yang tidak ikut membawa tag service lain akan mengembalikannya ke default `latest`, dan dua apply paralel juga akan berebut state lock. Kedua frontend berbagi satu variable `frontend_image_tag` karena keduanya selalu dibangun dari commit yang sama di run yang sama.
 - **Migrasi DB lewat ECS one-off task**, bukan entrypoint container: RDS `publicly_accessible = false` dan security group-nya hanya menerima ingress dari SG ECS, jadi runner GitHub tidak bisa connect langsung. Workflow me-register task definition `<prefix>-migrate` (image sama, command `prisma migrate deploy`) lewat `terraform apply -target`, menjalankannya dengan `aws ecs run-task`, lalu menggagalkan job kalau exit code-nya bukan 0 — semuanya **sebelum** service di-update, sehingga skema selalu mendahului kode yang memakainya. Dipilih di atas entrypoint karena kegagalan migrasi jadi terlihat di log Actions, bukan cuma jadi crashloop diam di CloudWatch.
 - **IAM policy role deploy dipecah dua**: `deploy-app-policy` (ECR/ECS/PassRole, di-scope ketat by ARN) dan `deploy-infra-policy` (permission Terraform yang lebih luas untuk resource seperti EC2/RDS/ELB yang memang tidak mendukung resource-level IAM di banyak action-nya). Ini batas realistis "least privilege" untuk role yang juga menjalankan `terraform apply` dari CI.
 - Password database RDS di-generate otomatis (`random_password`) dan disimpan di Secrets Manager — tidak pernah muncul sebagai plaintext di tfvars, state Terraform (yang selalu berisiko), atau GitHub secret.

@@ -1,10 +1,17 @@
 locals {
   prefix = "${var.project_name}-${var.env}"
 
-  sub_conditions = [
-    for pattern in var.trusted_sub_patterns :
-    "repo:${var.github_org}/${var.github_repo}:${pattern}"
-  ]
+  # GitHub can issue the OIDC `sub` claim in two forms: the classic
+  # "repo:OWNER/REPO:..." or, when immutable subject claims are on,
+  # "repo:OWNER@ownerId/REPO@repoId:...". Matching both with a wildcard is
+  # more robust than pinning the numeric IDs, which aren't visible from here
+  # and would otherwise have to be hardcoded per repo.
+  sub_conditions = flatten([
+    for pattern in var.trusted_sub_patterns : [
+      "repo:${var.github_org}/${var.github_repo}:${pattern}",
+      "repo:${var.github_org}@*/${var.github_repo}@*:${pattern}",
+    ]
+  ])
 
   # Application-infra resources are provisioned by a separate Terraform state
   # (infra/environments/<env>) and don't exist yet when this role is created
@@ -28,6 +35,12 @@ locals {
   # names track the engine version and so can't be pinned here.
   rds_param_group_arn  = "arn:aws:rds:${var.aws_region}:${var.account_id}:pg:*"
   rds_option_group_arn = "arn:aws:rds:${var.aws_region}:${var.account_id}:og:*"
+
+  # Off-hours start/stop schedules (staging only, but the policy is shared).
+  # Schedules live in the "default" schedule group, which we don't manage.
+  scheduler_arn_pattern   = "arn:aws:scheduler:${var.aws_region}:${var.account_id}:schedule/default/${local.prefix}-*"
+  scheduler_role_arn      = "arn:aws:iam::${var.account_id}:role/${local.prefix}-scheduler-role"
+  managed_role_arn_prefix = "arn:aws:iam::${var.account_id}:role/${local.prefix}"
 }
 
 resource "aws_iam_role" "deploy" {
@@ -91,9 +104,6 @@ resource "aws_iam_policy" "deploy_app" {
         Action = [
           "ecs:UpdateService",
           "ecs:DescribeServices",
-          "ecs:DescribeTaskDefinition",
-          "ecs:DescribeTasks",
-          "ecs:ListTasks",
           # One-off `prisma migrate deploy` task, run by the deploy workflow
           # before the service rolls out. RDS is unreachable from the runner.
           "ecs:RunTask"
@@ -105,10 +115,23 @@ resource "aws_iam_policy" "deploy_app" {
         ]
       },
       {
-        # ecs:RegisterTaskDefinition does not support resource-level
-        # restriction (the resulting ARN includes a revision number that
-        # isn't known ahead of time) — this is a documented AWS limitation,
-        # not an oversight.
+        # Despite being documented as supporting the task-definition/task
+        # resource types, these three do not enforce resource-level
+        # restriction in practice — AWS returns implicit deny for any
+        # Resource other than "*" (verified against this role with
+        # iam:SimulatePrincipalPolicy). ecs:RegisterTaskDefinition has the
+        # same limitation for a different, documented reason: the resulting
+        # ARN includes a revision number that isn't known ahead of time.
+        Sid    = "EcsWildcardOnly"
+        Effect = "Allow"
+        Action = [
+          "ecs:DescribeTaskDefinition",
+          "ecs:DescribeTasks",
+          "ecs:ListTasks",
+        ]
+        Resource = "*"
+      },
+      {
         Sid      = "EcsRegisterTaskDefinition"
         Effect   = "Allow"
         Action   = ["ecs:RegisterTaskDefinition"]
@@ -209,13 +232,24 @@ resource "aws_iam_policy" "deploy_infra" {
         Resource = local.ecr_repo_arn_pattern
       },
       {
+        # rds:Describe* doesn't support resource-level restriction, unlike the
+        # rest of this Sid — it has to be its own statement on "*".
+        Sid      = "RdsDescribe"
+        Effect   = "Allow"
+        Action   = ["rds:Describe*"]
+        Resource = "*"
+      },
+      {
         Sid    = "RdsInfra"
         Effect = "Allow"
         Action = [
-          "rds:Describe*",
           "rds:CreateDBInstance", "rds:DeleteDBInstance", "rds:ModifyDBInstance",
           "rds:CreateDBSubnetGroup", "rds:DeleteDBSubnetGroup", "rds:ModifyDBSubnetGroup",
-          "rds:AddTagsToResource", "rds:RemoveTagsFromResource", "rds:ListTagsForResource"
+          "rds:AddTagsToResource", "rds:RemoveTagsFromResource", "rds:ListTagsForResource",
+          # The deploy workflow wakes a scheduled-down staging database before
+          # running migrations. Stop is deliberately not granted here — only the
+          # scheduler role may stop the instance.
+          "rds:StartDBInstance"
         ]
         Resource = [
           local.rds_instance_arn,
@@ -235,7 +269,8 @@ resource "aws_iam_policy" "deploy_infra" {
           "s3:CreateBucket", "s3:DeleteBucket", "s3:Get*", "s3:ListBucket",
           "s3:PutBucketPolicy", "s3:PutBucketVersioning",
           "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock",
-          "s3:PutObject", "s3:PutBucketTagging"
+          "s3:PutObject", "s3:PutBucketTagging",
+          "s3:PutLifecycleConfiguration"
         ]
         Resource = [
           local.s3_assets_bucket_arn,
@@ -255,6 +290,9 @@ resource "aws_iam_policy" "deploy_infra" {
         Resource = local.secrets_arn_pattern
       },
       {
+        # Log-group-level actions (tagging, retention, create/delete) address
+        # the group by its ARN with no trailing ":*" — that suffix is only
+        # part of the ARN for stream-level actions like GetLogEvents below.
         Sid    = "Logs"
         Effect = "Allow"
         Action = [
@@ -262,7 +300,7 @@ resource "aws_iam_policy" "deploy_infra" {
           "logs:PutRetentionPolicy", "logs:TagResource", "logs:TagLogGroup",
           "logs:ListTagsForResource", "logs:ListTagsLogGroup"
         ]
-        Resource = "${local.logs_arn_pattern}:*"
+        Resource = local.logs_arn_pattern
       },
       {
         # DescribeLogGroups is a list call — it takes a name *prefix* as a
@@ -274,7 +312,9 @@ resource "aws_iam_policy" "deploy_infra" {
         Resource = "*"
       },
       {
-        Sid    = "IamEcsRoles"
+        # Covers both the ECS task roles and the EventBridge Scheduler role;
+        # every role this stack creates is named "<project>-<env>-*".
+        Sid    = "IamStackRoles"
         Effect = "Allow"
         Action = [
           "iam:CreateRole", "iam:DeleteRole", "iam:GetRole",
@@ -283,7 +323,31 @@ resource "aws_iam_policy" "deploy_infra" {
           "iam:ListRolePolicies", "iam:ListRoleTags", "iam:ListInstanceProfilesForRole",
           "iam:TagRole", "iam:UntagRole"
         ]
-        Resource = local.ecs_role_arn_pattern
+        Resource = "${local.managed_role_arn_prefix}-*"
+      },
+      {
+        # Attaching the scheduler role to a schedule is a PassRole, exactly as
+        # it is for ECS task roles above — but to a different service principal,
+        # so it needs its own statement and condition.
+        Sid      = "PassSchedulerRole"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
+        Resource = local.scheduler_role_arn
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "scheduler.amazonaws.com"
+          }
+        }
+      },
+      {
+        Sid    = "Scheduler"
+        Effect = "Allow"
+        Action = [
+          "scheduler:CreateSchedule", "scheduler:DeleteSchedule",
+          "scheduler:GetSchedule", "scheduler:UpdateSchedule",
+          "scheduler:ListTagsForResource", "scheduler:TagResource", "scheduler:UntagResource"
+        ]
+        Resource = local.scheduler_arn_pattern
       }
     ]
   })

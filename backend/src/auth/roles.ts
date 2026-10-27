@@ -1,29 +1,47 @@
-export const ROLES = ['SUPER_ADMIN', 'DATA_ADMIN', 'INTERNAL', 'PUBLIC'] as const;
+/** PRD Oktober 2026 §3 + US-15. SUPER_ADMIN = Admin Sistem / PM MBG. */
+export const ROLES = [
+  'SUPER_ADMIN',
+  'MANAGEMENT',
+  'FINANCE',
+  'KEPALA_KITCHEN',
+  'DATA_ADMIN',
+  'AHLI_GIZI',
+  'DATA_STEWARD',
+] as const;
 export type Role = (typeof ROLES)[number];
 
-/**
- * Auth0 role names -> DB enum. Create the roles in Auth0 with exactly these
- * names (see README); anything else is ignored rather than trusted.
- */
-export const AUTH0_ROLE_NAMES: Record<string, Role> = {
-  super_admin: 'SUPER_ADMIN',
-  data_admin: 'DATA_ADMIN',
-  internal: 'INTERNAL',
-  public: 'PUBLIC',
-};
-
-const RANK: Record<Role, number> = { PUBLIC: 0, INTERNAL: 1, DATA_ADMIN: 2, SUPER_ADMIN: 3 };
+/** Roles whose scope is "kitchen sendiri": no scope rows means no kitchens, never all. */
+export const KITCHEN_SCOPED_ROLES: readonly Role[] = ['KEPALA_KITCHEN', 'DATA_ADMIN', 'AHLI_GIZI'];
 
 /**
- * Reduce the roles claim to the single effective role.
- * Unknown or malformed claims fall back to the least privileged role — never
- * to a permissive default.
+ * The catalogue of things a route can demand. Which role holds which lives in
+ * `role_permissions` (edited through the admin API, read via rbac-store.ts);
+ * this list only says what exists, so a stale row for a retired permission is
+ * ignored rather than trusted.
+ *
+ *   users:read / users:manage   akun, sesi, undangan
+ *   settings:manage             peta role -> permission
+ *   audit:read                  audit trail
+ *
+ * SUPER_ADMIN (Project Manager MBG) always holds all of them except
+ * MAKER_PERMISSIONS and is not stored in the table.
  */
-export function roleFromClaims(claims: unknown): Role {
-  if (!Array.isArray(claims)) return 'PUBLIC';
-  return claims
-    .filter((c): c is string => typeof c === 'string')
-    .map((c) => AUTH0_ROLE_NAMES[c])
-    .filter((r): r is Role => r !== undefined)
-    .reduce<Role>((best, r) => (RANK[r] > RANK[best] ? r : best), 'PUBLIC');
-}
+export const PERMISSIONS = [
+  'upload:create',
+  'upload:view',
+  'batch:review',
+  'batch:publish',
+  'mapping:view',
+  'mapping:propose',
+  'reference:view',
+  'reference:edit',
+  'dashboard:view',
+  'users:read',
+  'users:manage',
+  'settings:manage',
+  'audit:read',
+] as const;
+export type Permission = (typeof PERMISSIONS)[number];
+
+/** Four-eyes (PRD AC-ROLE-02): the reviewer never holds the maker's permissions. */
+export const MAKER_PERMISSIONS: readonly Permission[] = ['upload:create', 'mapping:propose'];

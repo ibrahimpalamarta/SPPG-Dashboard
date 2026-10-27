@@ -48,3 +48,9 @@ variable "multi_az" {
 variable "backup_retention_period" {
   type = number
 }
+
+variable "apply_immediately" {
+  description = "Apply RDS modifications at once instead of deferring to the maintenance window. Safe for online changes like gp2->gp3; kept false in production."
+  type        = bool
+  default     = false
+}

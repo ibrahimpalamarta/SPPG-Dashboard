@@ -1,0 +1,23 @@
+name: qa-audit PR
+
+# Smoke suite (tags smoke, rbac, pii, a11y; quarantine skipped), enforced.
+# Required check name: "qa-audit / audit" (qa-audit/docs/ci.md).
+on:
+  pull_request:
+    branches: [develop, staging, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: qa-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa-audit:
+    uses: ./.github/workflows/qa-audit.yml
+    with:
+      trigger: pr
+      suite: smoke
+    secrets: inherit

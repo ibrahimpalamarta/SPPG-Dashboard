@@ -7,51 +7,1023 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Authorization roles. Auth0 is the source of truth (Roles & Permissions);
-/// this column is the synced copy the backend actually enforces against.
+// ---------------------------------------------------------------------------
+// Schema ini adalah terjemahan langsung dari `sppg_erd.drawio` (15 entitas).
+//
+// Dua konvensi menyimpang dari ERD, disengaja dan dicatat di prisma/README.md:
+//   1. Nama tabel plural (`kitchens`, bukan `KITCHEN`) - mengikuti tabel
+//      `users`/`audit_logs`/`gallery_images` yang sudah ada di repo.
+//   2. Nilai enum SCREAMING_SNAKE - mengikuti enum `Role` yang sudah ada.
+//      Nilai aslinya di ERD ditulis huruf kecil (`diterima`, `basah`, ...).
+//
+// PK memakai BigInt auto-increment untuk ID internal, sesuai ERD (`PK, INT`).
+// Entitas yang ID-nya keluar ke permukaan publik juga punya `public_id UUID`
+// supaya ID internal yang berurutan tidak bocor / tidak bisa dienumerasi.
+// ---------------------------------------------------------------------------
+
+/// Authorization roles, enforced from users.role. Which permissions a role holds
+/// lives in role_permissions and is edited through the admin API.
+/// Daftar role mengikuti PRD Oktober 2026 §3.
 enum Role {
   SUPER_ADMIN
+  MANAGEMENT
+  FINANCE
+  KEPALA_KITCHEN
   DATA_ADMIN
-  INTERNAL
-  PUBLIC
+  AHLI_GIZI
+  DATA_STEWARD
 }
 
-/// Application-side user record. Holds NO credentials — Auth0 owns identity,
-/// `auth0Sub` is the only link between the two.
-model User {
-  id       String  @id @default(uuid()) @db.Uuid
-  auth0Sub String  @unique @map("auth0_sub")
-  email    String? @unique
-  name     String?
-  role     Role    @default(PUBLIC)
+/// Status keaktifan akun maupun dapur - ERD memakai ENUM(active,inactive)
+/// untuk keduanya.
+enum ActiveStatus {
+  ACTIVE
+  INACTIVE
+}
 
-  /// Scopes a DATA_ADMIN to a single SPPG Dapur. Nullable and unconstrained for
-  /// now; a FK to the sppg_dapur table lands with that table in the next phase.
-  scopeId String? @map("scope_id") @db.Uuid
+/// Jenis dapur: basah (masak di tempat) atau kering (distribusi kemasan).
+enum KitchenType {
+  BASAH
+  KERING
+}
+
+/// Slot pendistribusian MBG pada tabel rujukan AKG.
+enum PendistribusianMbg {
+  PAGI
+  SIANG
+}
+
+/// Status batch unggahan (PRD FR-UP-05, SCRUM-22/37). Transisi yang sah ada
+/// di `src/lib/upload-status.ts`, bukan di sini.
+enum UploadStatus {
+  PROCESSING
+  NEEDS_REVIEW
+  NEEDS_MAPPING_UPDATE
+  READY
+  PUBLISHED
+  FAILED
+  /// Berkas diganti unggah ulang (SCRUM-124).
+  SUPERSEDED
+}
+
+/// Domain berkas yang diunggah (PRD Phase 1).
+enum UploadDomain {
+  CASHFLOW
+  MENU
+  RAB
+  PO
+  GOODS_RECEIPT
+  VENDOR_PAYMENT
+  INPUT_MAKER
+}
+
+/// Sistem asal data (field traceability `source_system`).
+enum SourceSystem {
+  INTERNAL
+  EFI
+  SIPGN
+  POP
+  AKSIS
+  MPM
+  WEB_MANUAL
+}
+
+/// Jenis menu pada form perencanaan menu SOP-OPR-001.
+enum MenuType {
+  KERING
+  BASAH
+}
+
+/// Kelompok porsi pada form menu. BUSUI_BUMIL = "Busui & Bumil"; nilai enum
+/// tidak boleh memuat spasi/ampersand sehingga ditulis snake.
+enum PortionClass {
+  KECIL
+  BESAR
+  BALITA
+  BUSUI_BUMIL
+}
+
+/// Posisi nilai gizi satu porsi terhadap rentang target AKG-nya (SCRUM-8).
+enum ComplianceStatus {
+  WITHIN
+  BELOW
+  ABOVE
+}
+
+/// Status penyelesaian satu catatan operasional harian dapur.
+enum OperationalStatus {
+  COMPLETED
+  PENDING
+  CANCELLED
+}
+
+/// Status publikasi konten CMS (SCRUM-14).
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// Format berkas dokumen CMS yang boleh diunggah.
+enum DocumentFileType {
+  PDF
+  DOCX
+  XLSX
+}
+
+// ---------------------------------------------------------------------------
+// Identitas & audit
+// ---------------------------------------------------------------------------
+
+/// Akun aplikasi. Identitas dan kredensial dikelola sendiri: login memakai
+/// email + `passwordHash` (argon2id), sesi ada di tabel `sessions`.
+///
+/// `passwordHash` null = akun belum punya password (baru diundang, atau
+/// dimigrasi dari Auth0) dan belum bisa login sampai memakai link set-password.
+model User {
+  id       BigInt  @id @default(autoincrement()) @map("user_id")
+  email    String? @unique
+  fullName String? @map("full_name")
+  role     Role
+
+  status      ActiveStatus @default(ACTIVE)
+  lastLoginAt DateTime?    @map("last_login")
+
+  passwordHash     String?   @map("password_hash")
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")
+
+  mfaEnabled   Boolean @default(false) @map("mfa_enabled")
+  /// Secret TOTP terenkripsi AES-256-GCM (lib/crypto). Jangan pernah dikirim ke klien.
+  mfaSecretEnc String? @map("mfa_secret_enc")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  auditLogs AuditLog[]
+  /// Dapur yang boleh diakses (SCRUM-20). KEPALA_KITCHEN, DATA_ADMIN dan
+  /// AHLI_GIZI wajib punya minimal satu; role lain tanpa baris di sini melihat
+  /// seluruh dapur.
+  kitchenScopes UserKitchenScope[]
+
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
+  mfaRecoveryCodes    MfaRecoveryCode[]
+
+  auditLogs        AuditLog[]
+  galleryImages    GalleryImage[]
+  uploadBatches    UploadBatch[]
+  cmsAnnouncements CmsAnnouncement[]
+  cmsDocuments     CmsDocument[]
 
   @@index([role])
-  @@index([scopeId])
   @@map("users")
 }
 
-/// Who did what, to which entity, when. Written sparsely in this phase;
-/// the shape is here so feature endpoints can just call writeAuditLog().
-model AuditLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  actorId    String?  @map("actor_id") @db.Uuid
-  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  action     String
-  entityType String   @map("entity_type")
-  entityId   String?  @map("entity_id")
-  metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at")
+/// Sesi login. Token mentah hanya ada di cookie klien; di sini hanya SHA-256-nya,
+/// jadi dump database tidak bisa dipakai untuk membajak sesi.
+model Session {
+  id     BigInt @id @default(autoincrement()) @map("session_id")
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([actorId, createdAt])
-  @@index([entityType, entityId])
+  tokenHash String @unique @map("token_hash")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  /// Batas absolut; idle timeout dihitung dari `lastSeenAt`.
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  ip        String?
+  userAgent String? @map("user_agent")
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Token sekali pakai untuk set/reset password (juga dipakai sebagai undangan).
+model PasswordResetToken {
+  id     BigInt @id @default(autoincrement()) @map("token_id")
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// Kode pemulihan MFA, sekali pakai. Hanya hash-nya yang disimpan.
+model MfaRecoveryCode {
+  id     BigInt @id @default(autoincrement()) @map("code_id")
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
+}
+
+/// Role -> permission yang bisa diubah lewat API tanpa deploy. SUPER_ADMIN
+/// tidak disimpan di sini: ia selalu memegang semua permission (tidak bisa
+/// dicabut, supaya tidak ada skenario lockout). Nilai `permission` divalidasi
+/// terhadap daftar PERMISSIONS di kode.
+model RolePermission {
+  role       Role
+  permission String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([role, permission])
+  @@map("role_permissions")
+}
+
+/// User <-> dapur (SCRUM-20). Menggantikan `users.scope_id` supaya satu akun
+/// bisa memegang lebih dari satu dapur.
+model UserKitchenScope {
+  userId BigInt @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([userId, kitchenId])
+  @@index([kitchenId])
+  @@map("user_kitchen_scopes")
+}
+
+/// Who did what, to which entity, when (SCRUM-1, SCRUM-14 "all actions logged").
+model AuditLog {
+  id     BigInt  @id @default(autoincrement()) @map("log_id")
+  userId BigInt? @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action   String
+  entity   String
+  entityId BigInt? @map("entity_id")
+
+  /// Tidak ada di ERD, tapi dipertahankan: kolom ini sudah dipakai
+  /// `writeAuditLog()` untuk menyimpan konteks perubahan (mis. role lama ke
+  /// role baru). Jangan pernah diisi token, password, atau raw request body.
+  metadata Json?
+
+  timestamp DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([entity, entityId])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Master data
+// ---------------------------------------------------------------------------
+
+/// Master SPPG Dapur - unit produksi yang memasak dan mendistribusikan makanan
+/// (SCRUM-15: 6 dapur saat peluncuran).
+model Kitchen {
+  id       BigInt @id @default(autoincrement()) @map("kitchen_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  name String @unique
+
+  /// Kode singkat dapur (SKN, LWG, DNM, PCK, SML) untuk nama berkas dan
+  /// `source_record_id`. Nullable: Turen belum punya kode resmi.
+  code String? @unique
+
+  /// Wilayah administratif. Nullable - TODO(catatan): master dapur belum ada
+  /// sebagai berkas. "SPPG Data points" 9.1 menandai tabel ini "build new"
+  /// dan menyebut nama dapur "today only implied by sheet name", jadi wilayah,
+  /// jenis, dan koordinat belum tersedia untuk keenam dapur.
+  province    String?
+  cityRegency String? @map("city_regency")
+  district    String?
+  village     String?
+
+  type   KitchenType?
+  status ActiveStatus @default(ACTIVE)
+
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  menuPlans      MenuPlan[]
+  uploadBatches  UploadBatch[]
+  menuNutritions MenuNutrition[]
+  dailyKitchens  DailyKitchen[]
+  menuCosts      MenuCost[]
+  userScopes     UserKitchenScope[]
+
+  financeTransactions FinanceTransaction[]
+  rabDailyBudgets     RabDailyBudget[]
+  vendorPayments      VendorPaymentWorkflow[]
+
+  @@index([status])
+  @@map("kitchens")
+}
+
+/// Master bahan kanonik. Menyatukan ~443 ejaan menjadi ~370 bahan nyata
+/// ("SPPG Data points" 9.2).
+model Ingredient {
+  id   BigInt @id @default(autoincrement()) @map("ingredient_id")
+  name String @unique
+
+  /// Ejaan-ejaan lain yang menunjuk bahan yang sama.
+  /// TODO(catatan): proses matching `menu_plans.bahan` (teks bebas) ke
+  /// `ingredient_id` belum didefinisikan aturannya - tunggu keputusan tim data.
+  /// Peringatan dari 9.2: "Ubi Ungu" dan "Kubis ungu" adalah bahan BERBEDA
+  /// dan tidak boleh digabung otomatis berdasarkan kemiripan string.
+  aliases String[] @default([])
+
+  /// Bagian Dapat Dimakan, dalam persen.
+  bddPct Decimal? @map("bdd_pct") @db.Decimal(5, 2)
+
+  /// Kandungan gizi per 100 g bahan mentah.
+  energiPer100g      Decimal? @map("energi_per100g") @db.Decimal(10, 2)
+  proteinPer100g     Decimal? @map("protein_per100g") @db.Decimal(10, 2)
+  lemakPer100g       Decimal? @map("lemak_per100g") @db.Decimal(10, 2)
+  karbohidratPer100g Decimal? @map("karbohidrat_per100g") @db.Decimal(10, 2)
+  seratPer100g       Decimal? @map("serat_per100g") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  menuPlans MenuPlan[]
+
+  @@map("ingredients")
+}
+
+/// Tabel rujukan AKG - 12 kelompok sasaran, Tabel 2 SOP-OPR-001
+/// (Juknis 401.1/2025). Lookup tetap, bukan data yang diunggah (SCRUM-8).
+model AkgTarget {
+  id                 BigInt             @id @default(autoincrement()) @map("akg_id")
+  kelompokSasaran    String             @map("kelompok_sasaran")
+  pendistribusianMbg PendistribusianMbg @map("pendistribusian_mbg")
+
+  /// Rentang %AKG sebagai teks apa adanya dari tabel rujukan, mis. "20-25%".
+  rujukanPctAkg String? @map("rujukan_pct_akg")
+
+  energiMin Decimal? @map("energi_min") @db.Decimal(10, 2)
+  energiMax Decimal? @map("energi_max") @db.Decimal(10, 2)
+
+  proteinMin Decimal? @map("protein_min") @db.Decimal(10, 2)
+  proteinMax Decimal? @map("protein_max") @db.Decimal(10, 2)
+
+  lemakMin Decimal? @map("lemak_min") @db.Decimal(10, 2)
+  lemakMax Decimal? @map("lemak_max") @db.Decimal(10, 2)
+
+  karbohidratMin Decimal? @map("karbohidrat_min") @db.Decimal(10, 2)
+  karbohidratMax Decimal? @map("karbohidrat_max") @db.Decimal(10, 2)
+
+  /// TODO(catatan): SCRUM-8 meminta kolom Serat di tabel AKG compliance, tapi
+  /// tabel rujukan resmi (Tabel 2 SOP-OPR-001 / Juknis 401.1 Tahun 2025) TIDAK
+  /// mencantumkan rentang Serat - hanya Energi/Protein/Lemak/Karbohidrat.
+  /// Kedua kolom ini dibiarkan NULL dan nilainya PERLU DIKONFIRMASI ke Program
+  /// Team sebelum dipakai untuk validasi compliance.
+  seratMin Decimal? @map("serat_min") @db.Decimal(10, 2)
+  seratMax Decimal? @map("serat_max") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  akgCompliances AkgCompliance[]
+
+  @@unique([kelompokSasaran, pendistribusianMbg])
+  @@map("akg_targets")
+}
+
+// ---------------------------------------------------------------------------
+// Unggah & data operasional
+// ---------------------------------------------------------------------------
+
+/// Satu percobaan unggah berkas (SCRUM-5, 6, 7; metadata umum SCRUM-22/37).
+/// Satu baris per percobaan: berkas yang sama diunggah ulang menjadi batch
+/// baru, bukan ditolak.
+model UploadBatch {
+  id BigInt @id @default(autoincrement()) @map("batch_id")
+
+  /// `upload_batch_id` di PRD — ID yang keluar ke klien dan masuk ke
+  /// `source_record_id` staging. BigInt `id` tetap internal.
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  domain       UploadDomain
+  sourceSystem SourceSystem @default(INTERNAL) @map("source_system")
+
+  /// Periode data, "YYYY-MM". Nullable: tidak semua domain punya periode.
+  period String?
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+
+  uploaderId BigInt? @map("uploader_id")
+  uploader   User?   @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  uploadDate DateTime @default(now()) @map("upload_date")
+  fileName   String   @map("file_name")
+
+  /// SHA-256 berkas. Tidak UNIQUE lagi (SCRUM-22): unggah ulang berkas yang
+  /// sama membuat batch baru plus peringatan duplikat; penggandaan fakta bisnis
+  /// dicegah saat publish, bukan di sini.
+  fileHash String @map("file_hash")
+
+  /// Byte. Nullable hanya untuk batch sebelum SCRUM-22.
+  fileSize Int? @map("file_size")
+
+  /// Object key di S3. Tidak pernah memuat nama berkas asli. NULL bila berkas
+  /// gagal sebelum sempat disimpan.
+  storageKey String? @map("storage_key")
+
+  /// Diisi deteksi profile (SCRUM-39) dan parser (SCRUM-35/36), NULL selama
+  /// belum terdeteksi.
+  mappingProfileId String? @map("mapping_profile_id")
+  templateVersion  String? @map("template_version")
+
+  rowCount Int          @default(0) @map("row_count")
+  status   UploadStatus @default(PROCESSING)
+
+  /// Kode mesin dan ringkasan kegagalan, untuk status FAILED /
+  /// NEEDS_MAPPING_UPDATE.
+  errorCode    String? @map("error_code")
+  errorSummary String? @map("error_summary")
+  durationMs   Int?    @map("duration_ms")
+
+  /// Catatan verifikasi.
+  notes String?
+
+  /// Diisi SCRUM-33 (validasi) dan SCRUM-95 (publish).
+  validatedAt DateTime? @map("validated_at")
+  publishedAt DateTime? @map("published_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  menuPlans           MenuPlan[]
+  stagingRows         StagingRow[]
+  financeTransactions FinanceTransaction[]
+  rabDailyBudgets     RabDailyBudget[]
+  vendorPayments      VendorPaymentWorkflow[]
+
+  @@index([kitchenId, uploadDate])
+  @@index([kitchenId, domain, uploadDate])
+  @@index([fileHash])
+  @@map("upload_batches")
+}
+
+/// Baris mentah hasil parse, satu wadah untuk semua domain (SCRUM-24, B-RAW).
+/// `cells` = huruf kolom -> sel persis seperti dibaca. Dihapus bersama batch.
+model StagingRow {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  /// Tidak UNIQUE: id memuat hash berkas, jadi berkas yang sama diunggah ulang (batch baru) menghasilkan id yang sama.
+  sourceRecordId   String       @map("source_record_id")
+  /// Kode dapur (atau id numerik bila belum ada kode, B-TUREN).
+  kitchenId        String       @map("kitchen_id")
+  sourceSystem     SourceSystem @map("source_system")
+  sourceFileName   String       @map("source_file_name")
+  templateVersion  String?      @map("template_version")
+  mappingProfileId String?      @map("mapping_profile_id")
+  loadedAt         DateTime     @map("loaded_at")
+  domain           UploadDomain
+
+  sheetName       String @map("sheet_name")
+  sourceRowNumber Int    @map("source_row_number")
+  cells           Json
+
+  @@index([sourceRecordId])
+  @@index([uploadBatchId])
+  @@map("staging_rows")
+}
+
+/// Hasil mapping Cashflow (MAP-SKN-CF-001, SCRUM-27/55/98): satu baris per
+/// transaksi. `txn_total` hidup di sini dan TIDAK di baris line, supaya total
+/// tidak pernah terjumlah per baris (anti-double-count). Ikut hilang bersama
+/// batch (cascade). INTERNAL-ONLY (SCRUM-13). Nama field [USULAN] (B-DD).
+model FinanceTransaction {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  mappingProfileId String @map("mapping_profile_id")
+
+  /// Field traceability PRD §7.2: upload_batch_id di atas, mapping_profile_id,
+  /// kitchen_id, source_system, source_file_name, template_version, loaded_at.
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+
+  sourceRecordId  String       @map("source_record_id")
+  sourceSystem    SourceSystem @map("source_system")
+  sourceFileName  String       @map("source_file_name")
+  templateVersion String?      @map("template_version")
+  loadedAt        DateTime     @map("loaded_at")
+
+  txnId        String    @map("txn_id")
+  txnDate      DateTime? @map("txn_date") @db.Date
+  txnType      String?   @map("txn_type")
+  direction    String?
+  category     String?
+  description  String?
+  txnTotal     Decimal?  @map("txn_total") @db.Decimal(14, 2)
+  reviewStatus String?   @map("review_status")
+  reviewNote   String?   @map("review_note")
+  confidence   String?
+
+  /// DQ PRD §7.4: petty cash dan transfer internal bukan pengeluaran eksternal
+  /// (Top 5 Supplier / Expense Mix hanya menjumlah yang true). TODO(B-DD): aturan
+  /// klasifikasi final; sementara arah KELUAR.
+  isExternalSpend Boolean @map("is_external_spend")
+
+  lines FinanceTransactionLine[]
+
+  @@unique([uploadBatchId, txnId])
+  @@index([kitchenId, txnDate])
+  @@index([sourceRecordId])
+  @@map("finance_transactions")
+}
+
+/// Baris item satu transaksi Cashflow. `sourceRecordId` menunjuk baris mentah
+/// di staging_rows. Tidak UNIQUE: berkas yang sama diunggah ulang menghasilkan id
+/// yang sama; penggandaan dicegah saat publish (SCRUM-22).
+model FinanceTransactionLine {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String             @map("upload_batch_id") @db.Uuid
+  txnId         String             @map("txn_id")
+  transaction   FinanceTransaction @relation(fields: [uploadBatchId, txnId], references: [uploadBatchId, txnId], onDelete: Cascade)
+
+  sourceRecordId String   @map("source_record_id")
+  lineId         String?  @map("line_id")
+  itemName       String?  @map("item_name")
+  counterparty   String?
+  qty            Decimal? @db.Decimal(14, 3)
+  unit           String?
+  unitPrice      Decimal? @map("unit_price") @db.Decimal(14, 2)
+  lineAmount     Decimal? @map("line_amount") @db.Decimal(14, 2)
+
+  @@index([uploadBatchId, txnId])
+  @@index([sourceRecordId])
+  @@map("finance_transaction_lines")
+}
+
+/// Hasil mapping RAB (MAP-SKN-RAB-001, SCRUM-44/28): anggaran satu hari untuk
+/// satu segmen porsi, dijumlah dari baris bahan. INTERNAL-ONLY (SCRUM-13).
+/// Nama field [USULAN] (B-DD).
+model RabDailyBudget {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  mappingProfileId String @map("mapping_profile_id")
+
+  /// Field traceability PRD §7.2: upload_batch_id di atas, mapping_profile_id,
+  /// kitchen_id, source_system, source_file_name, template_version, loaded_at.
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+
+  sourceRecordId  String       @map("source_record_id")
+  sourceSystem    SourceSystem @map("source_system")
+  sourceFileName  String       @map("source_file_name")
+  templateVersion String?      @map("template_version")
+  loadedAt        DateTime     @map("loaded_at")
+
+  budgetDate     DateTime @map("budget_date") @db.Date
+  portionSegment String   @map("portion_segment")
+  plannedCost    Decimal  @map("planned_cost") @db.Decimal(16, 2)
+
+  /// Jumlah paket/porsi rencana hari itu (PRD §7.1 "package count"): terbesar
+  /// dari "Kebutuhan Makanan Kemasan (pax)"; NULL bila tidak ada baris yang
+  /// mengisinya. Bukan jumlah Penerima Manfaat: itu `beneficiaries` per baris.
+  packageCount Decimal? @map("package_count") @db.Decimal(14, 2)
+
+  ingredients RabIngredientBudget[]
+
+  @@unique([uploadBatchId, budgetDate, portionSegment])
+  @@index([sourceRecordId])
+  @@map("rab_daily_budgets")
+}
+
+/// Satu baris bahan RAB. `sourceRecordId` = baris sumber tempat biaya
+/// rencana berasal (AC SCRUM-44). Angka porsi disimpan mentah; aturan porsi
+/// rencana ada di SCRUM-64.
+model RabIngredientBudget {
+  id BigInt @id @default(autoincrement())
+
+  dailyBudgetId BigInt         @map("daily_budget_id")
+  dailyBudget   RabDailyBudget @relation(fields: [dailyBudgetId], references: [id], onDelete: Cascade)
+
+  sourceRecordId   String   @map("source_record_id")
+  menuType         String?  @map("menu_type")
+  menuName         String?  @map("menu_name")
+  ingredient       String?
+  unitPrice        Decimal? @map("unit_price") @db.Decimal(14, 2)
+  lineTotal        Decimal? @map("line_total") @db.Decimal(16, 2)
+  beneficiaries    Decimal? @db.Decimal(14, 2)
+  ingredientNeedKg Decimal? @map("ingredient_need_kg") @db.Decimal(14, 3)
+  packagedNeedPax  Decimal? @map("packaged_need_pax") @db.Decimal(14, 2)
+
+  @@index([dailyBudgetId])
+  @@index([sourceRecordId])
+  @@map("rab_ingredient_budgets")
+}
+
+/// Hasil mapping Input Maker (MAP-SKN-PAY-001, SCRUM-30/47): satu baris per
+/// permintaan bayar. TAGIHAN adalah jumlah yang DIMINTA, bukan yang dibayar
+/// (OD-14); waktu maker/approval/bayar dan status lunas tidak diturunkan dari
+/// TANGGAL/TAGIHAN, jadi NULL sampai ada bukti yang andal. Kolom bank tidak
+/// pernah masuk (restricted). INTERNAL-ONLY (SCRUM-13). Nama field [USULAN] (B-DD).
+/// Constraint di migration: paid_at NOT NULL => payment_reference NOT NULL.
+model VendorPaymentWorkflow {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  /// ID stabil: hash isi baris + sheet, sama untuk berkas yang diunggah ulang.
+  paymentRequestId String @map("payment_request_id")
+
+  /// Field traceability PRD §7.2.
+  mappingProfileId String       @map("mapping_profile_id")
+  kitchenId        BigInt       @map("kitchen_id")
+  kitchen          Kitchen      @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  sourceRecordId   String       @map("source_record_id")
+  sourceSystem     SourceSystem @map("source_system")
+  sourceFileName   String       @map("source_file_name")
+  templateVersion  String?      @map("template_version")
+  loadedAt         DateTime     @map("loaded_at")
+
+  requestDate         DateTime? @map("request_date") @db.Date
+  /// Label mentah dari sumber, dipertahankan apa adanya.
+  description         String?
+  category            String?
+  supplierName        String?   @map("supplier_name")
+  requestAmount       Decimal?  @map("request_amount") @db.Decimal(16, 2)
+  checklist           Boolean?
+  supplierInvoiceLink String?   @map("supplier_invoice_link")
+  paymentInvoiceLink  String?   @map("payment_invoice_link")
+
+  /// Rantai workflow. Semuanya NULL dari Input Maker (tidak ada buktinya di sumber).
+  makerInputAt     DateTime? @map("maker_input_at")
+  approvedAt       DateTime? @map("approved_at")
+  paidAt           DateTime? @map("paid_at")
+  paidAmount       Decimal?  @map("paid_amount") @db.Decimal(16, 2)
+  paymentReference String?   @map("payment_reference")
+
+  @@unique([uploadBatchId, paymentRequestId])
+  @@index([kitchenId, requestDate])
+  @@index([sourceRecordId])
+  @@map("vendor_payment_workflows")
+}
+
+/// Form perencanaan menu SOP-OPR-001, sudah diratakan menjadi satu baris per
+/// bahan (SCRUM-2). Nama kolom sengaja dipertahankan dalam Bahasa Indonesia
+/// agar konsisten dengan istilah SOP dan header Excel sumbernya.
+model MenuPlan {
+  id BigInt @id @default(autoincrement()) @map("menu_plan_id")
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+
+  uploadBatchId BigInt      @map("upload_batch_id")
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [id], onDelete: Cascade)
+
+  /// TODO(catatan): proses matching bahan-ke-ingredient_id belum didefinisikan,
+  /// tunggu keputusan tim data. Sampai aturan itu ada, kolom ini tetap nullable
+  /// dan `bahan` di bawah adalah satu-satunya sumber nama bahan yang pasti.
+  ingredientId BigInt?     @map("ingredient_id")
+  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+
+  /// Tanggal menu disajikan.
+  tanggal DateTime @db.Date
+
+  /// Nama hari yang menyertai tanggal (Senin sampai Minggu).
+  /// TODO(catatan): nilai ini bisa diturunkan dari `tanggal`. Dipertahankan
+  /// karena ada di ERD dan di form SOP; konfirmasi apakah perlu disimpan.
+  hari String?
+
+  menuType     MenuType     @map("menu_type")
+  portionClass PortionClass @map("portion_class")
+
+  /// Nama masakan (kolom "menu" di form SOP).
+  menuName String @map("menu_name")
+
+  /// Nama bahan apa adanya seperti ditulis ahli gizi (kolom "bahan").
+  bahan String
+
+  /// Berat bersih (dapat dimakan) per porsi, gram.
+  beratBersih Decimal @map("berat_bersih") @db.Decimal(10, 2)
+
+  /// Berat kotor per porsi, gram.
+  /// TODO(catatan): "SPPG Data points" 11 mencatat sebagian baris punya
+  /// berat_kotor = berat_bersih dan sebagian lagi = bersih / BDD. Konvensi
+  /// mana yang benar belum diputuskan.
+  beratKotor Decimal @map("berat_kotor") @db.Decimal(10, 2)
+
+  /// Bagian Dapat Dimakan, persen.
+  bdd Decimal @db.Decimal(5, 2)
+
+  /// Ukuran Rumah Tangga: jumlah + satuan, mis. 1 "potong".
+  jumlahUrt Decimal? @map("jumlah_urt") @db.Decimal(10, 2)
+  satuanUrt String?  @map("satuan_urt")
+
+  /// Kandungan gizi per porsi.
+  energi      Decimal @db.Decimal(10, 2)
+  protein     Decimal @db.Decimal(10, 2)
+  lemak       Decimal @db.Decimal(10, 2)
+  karbohidrat Decimal @db.Decimal(10, 2)
+
+  /// TODO(catatan): kolom Serat ada di ERD dan diminta SCRUM-12, tapi tidak ada
+  /// di 14 kolom form menu maupun di tabel rujukan AKG. Dibuat nullable sampai
+  /// sumber datanya jelas.
+  serat Decimal? @db.Decimal(10, 2)
+
+  /// Jumlah penerima manfaat yang disuapi blok menu ini.
+  jumlahPm Int @map("jumlah_pm")
+
+  /// Total kebutuhan bahan untuk satu blok, kilogram.
+  kebutuhanBahanKg Decimal? @map("kebutuhan_bahan_kg") @db.Decimal(12, 3)
+
+  /// Total kebutuhan makanan kemasan, satuan pax.
+  kebutuhanKemasanPax Decimal? @map("kebutuhan_kemasan_pax") @db.Decimal(12, 2)
+
+  /// INTERNAL-ONLY (SCRUM-13). Harga satuan bahan dan total biaya baris, rupiah.
+  /// Dua kolom ini tidak boleh muncul di view publik manapun.
+  hargaBahan Decimal? @map("harga_bahan") @db.Decimal(14, 2)
+  totalHarga Decimal? @map("total_harga") @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  recipeCostings RecipeCosting[]
+  akgCompliances AkgCompliance[]
+  menuCosts      MenuCost[]
+
+  @@index([kitchenId, tanggal])
+  @@index([uploadBatchId])
+  @@index([ingredientId])
+  @@map("menu_plans")
+}
+
+/// Standar resep berbiaya (SOP-OPR-001 langkah 5). `yieldTestPct` adalah
+/// penyusutan material - berbeda dari BDD dan tidak boleh digabung dengannya.
+model RecipeCosting {
+  id BigInt @id @default(autoincrement()) @map("costing_id")
+
+  menuPlanId BigInt   @map("menu_plan_id")
+  menuPlan   MenuPlan @relation(fields: [menuPlanId], references: [id], onDelete: Cascade)
+
+  /// Nama bahan pada tabel standar resep.
+  item String
+
+  /// INTERNAL-ONLY (SCRUM-13): seluruh kolom biaya di bawah.
+  hargaPerKg Decimal? @map("harga_per_kg") @db.Decimal(14, 2)
+
+  /// Gramasi bahan per porsi.
+  gramasi Decimal? @db.Decimal(10, 2)
+
+  /// Bagian yang masih terpakai setelah persiapan, persen. Kosong berarti 100%.
+  yieldTestPct Decimal? @map("yield_test_pct") @db.Decimal(5, 2)
+
+  /// Biaya per porsi setelah disesuaikan yield test.
+  costPerPorsi Decimal? @map("cost_per_porsi") @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([menuPlanId])
+  @@map("recipe_costings")
+}
+
+// ---------------------------------------------------------------------------
+// Mart pre-computed
+//
+// Kelima tabel di bawah ditandai [mart] di ERD: isinya diturunkan dari tabel
+// operasional, bukan diisi manusia.
+// TODO(catatan): mekanisme refresh (job terjadwal / trigger / recompute saat
+// import di-commit) belum ditentukan. Migration ini hanya membuat strukturnya.
+// ---------------------------------------------------------------------------
+
+/// Hasil perbandingan gizi satu baris menu terhadap target AKG-nya (SCRUM-8).
+///
+/// TODO(catatan): "SPPG Data points" 11 mencatat pemetaan 4 portion_class di
+/// form menu ke 12 kelompok sasaran AKG BELUM ADA. Compliance tidak bisa
+/// dihitung sampai pemetaan itu diputuskan.
+model AkgCompliance {
+  id       BigInt @id @default(autoincrement()) @map("compliance_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  menuPlanId BigInt   @map("menu_plan_id")
+  menuPlan   MenuPlan @relation(fields: [menuPlanId], references: [id], onDelete: Cascade)
+
+  akgId     BigInt    @map("akg_id")
+  akgTarget AkgTarget @relation(fields: [akgId], references: [id], onDelete: Restrict)
+
+  status     ComplianceStatus
+  computedAt DateTime         @default(now()) @map("computed_at")
+
+  @@unique([menuPlanId, akgId])
+  @@map("akg_compliances")
+}
+
+/// Rekap gizi per dapur per tanggal per kelompok porsi (SCRUM-12).
+model MenuNutrition {
+  id       BigInt @id @default(autoincrement()) @map("mart_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  tanggal      DateTime     @db.Date
+  portionClass PortionClass @map("portion_class")
+
+  totalEnergi      Decimal? @map("total_energi") @db.Decimal(10, 2)
+  totalProtein     Decimal? @map("total_protein") @db.Decimal(10, 2)
+  totalLemak       Decimal? @map("total_lemak") @db.Decimal(10, 2)
+  totalKarbohidrat Decimal? @map("total_karbohidrat") @db.Decimal(10, 2)
+  totalSerat       Decimal? @map("total_serat") @db.Decimal(10, 2)
+
+  lastRefreshedAt DateTime @default(now()) @map("last_refreshed_at")
+
+  @@unique([kitchenId, tanggal, portionClass])
+  @@map("menu_nutritions")
+}
+
+/// Rekap operasional harian per dapur (SCRUM-11).
+model DailyKitchen {
+  id BigInt @id @default(autoincrement()) @map("mart_id")
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  tanggal DateTime @db.Date
+
+  mealsPrepared    Int @map("meals_prepared")
+  mealsDistributed Int @map("meals_distributed")
+
+  /// INTERNAL-ONLY (SCRUM-13): hitungan penerima manfaat yang eksak.
+  jumlahPm Int @map("jumlah_pm")
+
+  operationalStatus OperationalStatus @default(PENDING) @map("operational_status")
+
+  lastRefreshedAt DateTime @default(now()) @map("last_refreshed_at")
+
+  @@unique([kitchenId, tanggal])
+  @@map("daily_kitchens")
+}
+
+/// Rekap biaya per dapur per tanggal.
+/// ERD menandai tabel ini [mart, internal-only] - SELURUH isinya sensitif dan
+/// tidak boleh muncul di view publik manapun (SCRUM-13).
+model MenuCost {
+  id BigInt @id @default(autoincrement()) @map("mart_id")
+
+  kitchenId BigInt  @map("kitchen_id")
+  kitchen   Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  menuPlanId BigInt?   @map("menu_plan_id")
+  menuPlan   MenuPlan? @relation(fields: [menuPlanId], references: [id], onDelete: SetNull)
+
+  tanggal DateTime @db.Date
+
+  costPerPortion Decimal? @map("cost_per_portion") @db.Decimal(14, 2)
+  plannedCost    Decimal? @map("planned_cost") @db.Decimal(14, 2)
+  actualCost     Decimal? @map("actual_cost") @db.Decimal(14, 2)
+
+  lastRefreshedAt DateTime @default(now()) @map("last_refreshed_at")
+
+  @@index([kitchenId, tanggal])
+  @@index([menuPlanId])
+  @@map("menu_costs")
+}
+
+/// Angka ringkas untuk dashboard transparansi publik.
+model PublicSummary {
+  id       BigInt @id @default(autoincrement()) @map("summary_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  periodStart DateTime @map("period_start") @db.Date
+  periodEnd   DateTime @map("period_end") @db.Date
+
+  mealsServed    Int @map("meals_served")
+  kitchensActive Int @map("kitchens_active")
+  coverageCount  Int @map("coverage_count")
+
+  lastRefreshedAt DateTime @default(now()) @map("last_refreshed_at")
+
+  @@unique([periodStart, periodEnd])
+  @@map("public_summaries")
+}
+
+// ---------------------------------------------------------------------------
+// CMS (SCRUM-14)
+// ---------------------------------------------------------------------------
+
+/// Pengumuman untuk situs publik.
+model CmsAnnouncement {
+  id       BigInt @id @default(autoincrement()) @map("announcement_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  title String
+  body  String
+
+  status      ContentStatus @default(DRAFT)
+  publishDate DateTime?     @map("publish_date")
+
+  createdById BigInt? @map("created_by")
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status, publishDate])
+  @@index([createdById])
+  @@map("cms_announcements")
+}
+
+/// Berkas yang bisa diunduh publik (SOP, laporan).
+model CmsDocument {
+  id       BigInt @id @default(autoincrement()) @map("document_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  title    String
+  category String
+  fileType DocumentFileType @map("file_type")
+
+  /// Object key di S3 assets bucket. Tidak ada di ERD, tapi tanpa penunjuk
+  /// berkas record ini tidak bisa dipakai - pola yang sama sudah dipakai
+  /// GalleryImage.
+  storageKey String @map("storage_key")
+
+  uploadDate DateTime      @default(now()) @map("upload_date")
+  status     ContentStatus @default(DRAFT)
+
+  uploadedById BigInt? @map("uploaded_by")
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([category])
+  @@index([uploadedById])
+  @@map("cms_documents")
+}
+
+/// Foto dokumentasi program untuk galeri publik.
+///
+/// TODO(catatan): tabel ini TIDAK ADA di sppg_erd.drawio, tapi dipertahankan
+/// karena fitur galeri CMS sudah terpasang. Konfirmasi apakah memang harus
+/// dihapus atau ERD yang perlu ditambah.
+model GalleryImage {
+  id       BigInt @id @default(autoincrement()) @map("gallery_id")
+  publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
+
+  imageTitle  String  @map("image_title")
+  description String?
+
+  /// Object key di S3 assets bucket.
+  storageKey String @map("storage_key")
+
+  uploadDate DateTime      @default(now()) @map("upload_date")
+  status     ContentStatus @default(DRAFT)
+
+  uploadedById BigInt? @map("uploaded_by")
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  /// TODO: confirm fixed category list with stakeholder; promote to enum once frozen.
+  category String
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([uploadedById])
+  @@index([category])
+  @@map("gallery_images")
+}
+
+// ---------------------------------------------------------------------------
+// Seeding
+// ---------------------------------------------------------------------------
+
+/// Which files in `prisma/seeders/` have already run against this database —
+/// the same job Sequelize's `SequelizeData` table does for its seeders. One
+/// row per seeder `name` (its filename, no extension); `prisma/seed.ts` skips
+/// any name already here instead of re-running it.
+model SeedHistory {
+  id    BigInt   @id @default(autoincrement()) @map("seed_id")
+  name  String   @unique
+  ranAt DateTime @default(now()) @map("ran_at")
+
+  @@map("seed_history")
 }

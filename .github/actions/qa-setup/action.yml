@@ -1,0 +1,46 @@
+name: qa-audit setup
+description: Node 24, Semgrep, gitleaks, npm dependencies (qa-audit, backend, frontend-admin, frontend-public) and Chromium.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    # Everything below is network-bound and independent, so it runs side by side;
+    # each job's exit code is collected so any single failure fails the step.
+    - shell: bash
+      env:
+        GITLEAKS_VERSION: 8.30.1
+      run: |
+        set -uo pipefail
+        pids=()
+        pip install --quiet --disable-pip-version-check semgrep==1.180.0 & pids+=($!)
+        (curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | sudo tar -xz -C /usr/local/bin gitleaks) & pids+=($!)
+        for dir in backend frontend-admin frontend-public; do
+          (cd "$dir" && npm ci --no-audit --no-fund) & pids+=($!)
+        done
+        # npx playwright needs qa-audit's own dependencies first. On a cache hit only the OS libraries are missing.
+        (
+          cd qa-audit && npm ci --no-audit --no-fund
+          # A slow apt mirror once stalled this for 11 minutes and composite steps have no
+          # timeout-minutes, so cap each attempt with timeout(1) and retry.
+          echo 'Acquire::Retries "5"; Acquire::http::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
+          for attempt in 1 2 3; do
+            timeout 5m npx playwright install --with-deps chromium && exit 0
+            echo "playwright install failed (attempt $attempt)"
+            # timeout(1) kills npx but not the apt-get below it; that orphan keeps the dpkg
+            # lock and every later attempt fails at once with exit 100.
+            sudo pkill -x apt-get || true
+            sudo pkill -x dpkg || true
+            sudo dpkg --configure -a
+          done
+          exit 1
+        ) & pids+=($!)
+        fail=0
+        for pid in "${pids[@]}"; do wait "$pid" || fail=1; done
+        exit $fail

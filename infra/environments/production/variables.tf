@@ -10,7 +10,7 @@ variable "project_name" {
 
 variable "aws_region" {
   type    = string
-  default = "ap-southeast-2"
+  default = "ap-southeast-3"
 }
 
 # --- Network ---
@@ -22,10 +22,10 @@ variable "vpc_cidr" {
 
 # CI passes no tfvars file — terraform.tfvars is gitignored — so these defaults
 # are what the deploy workflow actually builds with. They must match the region
-# the state bucket lives in (ap-southeast-2).
+# the state bucket lives in (ap-southeast-3).
 variable "azs" {
   type    = list(string)
-  default = ["ap-southeast-2a", "ap-southeast-2b"]
+  default = ["ap-southeast-3a", "ap-southeast-3b"]
 }
 
 variable "public_subnet_cidrs" {
@@ -129,17 +129,8 @@ variable "db_backup_retention_period" {
   default = 7
 }
 
-variable "auth0_domain" {
-  description = "Auth0 tenant domain for this environment (staging and prod use separate Auth0 APIs)."
+variable "email_from" {
+  description = "Verified SES identity used as the sender of invitation and reset email."
   type        = string
-}
-
-variable "auth0_audience" {
-  description = "Auth0 API identifier the backend validates access tokens against."
-  type        = string
-}
-
-variable "auth0_roles_claim" {
-  description = "Namespaced custom claim on the access token carrying the user's roles."
-  type        = string
+  default     = ""
 }

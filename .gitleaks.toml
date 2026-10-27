@@ -1,0 +1,13 @@
+[extend]
+useDefault = true
+
+# Dummy fixture key so unit tests can load src/config/env.ts; not a real secret.
+[[allowlists]]
+description = "backend test env fixture"
+paths = ['''backend/\.env\.test$''']
+
+# Actions cache key (`key: pip-semgrep-<version>-py3.12`) trips generic-api-key on the word "key"; not a secret.
+[[allowlists]]
+description = "qa-setup pip cache key"
+paths = ['''\.github/actions/qa-setup/action\.yml$''']
+regexes = ['''key:\s*pip-semgrep-[\w.-]+''']

@@ -27,15 +27,18 @@ resource "aws_lb" "this" {
   }
 }
 
-resource "aws_lb_target_group" "frontend" {
-  name        = "${local.prefix}-fe-tg"
+# Target group names are capped at 32 characters, and "sppg-dashboard-production"
+# alone is 25 — hence "-adm-tg"/"-pub-tg" rather than a spelt-out "-frontend-admin-tg".
+# Lengthening either name breaks production, not staging, so it fails late.
+resource "aws_lb_target_group" "frontend_admin" {
+  name        = "${local.prefix}-adm-tg"
   port        = var.frontend_container_port
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {
-    path                = var.frontend_health_check_path
+    path                = var.frontend_admin_health_check_path
     matcher             = "200-399"
     healthy_threshold   = 3
     unhealthy_threshold = 3
@@ -44,7 +47,28 @@ resource "aws_lb_target_group" "frontend" {
   }
 
   tags = {
-    Name = "${local.prefix}-fe-tg"
+    Name = "${local.prefix}-adm-tg"
+  }
+}
+
+resource "aws_lb_target_group" "frontend_public" {
+  name        = "${local.prefix}-pub-tg"
+  port        = var.frontend_container_port
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = var.frontend_public_health_check_path
+    matcher             = "200-399"
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    interval            = 30
+    timeout             = 5
+  }
+
+  tags = {
+    Name = "${local.prefix}-pub-tg"
   }
 }
 
@@ -76,7 +100,7 @@ resource "aws_lb_listener" "http" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
+    target_group_arn = aws_lb_target_group.frontend_public.arn
   }
 }
 
@@ -117,6 +141,28 @@ resource "aws_lb_listener_rule" "api_http" {
   }
 }
 
+# Two frontends share one ALB, and with no domain/ACM yet there are no host
+# names to route on — so admin is carved out by path. This pairs with
+# `basePath: "/admin"` in frontend-admin/next.config.ts: the app emits every
+# asset URL under /admin, which is what keeps them matching this rule instead
+# of falling through to frontend-public. Changing one without the other breaks
+# the app. Swap this for a host_header condition once acm_certificate_arn is set.
+resource "aws_lb_listener_rule" "admin_http" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 20
+
+  condition {
+    path_pattern {
+      values = ["/admin", "/admin/*"]
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend_admin.arn
+  }
+}
+
 # HTTPS listener is only created once an ACM certificate is supplied — this
 # lets HTTPS be turned on later (e.g. once a domain exists) by setting
 # acm_certificate_arn, with no module/structure changes.
@@ -130,7 +176,7 @@ resource "aws_lb_listener" "https" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
+    target_group_arn = aws_lb_target_group.frontend_public.arn
   }
 }
 
@@ -168,14 +214,36 @@ resource "aws_lb_listener_rule" "api_https" {
   }
 }
 
-resource "aws_cloudwatch_log_group" "frontend" {
-  name              = "/ecs/${local.prefix}-frontend"
-  retention_in_days = 30
+resource "aws_lb_listener_rule" "admin_https" {
+  count        = var.acm_certificate_arn != "" ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 20
+
+  condition {
+    path_pattern {
+      values = ["/admin", "/admin/*"]
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend_admin.arn
+  }
+}
+
+resource "aws_cloudwatch_log_group" "frontend_admin" {
+  name              = "/ecs/${local.prefix}-frontend-admin"
+  retention_in_days = var.log_retention_in_days
+}
+
+resource "aws_cloudwatch_log_group" "frontend_public" {
+  name              = "/ecs/${local.prefix}-frontend-public"
+  retention_in_days = var.log_retention_in_days
 }
 
 resource "aws_cloudwatch_log_group" "backend" {
   name              = "/ecs/${local.prefix}-backend"
-  retention_in_days = 30
+  retention_in_days = var.log_retention_in_days
 }
 
 resource "aws_iam_role" "ecs_task_execution" {
@@ -200,6 +268,27 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# MFA_ENCRYPTION_KEY: encrypts TOTP secrets at rest and signs the MFA challenge
+# (backend/src/config/env.ts). Generated here so it never passes through a
+# person or a CI log; it lives in Secrets Manager and, like the DB password, in
+# Terraform state. Replacing this resource un-enrols every authenticator.
+resource "random_id" "mfa_key" {
+  byte_length = 32
+}
+
+resource "aws_secretsmanager_secret" "mfa_key" {
+  name = "${local.prefix}-mfa-encryption-key"
+
+  tags = {
+    Name = "${local.prefix}-mfa-encryption-key"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "mfa_key" {
+  secret_id     = aws_secretsmanager_secret.mfa_key.id
+  secret_string = random_id.mfa_key.b64_std
+}
+
 resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
   name = "${local.prefix}-ecs-task-exec-secrets"
   role = aws_iam_role.ecs_task_execution.id
@@ -209,7 +298,7 @@ resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["secretsmanager:GetSecretValue"]
-      Resource = var.db_secret_arn
+      Resource = [var.db_secret_arn, aws_secretsmanager_secret.mfa_key.arn]
     }]
   })
 }
@@ -231,6 +320,21 @@ resource "aws_iam_role" "ecs_task" {
   }
 }
 
+# Invitation and password-reset email (backend/src/lib/mailer.ts).
+resource "aws_iam_role_policy" "ecs_task_ses" {
+  name = "${local.prefix}-ecs-task-ses"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ses:SendEmail"]
+      Resource = "*"
+    }]
+  })
+}
+
 resource "aws_iam_role_policy" "ecs_task_assets" {
   name = "${local.prefix}-ecs-task-assets"
   role = aws_iam_role.ecs_task.id
@@ -245,8 +349,12 @@ resource "aws_iam_role_policy" "ecs_task_assets" {
   })
 }
 
-resource "aws_ecs_task_definition" "frontend" {
-  family                   = "${local.prefix}-frontend"
+# frontend-public is still a static "coming soon" page: no environment and no
+# secrets blocks, because it reads no configuration at runtime. The port and
+# HOSTNAME the container binds are baked into the Dockerfile. frontend-admin
+# below needs the API origin, since it relays logins and data calls server-side.
+resource "aws_ecs_task_definition" "frontend_admin" {
+  family                   = "${local.prefix}-frontend-admin"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.frontend_cpu
@@ -256,8 +364,48 @@ resource "aws_ecs_task_definition" "frontend" {
 
   container_definitions = jsonencode([
     {
-      name      = "frontend"
-      image     = "${var.ecr_frontend_repository_url}:${var.frontend_image_tag}"
+      name      = "frontend-admin"
+      image     = "${var.ecr_frontend_admin_repository_url}:${var.frontend_image_tag}"
+      essential = true
+      portMappings = [{
+        containerPort = var.frontend_container_port
+        protocol      = "tcp"
+      }]
+      # Not a secret. Over plain HTTP the ALB listener forwards /api/* straight
+      # to the backend; once a certificate is attached HTTP redirects to HTTPS,
+      # so set frontend_api_base_url to the certificate's domain.
+      environment = [
+        { name = "API_BASE_URL", value = var.frontend_api_base_url != "" ? var.frontend_api_base_url : "http://${aws_lb.this.dns_name}" },
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.frontend_admin.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "frontend-admin"
+        }
+      }
+    }
+  ])
+
+  tags = {
+    Name = "${local.prefix}-frontend-admin"
+  }
+}
+
+resource "aws_ecs_task_definition" "frontend_public" {
+  family                   = "${local.prefix}-frontend-public"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.frontend_cpu
+  memory                   = var.frontend_memory
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "frontend-public"
+      image     = "${var.ecr_frontend_public_repository_url}:${var.frontend_image_tag}"
       essential = true
       portMappings = [{
         containerPort = var.frontend_container_port
@@ -266,16 +414,16 @@ resource "aws_ecs_task_definition" "frontend" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.frontend.name
+          "awslogs-group"         = aws_cloudwatch_log_group.frontend_public.name
           "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "frontend"
+          "awslogs-stream-prefix" = "frontend-public"
         }
       }
     }
   ])
 
   tags = {
-    Name = "${local.prefix}-frontend"
+    Name = "${local.prefix}-frontend-public"
   }
 }
 
@@ -297,24 +445,46 @@ resource "aws_ecs_task_definition" "backend" {
         containerPort = var.backend_container_port
         protocol      = "tcp"
       }]
-      environment = [
+      environment = concat([
         { name = "NODE_ENV", value = "production" },
         { name = "PORT", value = tostring(var.backend_container_port) },
         { name = "DB_HOST", value = var.db_endpoint },
         { name = "DB_PORT", value = tostring(var.db_port) },
         { name = "DB_NAME", value = var.db_name },
-        # Auth0 config is deliberately plain environment, not secrets: the API
-        # only verifies tokens against the public JWKS, so it holds no Auth0
-        # credentials. The Management API M2M secret used for seeding is never
-        # given to the running service.
-        { name = "AUTH0_DOMAIN", value = var.auth0_domain },
-        { name = "AUTH0_AUDIENCE", value = var.auth0_audience },
-        { name = "AUTH0_ROLES_CLAIM", value = var.auth0_roles_claim },
-      ]
-      secrets = [
-        { name = "DB_USERNAME", valueFrom = "${var.db_secret_arn}:username::" },
-        { name = "DB_PASSWORD", valueFrom = "${var.db_secret_arn}:password::" },
-      ]
+        # The admin frontend relays logins and forwards the real client address
+        # in X-Forwarded-For; it reaches this API through the ALB, so two hops
+        # (ALB -> frontend -> ALB) are trusted. See TRUST_PROXY_HOPS in env.ts.
+        { name = "TRUST_PROXY_HOPS", value = "2" },
+        { name = "MFA_REQUIRED_ROLES", value = var.mfa_required_roles },
+        # Uploads (SCRUM-5/14). Not a secret: the bucket name is visible in
+        # every object URL, and access comes from the task role, not from a key.
+        { name = "S3_BUCKET", value = var.assets_bucket_name },
+        { name = "AWS_REGION", value = var.aws_region },
+        # Activation and reset links point at the admin app, which shares the
+        # API's origin (ALB, or the certificate's domain).
+        { name = "ADMIN_BASE_URL", value = var.frontend_api_base_url != "" ? var.frontend_api_base_url : "http://${aws_lb.this.dns_name}" },
+        ],
+        var.email_from == "" ? [] : [{ name = "EMAIL_FROM", value = var.email_from }],
+        # Staging has no sppg_public role while the public dashboard is parked;
+        # see ALLOW_SHARED_PUBLIC_DB in backend env.ts. Production never gets it.
+        var.env == "staging" ? [{ name = "ALLOW_SHARED_PUBLIC_DB", value = "true" }] : [],
+      )
+      # DATABASE_URL_PUBLIC is appended only once the key exists in the secret,
+      # so enabling SCRUM-13's restricted role is a deliberate second step and
+      # never a deploy that cannot start. See variable public_db_secret_key.
+      secrets = concat(
+        [
+          { name = "DB_USERNAME", valueFrom = "${var.db_secret_arn}:username::" },
+          { name = "DB_PASSWORD", valueFrom = "${var.db_secret_arn}:password::" },
+          { name = "MFA_ENCRYPTION_KEY", valueFrom = aws_secretsmanager_secret.mfa_key.arn },
+        ],
+        var.public_db_secret_key == "" ? [] : [
+          {
+            name      = "DATABASE_URL_PUBLIC"
+            valueFrom = "${var.db_secret_arn}:${var.public_db_secret_key}::"
+          },
+        ],
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -370,22 +540,22 @@ resource "aws_ecs_task_definition" "migrate" {
   }
 }
 
-resource "aws_ecs_service" "frontend" {
-  name            = "${local.prefix}-frontend"
+resource "aws_ecs_service" "frontend_admin" {
+  name            = "${local.prefix}-frontend-admin"
   cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.frontend.arn
+  task_definition = aws_ecs_task_definition.frontend_admin.arn
   desired_count   = var.frontend_desired_count
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.task_subnet_ids
     security_groups  = [var.ecs_tasks_security_group_id]
-    assign_public_ip = false
+    assign_public_ip = var.task_assign_public_ip
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.frontend.arn
-    container_name   = "frontend"
+    target_group_arn = aws_lb_target_group.frontend_admin.arn
+    container_name   = "frontend-admin"
     container_port   = var.frontend_container_port
   }
 
@@ -393,8 +563,47 @@ resource "aws_ecs_service" "frontend" {
 
   depends_on = [aws_lb_listener.http]
 
+  # Same reason as the backend service below: the staging off-hours scheduler
+  # scales this to 0 overnight, so Terraform must stop tracking desired_count
+  # or every apply fights it.
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+
   tags = {
-    Name = "${local.prefix}-frontend"
+    Name = "${local.prefix}-frontend-admin"
+  }
+}
+
+resource "aws_ecs_service" "frontend_public" {
+  name            = "${local.prefix}-frontend-public"
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.frontend_public.arn
+  desired_count   = var.frontend_desired_count
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = var.task_subnet_ids
+    security_groups  = [var.ecs_tasks_security_group_id]
+    assign_public_ip = var.task_assign_public_ip
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.frontend_public.arn
+    container_name   = "frontend-public"
+    container_port   = var.frontend_container_port
+  }
+
+  health_check_grace_period_seconds = 60
+
+  depends_on = [aws_lb_listener.http]
+
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+
+  tags = {
+    Name = "${local.prefix}-frontend-public"
   }
 }
 
@@ -406,9 +615,9 @@ resource "aws_ecs_service" "backend" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.task_subnet_ids
     security_groups  = [var.ecs_tasks_security_group_id]
-    assign_public_ip = false
+    assign_public_ip = var.task_assign_public_ip
   }
 
   load_balancer {
@@ -420,6 +629,19 @@ resource "aws_ecs_service" "backend" {
   health_check_grace_period_seconds = 60
 
   depends_on = [aws_lb_listener.http]
+
+  # desired_count is deliberately not tracked after creation. In staging the
+  # EventBridge scheduler scales this to 0 overnight and back to 1 each
+  # morning; without this, every apply would fight the scheduler and leave a
+  # permanent phantom diff in the plan. Terraform still applies var.desired_count
+  # when the service is first created.
+  #
+  # Note this makes var.desired_count a create-time value in ALL environments:
+  # to change it later, scale with `aws ecs update-service --desired-count`
+  # (or add autoscaling, which requires this same lifecycle rule anyway).
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
 
   tags = {
     Name = "${local.prefix}-backend"

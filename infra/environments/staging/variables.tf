@@ -10,7 +10,7 @@ variable "project_name" {
 
 variable "aws_region" {
   type    = string
-  default = "ap-southeast-2"
+  default = "ap-southeast-3"
 }
 
 # --- Network ---
@@ -22,11 +22,11 @@ variable "vpc_cidr" {
 
 # CI passes no tfvars file — terraform.tfvars is gitignored — so these defaults
 # are what the deploy workflow actually builds with. They must match the region
-# the state bucket and the live VPC are in (ap-southeast-2), or Terraform will
+# the state bucket and the live VPC are in (ap-southeast-3), or Terraform will
 # try to move every subnet into an AZ that doesn't exist there.
 variable "azs" {
   type    = list(string)
-  default = ["ap-southeast-2a", "ap-southeast-2b"]
+  default = ["ap-southeast-3a", "ap-southeast-3b"]
 }
 
 variable "public_subnet_cidrs" {
@@ -76,6 +76,13 @@ variable "desired_count" {
   default = 1
 }
 
+# Applies to both frontend services. Overrides the module default of 0, which
+# exists for environments that do not yet push frontend images.
+variable "frontend_desired_count" {
+  type    = number
+  default = 1
+}
+
 variable "frontend_image_tag" {
   type    = string
   default = "latest"
@@ -90,6 +97,13 @@ variable "acm_certificate_arn" {
   description = "Leave empty until a domain/ACM certificate is available"
   type        = string
   default     = ""
+}
+
+# 7 rather than the module default of 30: staging logs older than a week are
+# never read, and CloudWatch bills for stored volume.
+variable "log_retention_in_days" {
+  type    = number
+  default = 7
 }
 
 # --- Database ---
@@ -130,17 +144,8 @@ variable "db_backup_retention_period" {
   default = 1
 }
 
-variable "auth0_domain" {
-  description = "Auth0 tenant domain for this environment (staging and prod use separate Auth0 APIs)."
+variable "email_from" {
+  description = "Verified SES identity used as the sender of invitation and reset email."
   type        = string
-}
-
-variable "auth0_audience" {
-  description = "Auth0 API identifier the backend validates access tokens against."
-  type        = string
-}
-
-variable "auth0_roles_claim" {
-  description = "Namespaced custom claim on the access token carrying the user's roles."
-  type        = string
+  default     = "ibrahimpalamarta@gmail.com"
 }

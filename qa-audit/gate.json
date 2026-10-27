@@ -1,0 +1,37 @@
+{
+  "$comment": "Satu-satunya sumber aturan gate. Hanya dibaca scripts/merge-report.ts. Ubah = catat alasan di docs/decision-log.md.",
+  "severity": {
+    "tsc": "Blocker",
+    "eslint": { "error": "Warning", "warning": "Info" },
+    "eslintA11yInactive": "Warning",
+    "eslintEffect": "Warning",
+    "knip": "Warning",
+    "semgrep": { "error": "Blocker", "warning": "Warning", "note": "Info", "security": "Blocker" },
+    "gitleaks": "Blocker",
+    "vitest": { "failed": "Blocker" },
+    "playwright": { "failed": "Warning", "flaky": "Warning" },
+    "playwrightBlockerTags": ["smoke", "rbac", "pii"],
+    "axe": { "critical": "Blocker", "serious": "Blocker", "moderate": "Warning", "minor": "Warning" },
+    "trivy": { "CRITICAL": "Blocker", "HIGH": "Blocker", "MEDIUM": "Warning", "LOW": "Info" },
+    "zap": { "3": "Blocker", "2": "Warning", "1": "Info", "0": "Info" },
+    "lighthouseBelowThreshold": "Warning",
+    "visualDiffAboveThreshold": "Warning",
+    "toolMissingInCI": "Blocker",
+    "stageFailedWithoutReport": "Blocker",
+    "pendingFeaturePastTarget": "Blocker",
+    "noTestPastTarget": "Blocker"
+  },
+  "thresholds": {
+    "lighthouse": { "performance": 0.8, "accessibility": 0.9 },
+    "visualDiffRatio": 0.01
+  },
+  "unwaivable": ["gitleaks"],
+  "waivers": [
+    {
+      "match": "semgrep:qa-audit.semgrep.sppg-raw-sql-unsafe:backend/scripts/grant-public-role.ts",
+      "reason": "DDL ALTER ROLE tidak bisa di-bind; SQL dibangun Postgres format() dengan %I/%L dari parameter ter-bind (QD-31)",
+      "owner": "ItsMauls",
+      "expires": "2027-04-30"
+    }
+  ]
+}

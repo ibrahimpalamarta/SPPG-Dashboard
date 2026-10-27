@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -88,10 +88,7 @@ jobs:
             -target=module.compute.aws_ecs_cluster.this \
             -target=module.compute.aws_ecs_task_definition.migrate \
             -var="aws_region=${{ vars.AWS_REGION }}" \
-            -var="backend_image_tag=${{ github.sha }}" \
-            -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
-            -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
-            -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+            -var="backend_image_tag=${{ github.sha }}"
           echo "ECR_BACKEND_URL=$(terraform output -raw ecr_backend_repository_url)" >> "$GITHUB_ENV"
 
       - name: Login to Amazon ECR
@@ -100,6 +97,13 @@ jobs:
       # Frontend is deliberately absent from this workflow — frontend/ has no
       # app yet, and its ECS service is pinned to desired_count 0 in Terraform
       # for the same reason. Add a step here once frontend/ has a Dockerfile.
+      # frontend-admin and frontend-public are deliberately not built here yet.
+      # Terraform provisions their repositories, target groups, listener rules
+      # and services in production too, but at frontend_desired_count 0, so
+      # nothing runs and nothing is billed. Turning production on means adding
+      # the two build/push steps from deploy-staging.yml, passing
+      # frontend_image_tag to the apply below, and setting frontend_desired_count
+      # in infra/environments/production/main.tf.
       - name: Build and push backend image
         working-directory: backend
         run: |
@@ -144,10 +148,7 @@ jobs:
         run: |
           terraform apply -auto-approve \
             -var="aws_region=${{ vars.AWS_REGION }}" \
-            -var="backend_image_tag=${{ github.sha }}" \
-            -var="auth0_domain=${{ vars.AUTH0_DOMAIN }}" \
-            -var="auth0_audience=${{ vars.AUTH0_AUDIENCE }}" \
-            -var="auth0_roles_claim=${{ vars.AUTH0_ROLES_CLAIM }}"
+            -var="backend_image_tag=${{ github.sha }}"
 
       # terraform apply returns as soon as UpdateService is accepted, so
       # without this the job goes green while the new tasks are still

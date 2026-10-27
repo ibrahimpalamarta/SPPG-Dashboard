@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.11"
+    "node": ">=24"
   },
   "scripts": {
     "dev": "node --env-file=.env --import tsx --watch src/server.ts",
@@ -13,21 +13,32 @@
     "start": "node dist/src/server.js",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
+    "seed": "node --env-file=.env --import tsx prisma/seed.ts",
     "seed:superadmin": "node --env-file=.env --import tsx scripts/seed-superadmin.ts",
+    "grant:public-role": "node --env-file=.env --import tsx scripts/grant-public-role.ts",
     "pretest": "prisma generate",
-    "test": "node --env-file=.env.test --import tsx --test src/config/env.test.ts src/auth/jwt.test.ts src/auth/user-sync.test.ts src/auth/guard.test.ts"
+    "test": "node --env-file=.env.test --import tsx --test src/auth/guard.test.ts src/auth/password.test.ts src/controllers/auth/auth.test.ts src/controllers/admin/user.test.ts src/lib/crypto.test.ts src/lib/mail-template.test.ts src/config/env.test.ts src/controllers/auth/me.test.ts src/controllers/cms/cms.test.ts src/controllers/menu/menu-plan.test.ts src/controllers/upload/upload-batch.test.ts src/lib/ingest/cashflow.test.ts src/lib/ingest/menu.test.ts src/lib/ingest/workbook.test.ts src/lib/ingest/pipeline.test.ts src/lib/ingest/staging-prisma.test.ts src/lib/mapping/values.test.ts src/lib/mapping/detect.test.ts src/lib/mapping/sukun-cashflow.test.ts src/lib/mapping/sukun-menu.test.ts src/lib/mapping/sukun-rab.test.ts src/lib/mapping/input-maker.test.ts src/lib/templates.test.ts src/lib/kitchen-rollout.test.ts src/lib/scope.test.ts src/lib/upload-status.test.ts src/lib/serialize.test.ts src/lib/visibility.test.ts src/middleware/validate.test.ts src/routes/master/reference.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1113.0",
+    "@aws-sdk/client-sesv2": "^3.1156.0",
+    "@node-rs/argon2": "^2.2.2",
     "@prisma/client": "^6.2.1",
+    "cors": "^2.8.6",
+    "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
-    "jose": "^5.9.6",
+    "helmet": "^8.3.0",
+    "multer": "^2.2.0",
+    "otplib": "^13.5.0",
     "prisma": "^6.2.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.0",
-    "@types/node": "^22.10.5",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^24",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

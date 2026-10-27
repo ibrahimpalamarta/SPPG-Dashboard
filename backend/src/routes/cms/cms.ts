@@ -1,0 +1,79 @@
+import { Router } from 'express';
+import type { RequestHandler } from 'express';
+import type { ZodTypeAny } from 'zod';
+import { requireRole } from '../../auth/guard.js';
+import { validate } from '../../middleware/validate.js';
+import { singleFile } from '../../middleware/upload.js';
+import { wrap } from '../../lib/wrap.js';
+import { idParam } from '../../schemas/common.js';
+import {
+  announcementCreate,
+  announcementUpdate,
+  cmsDocumentListQuery,
+  cmsListQuery,
+  documentCreate,
+  documentUpdate,
+  galleryCreate,
+  galleryUpdate,
+} from '../../schemas/cms.js';
+import {
+  ANNOUNCEMENT,
+  DOCUMENT,
+  GALLERY,
+  createCms,
+  deleteCms,
+  getCms,
+  listCms,
+  updateCms,
+  type CmsResource,
+} from '../../controllers/cms/cms.js';
+
+/** SCRUM-14: the PRD Oktober has no CMS role, so content is Super Admin only. */
+const cmsRoles: RequestHandler = requireRole('SUPER_ADMIN');
+
+function cmsRouter(resource: CmsResource, schemas: {
+  list: ZodTypeAny;
+  create: ZodTypeAny;
+  update: ZodTypeAny;
+}): Router {
+  const router = Router();
+  router.use(cmsRoles);
+
+  // SCRUM-14 AC2. Announcements carry no file, so they get no upload handler at
+  // all. Where there is one it runs before validate(), because multer is what
+  // turns a multipart request into req.body. Mandatory on create, optional on
+  // update — editing a title should not mean re-uploading the SOP.
+  const upload = (required: boolean): RequestHandler[] =>
+    resource.file ? [singleFile('file', resource.file.extensions, { required })] : [];
+
+  router.get('/', validate({ query: schemas.list }), wrap(listCms(resource)));
+  router.get('/:id', validate({ params: idParam }), wrap(getCms(resource)));
+  router.post('/', ...upload(true), validate({ body: schemas.create }), wrap(createCms(resource)));
+  router.patch(
+    '/:id',
+    ...upload(false),
+    validate({ params: idParam, body: schemas.update }),
+    wrap(updateCms(resource)),
+  );
+  router.delete('/:id', validate({ params: idParam }), wrap(deleteCms(resource)));
+
+  return router;
+}
+
+export const announcementRouter = cmsRouter(ANNOUNCEMENT, {
+  list: cmsListQuery,
+  create: announcementCreate,
+  update: announcementUpdate,
+});
+
+export const documentRouter = cmsRouter(DOCUMENT, {
+  list: cmsDocumentListQuery,
+  create: documentCreate,
+  update: documentUpdate,
+});
+
+export const galleryRouter = cmsRouter(GALLERY, {
+  list: cmsDocumentListQuery,
+  create: galleryCreate,
+  update: galleryUpdate,
+});
