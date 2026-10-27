@@ -123,10 +123,11 @@ module "scheduler" {
 
   ecs_cluster_name = module.compute.ecs_cluster_name
 
-  # Parked until UAT. Flip to false to put staging back on its daily schedule;
-  # the services and the database also have to be started once by hand, because
-  # the schedules only fire at their next cron time.
-  suspended = true
+  # Set to true to park staging: the start schedules never fire, so it stays
+  # scaled to zero. After flipping back to false the services and the database
+  # have to be started once by hand (infra/scripts/staging.sh on), because the
+  # schedules only fire at their next cron time.
+  suspended = false
 
   ecs_services = {
     "backend" = {

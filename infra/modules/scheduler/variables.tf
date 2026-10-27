@@ -43,23 +43,23 @@ variable "timezone" {
 variable "start_cron" {
   description = "When to start RDS. Runs ~10 minutes before the ECS start, because a stopped instance takes several minutes to reach 'available'."
   type        = string
-  default     = "cron(50 6 ? * MON-FRI *)"
+  default     = "cron(50 8 ? * MON-FRI *)"
 }
 
 variable "ecs_start_cron" {
   type    = string
-  default = "cron(0 7 ? * MON-FRI *)"
+  default = "cron(0 9 ? * MON-FRI *)"
 }
 
 variable "ecs_stop_cron" {
   type    = string
-  default = "cron(0 21 ? * MON-FRI *)"
+  default = "cron(0 17 ? * MON-FRI *)"
 }
 
 variable "stop_cron" {
   description = "When to stop RDS. Runs after the ECS stop so nothing is holding a connection open."
   type        = string
-  default     = "cron(5 21 ? * MON-FRI *)"
+  default     = "cron(5 17 ? * MON-FRI *)"
 }
 
 # Set while the environment is parked (staging before UAT): the start schedules
