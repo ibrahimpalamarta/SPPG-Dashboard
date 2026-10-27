@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { env } from '../config/env.js';
 
 /**
@@ -23,4 +23,16 @@ export const putObject: PutObject = async (key, body, contentType) => {
     new PutObjectCommand({ Bucket: env.S3_BUCKET, Key: key, Body: body, ContentType: contentType }),
   );
   return key;
+};
+
+export type GetObject = (key: string) => Promise<Buffer>;
+export type DeleteObject = (key: string) => Promise<void>;
+
+export const getObject: GetObject = async (key) => {
+  const out = await client.send(new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
+  return Buffer.from(await out.Body!.transformToByteArray());
+};
+
+export const deleteObject: DeleteObject = async (key) => {
+  await client.send(new DeleteObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
 };

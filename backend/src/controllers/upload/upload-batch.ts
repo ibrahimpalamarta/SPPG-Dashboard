@@ -7,7 +7,7 @@ import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
 import { kitchenScope, kitchenWhere } from '../../lib/scope.js';
-import { CSV_MIME, XLSX_MIME, putObject, type PutObject } from '../../lib/s3.js';
+import { CSV_MIME, XLSX_MIME, deleteObject, getObject, putObject, type DeleteObject, type GetObject, type PutObject } from '../../lib/s3.js';
 import { dateFilter } from '../../schemas/common.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
@@ -84,6 +84,56 @@ export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, r
     return;
   }
   sendJson(res, row);
+};
+
+/** Upload history "Export": the original file as stored, nothing regenerated. */
+export const downloadUploadBatchFile = (db: Db = prisma, get: GetObject = getObject): RequestHandler => async (req, res) => {
+  const { id } = req.valid!.params as { id: bigint };
+  const row = await db.uploadBatch.findUnique({ where: { id } });
+  if (!row?.storageKey) {
+    sendError(res, 'NOT_FOUND');
+    return;
+  }
+  if (!kitchenScope(req.user!, row.kitchenId).ok) {
+    sendError(res, 'FORBIDDEN_KITCHEN');
+    return;
+  }
+  res.setHeader('Content-Type', isCsv(row.fileName) ? CSV_MIME : XLSX_MIME);
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(row.fileName)}`);
+  res.send(await get(row.storageKey));
+};
+
+/**
+ * Dev clean-up: hard-deletes a batch, its staging rows and menu plans (FK
+ * cascade) and the stored original. PUBLISHED is refused — canonical data was
+ * built from it and does not cascade.
+ */
+export const deleteUploadBatch = (db: Db = prisma, remove: DeleteObject = deleteObject): RequestHandler => async (req, res) => {
+  const { id } = req.valid!.params as { id: bigint };
+  const row = await db.uploadBatch.findUnique({ where: { id } });
+  if (!row) {
+    sendError(res, 'NOT_FOUND');
+    return;
+  }
+  if (!kitchenScope(req.user!, row.kitchenId).ok) {
+    sendError(res, 'FORBIDDEN_KITCHEN');
+    return;
+  }
+  if (row.status === UploadStatus.PUBLISHED) {
+    sendError(res, 'CONFLICT', { message: 'Batch yang sudah dipublish tidak bisa dihapus.' });
+    return;
+  }
+
+  await db.uploadBatch.delete({ where: { id } });
+  if (row.storageKey) await remove(row.storageKey);
+  await writeAuditLog(db, {
+    userId: req.user!.id,
+    action: 'upload_batch.deleted',
+    entity: 'upload_batches',
+    entityId: row.id,
+    metadata: { fileName: row.fileName, kitchenId: String(row.kitchenId), domain: row.domain, status: row.status },
+  });
+  res.status(204).end();
 };
 
 /** Rows returned by a dry run. Enough to eyeball the mapping, not the file. */
