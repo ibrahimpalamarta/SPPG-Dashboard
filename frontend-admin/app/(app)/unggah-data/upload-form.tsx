@@ -202,7 +202,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
                 </button>
               )}
               <Link href="/mapping-validasi" className="inline-block font-medium text-emerald-700 hover:underline">
-                Ke Mapping &amp; Validasi
+                Ke Validasi Data
               </Link>
             </div>
           </section>

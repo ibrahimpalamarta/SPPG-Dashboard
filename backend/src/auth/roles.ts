@@ -23,8 +23,8 @@ export const KITCHEN_SCOPED_ROLES: readonly Role[] = ['KEPALA_KITCHEN', 'DATA_AD
  *   settings:manage             peta role -> permission
  *   audit:read                  audit trail
  *
- * SUPER_ADMIN (Project Manager MBG) always holds all of them and is not stored
- * in the table.
+ * SUPER_ADMIN (Project Manager MBG) always holds all of them except
+ * MAKER_PERMISSIONS and is not stored in the table.
  */
 export const PERMISSIONS = [
   'upload:create',
@@ -42,3 +42,6 @@ export const PERMISSIONS = [
   'audit:read',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
+
+/** Four-eyes (PRD AC-ROLE-02): the reviewer never holds the maker's permissions. */
+export const MAKER_PERMISSIONS: readonly Permission[] = ['upload:create', 'mapping:propose'];

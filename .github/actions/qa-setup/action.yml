@@ -55,6 +55,11 @@ runs:
             # shellcheck disable=SC2086
             timeout 5m npx playwright $pw && exit 0
             echo "playwright $pw failed (attempt $attempt)"
+            # timeout(1) kills npx but not the apt-get below it; that orphan keeps the dpkg
+            # lock and every later attempt fails at once with exit 100.
+            sudo pkill -x apt-get || true
+            sudo pkill -x dpkg || true
+            sudo dpkg --configure -a
           done
           exit 1
         ) & pids+=($!)

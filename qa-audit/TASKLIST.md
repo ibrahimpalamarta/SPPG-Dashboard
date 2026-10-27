@@ -45,26 +45,26 @@ Setiap tiket dianggap selesai bila semua poin di kolom *Selesai bila* lulus, dan
 | T06 | Excel pipeline + halaman Unggah Data + history/status | 24, 5, 25 | IN_PROGRESS |
 | T07 | Cashflow Upload v1 staging parser | 35 | IN_PROGRESS (B-SCHEMA, B-TPLVER) |
 | T08 | Menu Upload v1 staging parser | 36 | IN_PROGRESS (B-SCHEMA) |
-| T09 | Input Maker Upload v1 + Sukun raw staging | 86, 118 (126 duplikat) | TODO |
-| T10 | Template resmi: generate, tombol download, tolak header-only | 130, 125, 131 | TODO |
+| T09 | Input Maker Upload v1 + Sukun raw staging | 86, 118 (126 duplikat) | IN REVIEW |
+| T10 | Template resmi: generate, tombol download, tolak header-only | 130, 125, 131 | IN REVIEW |
 | **Tahap 3 — Mapping** ||||
 | T11 | Mapping Profile Registry + detect/apply per dapur | 26, 39 | IN_PROGRESS (B-REG default dipakai, B-DD) |
 | T12 | Schema mismatch handling + layar kolom berbeda | 94, 124 | IN_PROGRESS (B-SCHEMA) |
-| T13 | Sukun Cashflow profile/adapter | 27, 55 | IN_PROGRESS (B-DD, B-MAPOUT) |
-| T14 | Lawang + persiapan DNM/PCK/SML Cashflow | 32, 56, 57 | TODO (B-SAMPLE-LWG/OTHER) |
+| T13 | Sukun Cashflow profile/adapter | 27, 55 | IN REVIEW (B-DD) |
+| T14 | Lawang + persiapan DNM/PCK/SML Cashflow | 32, 56, 57 | IN REVIEW (B-SAMPLE-LWG/OTHER) |
 | T15 | Menu common adapter + menu_recipe_line + profil 5 dapur | 31, 73, 58 | IN_PROGRESS (B-MAPOUT; T15.3 B-SAMPLE-LWG/OTHER) |
 | **Tahap 4 — Kanonik Finance** ||||
-| T16 | finance_transaction header/line + anti-double-count | 77, 40, 98, 41 | TODO |
-| T17 | Rantai RAB → PO → GR → Payment (Sukun) | 44, 28, 45, 29, 46, 47, 30 | TODO (B-RAW) |
-| T18 | Dataset finance_balance + beneficiary_daily_count + PII | 49, 50, 72 | TODO |
+| T16 | finance_transaction header/line + anti-double-count | 77, 40, 98, 41 | IN REVIEW |
+| T17 | Rantai RAB → PO → GR → Payment (Sukun) | 44, 28, 45, 29, 46, 47, 30 | BLOCKED (B-SRC-SKN) (B-RAW) |
+| T18 | Dataset finance_balance + beneficiary_daily_count + PII | 49, 50, 72 | BLOCKED (B-SRC-SKN) |
 | **Tahap 5 — Validasi & Publish** ||||
-| T19 | Normalisasi bersama (tanggal/mata uang/unit) + missing ≠ 0 | 52, 53 | TODO |
-| T20 | Validation framework + severity & quarantine | 33, 51 | TODO |
-| T21 | Finance DQ: kategori, transfer internal, SLA D0/D+1, rekonsiliasi Ringkasan_Transaksi | 34, 42, 43, 48, 84, 119 (127 duplikat) | TODO |
-| T22 | Menu DQ lintas template dapur | 85, 120 (128 duplikat) | TODO |
-| T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | TODO |
+| T19 | Normalisasi bersama (tanggal/mata uang/unit) + missing ≠ 0 | 52, 53 | BLOCKED (B-SRC-SKN) |
+| T20 | Validation framework + severity & quarantine | 33, 51 | IN REVIEW (link PO/GR: B-SRC-SKN) |
+| T21 | Finance DQ: kategori, transfer internal, SLA D0/D+1, rekonsiliasi Ringkasan_Transaksi | 34, 42, 43, 48, 84, 119 (127 duplikat) | IN REVIEW |
+| T22 | Menu DQ lintas template dapur | 85, 120 (128 duplikat) | BLOCKED (B-SRC-SKN) |
+| T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | BLOCKED (B-SRC-SKN) |
 | **Tahap 6 — KPI & Dashboard** ||||
-| T24 | Widget Finance: Top 5 Supplier, Expense Mix, Planned Cost/Portion, Saldo, EFI Transfer | 62, 97, 63, 99, 64, 100, 65, 101, 66, 102 | TODO |
+| T24 | Widget Finance: Top 5 Supplier, Expense Mix, Planned Cost/Portion, Saldo, EFI Transfer | 62, 97, 63, 99, 64, 100, 65, 101, 66, 102 | BLOCKED (B-SRC-SKN) |
 | T25 | Widget Menu/Gizi/Beneficiary + validasi total tersalurkan | 74, 115, 76, 116, 103, 129 | TODO |
 | T26 | Data Health & traceability | 104, 60, 105, 61, 106, 59, 107, 67, 68 | TODO |
 | **Tahap 7 — Fallback & Foto** ||||
@@ -167,11 +167,11 @@ logika yang di-hardcode berdasarkan nama dapur.
 | T12.1 | SCRUM-94 | Mapping/schema mismatch handling | IN_PROGRESS | U | File tidak dikenal/tidak kompatibel diblokir dengan pesan error yang bisa ditindaklanjuti |
 | T12.2 | SCRUM-124 | Layar sederhana file kolom berbeda | IN REVIEW | UI | Data Operasional hanya melihat tabel perbedaan kolom + tombol Unggah Ulang File (tanpa Buat format baru/Tolak). File lama otomatis berstatus Diganti |
 
-#### T13 — Sukun Cashflow · Butuh: T07, T11 · Status: IN_PROGRESS (B-DD, B-MAPOUT)
+#### T13 — Sukun Cashflow · Butuh: T07, T11 · Status: IN REVIEW (B-DD)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T13.1 | SCRUM-55 | [DATA-022] Sukun Cashflow profile MAP-SKN-CF-001 | IN_PROGRESS (B-DD) | U, D | Parsing mata uang, grouping header/line, normalisasi kategori/unit. Versi mapping tersimpan. Sampel cocok dengan total sumber |
-| T13.2 | SCRUM-27 | Sukun Cashflow adapter | IN_PROGRESS (B-MAPOUT) | U | Field wajib Cashflow termapping; Rp, total, unit, review status ditangani |
+| T13.1 | SCRUM-55 | [DATA-022] Sukun Cashflow profile MAP-SKN-CF-001 | IN REVIEW (B-DD) | U, D | Parsing mata uang, grouping header/line, normalisasi kategori/unit. Versi mapping tersimpan. Sampel cocok dengan total sumber |
+| T13.2 | SCRUM-27 | Sukun Cashflow adapter | IN REVIEW | U | Field wajib Cashflow termapping; Rp, total, unit, review status ditangani |
 
 #### T14 — Cashflow dapur lain · Butuh: T13 · Status: TODO (B-SAMPLE-LWG, B-SAMPLE-OTHER, B-LWG)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
@@ -203,8 +203,8 @@ logika yang di-hardcode berdasarkan nama dapur.
 #### T17 — RAB → PO → GR → Payment · Butuh: T09, T16 · Status: TODO (B-RAW)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T17.1 | SCRUM-44 | [DATA-011] Sukun RAB mapping profile | TODO | U, D | Layout presentasi di-flatten; record budget harian + bahan dibuat; planned cost tertelusur ke baris source |
-| T17.2 | SCRUM-28 | Sukun RAB adapter | TODO | U | RAB → rab_daily_budget / rab_ingredient_budget |
+| T17.1 | SCRUM-44 | [DATA-011] Sukun RAB mapping profile | IN REVIEW (B-DD) | U, D | Layout presentasi di-flatten; record budget harian + bahan dibuat; planned cost tertelusur ke baris source |
+| T17.2 | SCRUM-28 | Sukun RAB adapter | IN REVIEW | U | RAB → rab_daily_budget / rab_ingredient_budget |
 | T17.3 | SCRUM-45 | [DATA-012] Sukun PO mapping + stable IDs | TODO | U | po_id dan po_line_id stabil; label supplier/item mentah ada; FK ke rab_id bila ada; duplikat ditangani |
 | T17.4 | SCRUM-29 | Sukun PO adapter | TODO | U | List PO/Nota Pesanan → purchase_order_line |
 | T17.5 | SCRUM-46 | [DATA-013] Goods Receipt mapping (opsional) | TODO | U | receipt_id/line; qty_match_status diturunkan dari ordered vs received; flag manual tidak otoritatif. Bukan blocker Phase 1 |

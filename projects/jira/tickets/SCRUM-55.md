@@ -1,5 +1,5 @@
 # SCRUM-55: [DATA-022] Sukun Cashflow profile MAP-SKN-CF-001
-Tahap: 3 | Status: IN_PROGRESS (sebagian BLOCKED: B-DD) | Terakhir diubah: 2026-10-26
+Tahap: 3 | Status: IN REVIEW (sebagian BLOCKED: B-DD) | Terakhir diubah: 2026-10-27
 
 ## Yang sudah dikerjakan
 - [x] Profil `MAP-SKN-CF-001` v1 (DRAFT) untuk layout flat `Transaksi_Kas` baseline Sukun. Versi mapping tersimpan di batch.

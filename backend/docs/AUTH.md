@@ -116,7 +116,7 @@ Permission (`PERMISSIONS` di `src/auth/roles.ts`):
 Peta role → permission ada di tabel `role_permissions` dan diubah lewat
 `PUT /api/admin/roles/:role/permissions` (UI: **Peran & Izin**), **tanpa
 deploy**. Aturan:
-- `SUPER_ADMIN` selalu memegang semua permission dan tidak disimpan di tabel —
+- `SUPER_ADMIN` selalu memegang semua permission kecuali `upload:create` dan `mapping:propose` (four-eyes: PM hanya mereview) dan tidak disimpan di tabel —
   tidak bisa dicabut, jadi tidak ada skenario lockout.
 - Role baru/akun baru **tidak** otomatis mendapat hak admin. `users:*`,
   `settings:manage`, `audit:read` awalnya hanya dimiliki `SUPER_ADMIN`.

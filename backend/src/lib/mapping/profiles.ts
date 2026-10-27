@@ -3,6 +3,7 @@ import type { StagedSheet, StagingRow } from '../ingest/staging.js';
 import type { Issue } from './values.js';
 import { applySukunCashflow } from './sukun-cashflow.js';
 import { applySukunMenu } from './sukun-menu.js';
+import { applySukunRab } from './sukun-rab.js';
 import { applyInputMaker } from './input-maker.js';
 
 export type MappingOutput = { records: unknown[]; totals: Record<string, number>; issues: Issue[] };
@@ -46,6 +47,33 @@ const CASHFLOW_COLUMNS: Record<string, string> = {
   review_note: 'catatan_review',
 };
 
+/** MASTER DATA MENU - SUKUN, one sheet per month; the first header is the kitchen name. The RAB reads the same costing columns. */
+const MENU_COLUMNS: Record<string, string> = {
+  kitchen_name: 'Sukun',
+  period: 'Periode',
+  serving_date: 'Tanggal',
+  day_name: 'Hari',
+  menu_type: 'Menu Type',
+  portion_segment: 'Porsi',
+  menu_name: 'Menu',
+  ingredient: 'Bahan',
+  gross_weight_g: 'Berat Kotor (g)',
+  net_weight_g: 'Berat Bersih (g)',
+  edible_portion_pct: 'BDD (%)',
+  urt_qty: 'Jumlah URT',
+  urt_unit: 'URT',
+  energy_kcal: 'Energi (kkal)',
+  protein_g: 'Protein (g)',
+  fat_g: 'Lemak (g)',
+  carbohydrate_g: 'Karbohidrat (g)',
+  fiber_g: 'Serat (g)',
+  beneficiaries: 'Jumlah PM',
+  ingredient_need_kg: 'Kebutuhan Bahan (kg)',
+  packaged_need_pax: 'Kebutuhan Makanan Kemasan (pax)',
+  unit_price: 'Harga Bahan (Rp)',
+  line_total: 'Total Harga (Rp)',
+};
+
 /**
  * The registry (B-REG default: config in the repo, reviewed like code).
  * TODO(B-DD): canonical field names are [USULAN] until the data dictionary is
@@ -80,33 +108,18 @@ export const PROFILES: MappingProfile[] = [
     kitchenCode: 'SKN',
     domain: 'MENU',
     sourceSystem: 'INTERNAL',
-    // MASTER DATA MENU - SUKUN, one sheet per month; the first header is the kitchen name.
-    columns: {
-      kitchen_name: 'Sukun',
-      period: 'Periode',
-      serving_date: 'Tanggal',
-      day_name: 'Hari',
-      menu_type: 'Menu Type',
-      portion_segment: 'Porsi',
-      menu_name: 'Menu',
-      ingredient: 'Bahan',
-      gross_weight_g: 'Berat Kotor (g)',
-      net_weight_g: 'Berat Bersih (g)',
-      edible_portion_pct: 'BDD (%)',
-      urt_qty: 'Jumlah URT',
-      urt_unit: 'URT',
-      energy_kcal: 'Energi (kkal)',
-      protein_g: 'Protein (g)',
-      fat_g: 'Lemak (g)',
-      carbohydrate_g: 'Karbohidrat (g)',
-      fiber_g: 'Serat (g)',
-      beneficiaries: 'Jumlah PM',
-      ingredient_need_kg: 'Kebutuhan Bahan (kg)',
-      packaged_need_pax: 'Kebutuhan Makanan Kemasan (pax)',
-      unit_price: 'Harga Bahan (Rp)',
-      line_total: 'Total Harga (Rp)',
-    },
+    columns: MENU_COLUMNS,
     apply: applySukunMenu,
+  },
+  {
+    id: 'MAP-SKN-RAB-001',
+    version: '1',
+    status: 'DRAFT',
+    kitchenCode: 'SKN',
+    domain: 'RAB',
+    sourceSystem: 'INTERNAL',
+    columns: MENU_COLUMNS,
+    apply: applySukunRab,
   },
   {
     id: 'MAP-SKN-PAY-001',

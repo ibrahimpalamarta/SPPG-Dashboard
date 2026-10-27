@@ -6,7 +6,7 @@ import { SampleDataNote } from "@/components/ui/sample-data-note";
 import { requirePage } from "@/lib/guard";
 import { stats } from "@/lib/mock/kelengkapan-data";
 
-export const metadata: Metadata = { title: "Data Health · SPPG Internal" };
+export const metadata: Metadata = { title: "Kelengkapan Data · SPPG Internal" };
 
 export default async function KelengkapanPage() {
   await requirePage("/kesehatan-data");

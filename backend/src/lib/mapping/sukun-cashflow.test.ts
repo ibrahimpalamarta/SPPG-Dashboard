@@ -67,11 +67,56 @@ describe('DQ rule ids on issues', () => {
   });
 });
 
+describe('external spend (PRD §7.4)', () => {
+  test('petty cash coming in is not external spend', async () => {
+    const { batch } = await staged(
+      withRows('sukun-cashflow.csv', [
+        '1,TXN-P1,05/03/2026,PENERIMAAN,MASUK,Operasional,Petty Cash,Petty Cash,Firli,1,pax,Rp2.000.000,Rp2.000.000,Rp2.000.000,high,TERKONFIRMASI,',
+        '2,TXN-B1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Ayam,Ayam,Supplier A,1,kg,Rp40.000,Rp40.000,Rp40.000,high,TERKONFIRMASI,',
+      ]),
+      'CASHFLOW',
+    );
+    const txns = profile.apply(batch.sheets, batch.rows, profile).records as CashflowTxn[];
+    assert.deepEqual(txns.map((x) => [x.txn_id, x.is_external_spend]), [['TXN-P1', false], ['TXN-B1', true]]);
+  });
+});
+
 describe('MAP-LWG-CF-001 (SCRUM-32/56)', () => {
   test('Lawang uses the same canonical columns and is detected by kitchen code', async () => {
     const { detection, mapping } = await staged(fixture('sukun-cashflow.csv'), 'CASHFLOW', 'LWG');
     assert.ok(detection.ok);
     assert.equal(detection.profile.id, 'MAP-LWG-CF-001');
     assert.equal(mapping?.profileId, 'MAP-LWG-CF-001');
+  });
+});
+
+describe('anti-double-count (SCRUM-41, DQ PRD §7.4)', () => {
+  const multiLine = withRows('sukun-cashflow.csv', [
+    '1,TXN-X1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Ayam,Supplier A,1,kg,Rp300.000,Rp300.000,Rp327.000,high,TERKONFIRMASI,',
+    '2,TXN-X1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Garam,Supplier A,1,pcs,Rp27.000,Rp27.000,Rp327.000,high,TERKONFIRMASI,',
+    '3,TXN-X1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Merica,Supplier A,1,pcs,Rp0,Rp0,Rp327.000,high,TERKONFIRMASI,',
+  ]);
+
+  test('a three-line BELANJA counts its total once: header total = Σ line_amount, not 3 × total', async () => {
+    const { batch, mapping } = await staged(multiLine, 'CASHFLOW');
+    const [txn] = profile.apply(batch.sheets, batch.rows, profile).records as CashflowTxn[];
+    assert.ok(txn);
+    assert.equal(txn.lines.length, 3);
+    assert.equal(txn.txn_total, 327000);
+    assert.equal(txn.lines.reduce((n, l) => n + (l.line_amount ?? 0), 0), 327000);
+    // The mistake the rule guards against: summing the repeated source total per row.
+    assert.notEqual(txn.lines.length * 327000, mapping?.totals.KELUAR);
+    assert.deepEqual(mapping?.totals, { KELUAR: 327000 });
+  });
+
+  test('a total that differs between the lines of one transaction is flagged', async () => {
+    const { mapping } = await staged(
+      withRows('sukun-cashflow.csv', [
+        '1,TXN-X2,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Ayam,Supplier A,1,kg,Rp300.000,Rp300.000,Rp327.000,high,TERKONFIRMASI,',
+        '2,TXN-X2,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Garam,Supplier A,1,pcs,Rp27.000,Rp27.000,Rp654.000,high,TERKONFIRMASI,',
+      ]),
+      'CASHFLOW',
+    );
+    assert.equal(mapping?.issueCounts.TOTAL_INCONSISTENT, 1);
   });
 });

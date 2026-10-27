@@ -9,7 +9,7 @@ import { requirePage } from "@/lib/guard";
 import { batchFindings, type Batch } from "@/lib/mapping-validasi";
 import { DOMAINS, StatusBadge } from "@/lib/upload";
 
-export const metadata: Metadata = { title: "Mapping & Validasi · SPPG Internal" };
+export const metadata: Metadata = { title: "Validasi Data · SPPG Internal" };
 
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
 
@@ -42,7 +42,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 p-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Mapping & Validasi</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Validasi Data</h1>
             <FileSelect value={batch.publicId} options={batches.map((b) => ({ id: b.publicId, label: label(b) }))} />
             <StatusBadge status={batch.status} errorCode={batch.errorCode} />
           </div>
