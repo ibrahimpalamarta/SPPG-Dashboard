@@ -4,7 +4,7 @@ import { prisma, type Db } from '../db.js';
 import { resolveSession } from './session.js';
 import { permissionsFor } from './rbac-store.js';
 import type { AppUser } from './user.js';
-import type { Permission, Role } from './roles.js';
+import { KITCHEN_SCOPED_ROLES, type Permission, type Role } from './roles.js';
 import { sendError } from '../middleware/error-handler.js';
 
 declare global {
@@ -62,8 +62,8 @@ export function requireAuth(db: Db = prisma, { allowUnenrolled = false } = {}): 
  *
  *   router.post('/pengeluaran', requireRole('SUPER_ADMIN', 'DATA_ADMIN'), handler)
  *
- * INTERNAL and PUBLIC are read-only simply by never appearing on a mutating
- * route's allow-list.
+ * View-only roles (Management, Finance, Kepala Kitchen) are read-only simply by
+ * never appearing on a mutating route's allow-list.
  */
 export function requireRole(...allowed: Role[]): RequestHandler {
   return (req, res, next) => {
@@ -97,12 +97,12 @@ export function requirePermission(perm: Permission): RequestHandler {
 /**
  * The dapur a caller may touch.
  *
- * @returns null when unrestricted: SUPER_ADMIN always, and any other role that
- * has no scope rows. A DATA_ADMIN with no rows gets `[]` — it sees nothing,
- * never everything.
+ * @returns null when unrestricted: SUPER_ADMIN always, and any cross-kitchen
+ * role (Management, Finance, Data Steward) that has no scope rows. A
+ * kitchen-scoped role with no rows gets `[]` — it sees nothing, never everything.
  */
 export function resolveKitchenIds(user: AppUser): bigint[] | null {
   if (user.role === 'SUPER_ADMIN') return null;
   const ids = user.kitchenScopes.map((s) => s.kitchenId);
-  return ids.length === 0 && user.role !== 'DATA_ADMIN' ? null : ids;
+  return ids.length === 0 && !KITCHEN_SCOPED_ROLES.includes(user.role) ? null : ids;
 }

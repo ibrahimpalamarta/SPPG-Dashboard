@@ -9,7 +9,7 @@ Keputusan proyek aplikasi (D-xx) ada di `projects/jira/decisions.md`; yang ini k
 
 **QD-02 · Fitur yang belum dibangun.** Test P0 ditulis sesuai PRD sebagai `test.fixme` → status *Menunggu fitur* (tidak memblok). Lewat `target` di `requirements.json` → Blocker (`pendingFeaturePastTarget`); P0 tanpa test lewat target juga Blocker (`noTestPastTarget`). *Penyimpangan*: prompt hanya punya empat status; ditambah *Menunggu fitur* dan *Tidak dijalankan* (test ada tapi di luar suite run ini).
 
-**QD-03 · Peta role.** Management & Finance = `INTERNAL` semua kitchen; Kepala Kitchen SKN = `INTERNAL` + scope SKN; Data Steward = `DATA_ADMIN` dengan scope semua kitchen (DATA_ADMIN tanpa baris scope tidak melihat apa pun). Satu tempat: `scripts/seed-qa.ts`. Diganti saat enum role PRD masuk (B-ROLE).
+**QD-03 · Peta role.** Enum role PRD Oktober §3 sudah masuk (migrasi `20261027000000_rbac_prd_oktober`): Management = `MANAGEMENT`, Finance = `FINANCE`, Kepala Kitchen SKN = `KEPALA_KITCHEN` + scope SKN, Data Steward = `DATA_STEWARD`, semuanya semua kitchen kecuali Kepala Kitchen. Role per dapur (`KEPALA_KITCHEN`, `DATA_ADMIN`, `AHLI_GIZI`) tanpa baris scope tidak melihat apa pun. Satu tempat: `scripts/seed-qa.ts`. Sebelumnya `INTERNAL`/`DATA_ADMIN` (menutup B-ROLE untuk 4 akun QA).
 
 **QD-04 · Trigger PR.** PR ke `develop`, `staging`, `main`; required check di ketiganya. *Penyimpangan*: prompt menyebut "PR ke main"; alur repo memasukkan fitur ke `develop`.
 

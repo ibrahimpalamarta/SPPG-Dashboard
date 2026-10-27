@@ -45,14 +45,14 @@ Suite → filter ada di `playwright.config.ts` (`SUITES`). Gagal di tag `smoke`/
 (`gate.json` → `playwrightBlockerTags`).
 
 ## Role (akun seed QA)
-Dibuat `scripts/seed-qa.ts`, email `qa.<key>@qa-audit.test`. Peta role PRD → role kode (QD-03):
+Dibuat `scripts/seed-qa.ts`, email `qa.<key>@qa-audit.test`. Peta role PRD → role kode (QD-03, PRD Oktober §3):
 
 | Key / storageState | Role PRD | Role kode | Kitchen scope |
 |---|---|---|---|
-| `management` | Management (COO/Head of MBG) | `INTERNAL` | semua |
-| `finance` | Finance | `INTERNAL` | semua |
-| `kepala-kitchen-skn` | Kepala Kitchen Sukun | `INTERNAL` | SKN |
-| `data-steward` | Data Steward pusat | `DATA_ADMIN` | semua (baris scope per dapur) |
+| `management` | Management (COO/Head of MBG) | `MANAGEMENT` | semua |
+| `finance` | Finance | `FINANCE` | semua |
+| `kepala-kitchen-skn` | Kepala Kitchen Sukun | `KEPALA_KITCHEN` | SKN |
+| `data-steward` | Data Steward pusat | `DATA_STEWARD` | semua |
 
 Login dilakukan sekali per role oleh project `setup` (`tests/e2e/auth.setup.ts`), disimpan ke
 `.auth/<key>.json`; test memakai `test.use({ storageState: storageState('finance') })`.

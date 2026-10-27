@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ROLES } from '../auth/roles.js';
 
 /**
  * Single place where process.env is read. Everything else imports `env`.
@@ -85,7 +86,7 @@ const schema = z.object({
         .map((r) => r.trim())
         .filter(Boolean),
     )
-    .pipe(z.array(z.enum(['SUPER_ADMIN', 'DATA_ADMIN', 'CMS_ADMIN', 'INTERNAL', 'PUBLIC']))),
+    .pipe(z.array(z.enum(ROLES))),
 
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60_000),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),

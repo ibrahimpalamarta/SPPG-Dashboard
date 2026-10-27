@@ -56,7 +56,7 @@ test('[SCRUM-122] aktivasi: email, nama, dan peran tampil, password pertama memb
   await page.goto(`aktivasi/${token}`);
   await expect(page.getByText(email)).toBeVisible();
   await expect(page.getByText('QA Anggota Baru')).toBeVisible();
-  await expect(page.getByText('Data Operasional')).toBeVisible();
+  await expect(page.getByText('PIC/Data Admin Kitchen')).toBeVisible();
 
   const password = newPassword();
   await page.getByLabel('Password baru').fill(password);

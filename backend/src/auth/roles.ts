@@ -1,5 +1,17 @@
-export const ROLES = ['SUPER_ADMIN', 'DATA_ADMIN', 'CMS_ADMIN', 'INTERNAL', 'PUBLIC'] as const;
+/** PRD Oktober 2026 §3 + US-15. SUPER_ADMIN = Admin Sistem / PM MBG. */
+export const ROLES = [
+  'SUPER_ADMIN',
+  'MANAGEMENT',
+  'FINANCE',
+  'KEPALA_KITCHEN',
+  'DATA_ADMIN',
+  'AHLI_GIZI',
+  'DATA_STEWARD',
+] as const;
 export type Role = (typeof ROLES)[number];
+
+/** Roles whose scope is "kitchen sendiri": no scope rows means no kitchens, never all. */
+export const KITCHEN_SCOPED_ROLES: readonly Role[] = ['KEPALA_KITCHEN', 'DATA_ADMIN', 'AHLI_GIZI'];
 
 /**
  * The catalogue of things a route can demand. Which role holds which lives in
@@ -12,8 +24,7 @@ export type Role = (typeof ROLES)[number];
  *   audit:read                  audit trail
  *
  * SUPER_ADMIN (Project Manager MBG) always holds all of them except
- * MAKER_PERMISSIONS and is not stored in the table. CMS_ADMIN and PUBLIC hold none by default: CMS routes still
- * gate on requireRole.
+ * MAKER_PERMISSIONS and is not stored in the table.
  */
 export const PERMISSIONS = [
   'upload:create',

@@ -17,13 +17,24 @@ export const PERMISSIONS = [
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-export const ROLES = ["SUPER_ADMIN", "DATA_ADMIN", "CMS_ADMIN", "INTERNAL", "PUBLIC"] as const;
+/** Mirrors backend ROLES (PRD Oktober 2026 §3). */
+export const ROLES = [
+  "SUPER_ADMIN",
+  "MANAGEMENT",
+  "FINANCE",
+  "KEPALA_KITCHEN",
+  "DATA_ADMIN",
+  "AHLI_GIZI",
+  "DATA_STEWARD",
+] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
-  SUPER_ADMIN: "Project Manager MBG",
-  DATA_ADMIN: "Data Operasional",
-  INTERNAL: "Internal (lihat saja)",
-  CMS_ADMIN: "Admin CMS",
-  PUBLIC: "Publik",
+  SUPER_ADMIN: "Admin Sistem (PM MBG)",
+  MANAGEMENT: "Management",
+  FINANCE: "Finance",
+  KEPALA_KITCHEN: "Kepala Kitchen",
+  DATA_ADMIN: "PIC/Data Admin Kitchen",
+  AHLI_GIZI: "Ahli Gizi",
+  DATA_STEWARD: "Data Steward",
 };

@@ -23,7 +23,7 @@ const actor = (role: Role, permissions: Permission[], id = 1n): AppUser =>
 /** role -> permissions as stored in role_permissions. */
 const TABLE: Partial<Record<Role, Permission[]>> = {
   DATA_ADMIN: ['upload:create', 'upload:view'],
-  INTERNAL: ['upload:view'],
+  MANAGEMENT: ['upload:view'],
 };
 
 type Target = { role: Role; status?: 'ACTIVE' | 'INACTIVE'; passwordHash?: string | null };
@@ -102,7 +102,7 @@ const noMail: SendMail = async () => {};
 
 const SUPER = actor('SUPER_ADMIN', ['users:manage', 'settings:manage']);
 // users:manage on a lower-ranked account: the privilege-escalation candidate.
-const MANAGER = actor('INTERNAL', ['users:manage', 'upload:view', 'settings:manage']);
+const MANAGER = actor('MANAGEMENT', ['users:manage', 'upload:view', 'settings:manage']);
 
 describe('privilege escalation', () => {
   test('a user manager cannot mint a SUPER_ADMIN', async () => {
@@ -114,7 +114,7 @@ describe('privilege escalation', () => {
   });
 
   test('nor promote an existing account to SUPER_ADMIN', async () => {
-    const { db, calls } = setup({ '5': { role: 'INTERNAL' } });
+    const { db, calls } = setup({ '5': { role: 'MANAGEMENT' } });
     const valid = { params: { id: 5n }, body: { role: 'SUPER_ADMIN' } };
     assert.equal((await call(updateUser(db), { user: MANAGER, valid })).status, 403);
     assert.equal(calls.updated.length, 0);
@@ -138,7 +138,7 @@ describe('privilege escalation', () => {
 
   test('a manager may create a role within its own permissions', async () => {
     const { db } = setup();
-    const body = { email: 'x@example.com', fullName: 'X', role: 'INTERNAL', kitchenIds: [] };
+    const body = { email: 'x@example.com', fullName: 'X', role: 'MANAGEMENT', kitchenIds: [] };
     const out = await call(createUser(db, noMail), { user: MANAGER, valid: { body } });
     assert.equal(out.status, 201);
     assert.equal(typeof out.body?.resetToken, 'string');
@@ -158,34 +158,34 @@ describe('privilege escalation', () => {
 
   test('nobody can change their own role or status', async () => {
     const { db } = setup({ '1': { role: 'SUPER_ADMIN' } });
-    const valid = { params: { id: 1n }, body: { role: 'INTERNAL' } };
+    const valid = { params: { id: 1n }, body: { role: 'MANAGEMENT' } };
     assert.equal((await call(updateUser(db), { user: SUPER, valid })).status, 403);
   });
 });
 
 describe('access revocation', () => {
   test('deactivating an account ends its sessions at once', async () => {
-    const { db, calls } = setup({ '5': { role: 'INTERNAL' } });
+    const { db, calls } = setup({ '5': { role: 'MANAGEMENT' } });
     await call(updateUser(db), { user: SUPER, valid: { params: { id: 5n }, body: { status: 'INACTIVE' } } });
     assert.equal(calls.sessionsRevoked.length, 1);
   });
 
   test('so does a role change, but a cosmetic edit does not', async () => {
-    const { db, calls } = setup({ '5': { role: 'INTERNAL' } });
+    const { db, calls } = setup({ '5': { role: 'MANAGEMENT' } });
     await call(updateUser(db), { user: SUPER, valid: { params: { id: 5n }, body: { fullName: 'New Name' } } });
     assert.equal(calls.sessionsRevoked.length, 0);
-    await call(updateUser(db), { user: SUPER, valid: { params: { id: 5n }, body: { role: 'CMS_ADMIN' } } });
+    await call(updateUser(db), { user: SUPER, valid: { params: { id: 5n }, body: { role: 'FINANCE' } } });
     assert.equal(calls.sessionsRevoked.length, 1);
   });
 
   test('role and status changes are audited with before and after', async () => {
-    const { db, calls } = setup({ '5': { role: 'INTERNAL' } });
-    const valid = { params: { id: 5n }, body: { role: 'CMS_ADMIN', status: 'INACTIVE' } };
+    const { db, calls } = setup({ '5': { role: 'MANAGEMENT' } });
+    const valid = { params: { id: 5n }, body: { role: 'FINANCE', status: 'INACTIVE' } };
     await call(updateUser(db), { user: SUPER, valid });
     const entry = calls.audit[0] as { action: string; metadata: Record<string, unknown> };
     assert.equal(entry.action, 'user.updated');
-    assert.equal(entry.metadata.roleFrom, 'INTERNAL');
-    assert.equal(entry.metadata.roleTo, 'CMS_ADMIN');
+    assert.equal(entry.metadata.roleFrom, 'MANAGEMENT');
+    assert.equal(entry.metadata.roleTo, 'FINANCE');
     assert.equal(entry.metadata.statusTo, 'INACTIVE');
   });
 });
@@ -202,25 +202,25 @@ describe('role permissions editor', () => {
 
   test('SUPER_ADMIN can reshape another role, and the change is audited', async () => {
     const { db, calls } = setup();
-    assert.equal((await put(db, SUPER, 'CMS_ADMIN', ['upload:view'])).status, 200);
+    assert.equal((await put(db, SUPER, 'FINANCE', ['upload:view'])).status, 200);
     assert.equal(calls.setPerms.length, 1);
     assert.equal((calls.audit[0] as { action: string }).action, 'role.permissions_updated');
   });
 
   test('a settings manager cannot grant what it does not hold', async () => {
     const { db, calls } = setup();
-    assert.equal((await put(db, MANAGER, 'PUBLIC', ['users:manage', 'batch:publish'])).status, 403);
+    assert.equal((await put(db, MANAGER, 'FINANCE', ['users:manage', 'batch:publish'])).status, 403);
     assert.equal(calls.setPerms.length, 0);
   });
 
   test('nor edit its own role', async () => {
     const { db } = setup();
-    assert.equal((await put(db, MANAGER, 'INTERNAL', ['upload:view'])).status, 403);
+    assert.equal((await put(db, MANAGER, 'MANAGEMENT', ['upload:view'])).status, 403);
   });
 
   test('but may grant permissions it holds to another role', async () => {
     const { db } = setup();
-    assert.equal((await put(db, MANAGER, 'PUBLIC', ['upload:view'])).status, 200);
+    assert.equal((await put(db, MANAGER, 'FINANCE', ['upload:view'])).status, 200);
   });
 });
 
@@ -254,8 +254,8 @@ describe('SCRUM-121: members and invitations', () => {
   });
 
   test('an invitation link lives INVITE_TTL_HOURS (72 by default), on create and on resend', async () => {
-    const { db, calls } = setup({ '5': { role: 'INTERNAL', passwordHash: null } });
-    const body = { email: 'x@example.com', fullName: 'X', role: 'INTERNAL', kitchenIds: [] };
+    const { db, calls } = setup({ '5': { role: 'MANAGEMENT', passwordHash: null } });
+    const body = { email: 'x@example.com', fullName: 'X', role: 'MANAGEMENT', kitchenIds: [] };
     const created = await call(createUser(db, noMail), { user: SUPER, valid: { body } });
     assert.ok(Math.abs(hoursFromNow(created.body?.resetTokenExpiresAt) - 72) < 0.1);
 
@@ -268,7 +268,7 @@ describe('SCRUM-121: members and invitations', () => {
     const { db } = setup();
     const sent: { to: string; text: string }[] = [];
     const mail: SendMail = async (to, _subject, text) => void sent.push({ to, text });
-    const body = { email: 'x@example.com', fullName: 'X', role: 'INTERNAL', kitchenIds: [], message: 'Halo tim' };
+    const body = { email: 'x@example.com', fullName: 'X', role: 'MANAGEMENT', kitchenIds: [], message: 'Halo tim' };
     const out = await call(createUser(db, mail), { user: SUPER, valid: { body } });
     assert.equal(out.body?.emailed, true);
     assert.equal(sent[0]?.to, 'x@example.com');
@@ -279,21 +279,21 @@ describe('SCRUM-121: members and invitations', () => {
   test('a failing SES send does not fail the invitation; the admin gets the link instead', async () => {
     const { db } = setup();
     const mail: SendMail = async () => Promise.reject(new Error('ses down'));
-    const body = { email: 'x@example.com', fullName: 'X', role: 'INTERNAL', kitchenIds: [] };
+    const body = { email: 'x@example.com', fullName: 'X', role: 'MANAGEMENT', kitchenIds: [] };
     const out = await call(createUser(db, mail), { user: SUPER, valid: { body } });
     assert.equal(out.status, 201);
     assert.equal(out.body?.emailed, false);
   });
 
   test('a password reset for an active account keeps the short reset lifetime', async () => {
-    const { db, calls } = setup({ '5': { role: 'INTERNAL', passwordHash: 'h' } });
+    const { db, calls } = setup({ '5': { role: 'MANAGEMENT', passwordHash: 'h' } });
     const out = await call(createPasswordReset(db, noMail), { user: SUPER, valid: { params: { id: 5n } } });
     assert.ok(hoursFromNow(out.body?.resetTokenExpiresAt) <= 1);
     assert.equal((calls.audit.at(-1) as { action: string }).action, 'user.password_reset_issued');
   });
 
   test('cancelling an invitation deletes the account and is audited', async () => {
-    const { db, calls } = setup({ '5': { role: 'INTERNAL', passwordHash: null } });
+    const { db, calls } = setup({ '5': { role: 'MANAGEMENT', passwordHash: null } });
     const out = await call(cancelInvite(db), { user: SUPER, valid: { params: { id: 5n } } });
     assert.equal(out.status, 204);
     assert.deepEqual((calls.deleted[0] as { where: unknown }).where, { id: 5n });
@@ -301,7 +301,7 @@ describe('SCRUM-121: members and invitations', () => {
   });
 
   test('only an account without a password can be cancelled, and not by someone below its role', async () => {
-    const active = setup({ '5': { role: 'INTERNAL', passwordHash: 'h' } });
+    const active = setup({ '5': { role: 'MANAGEMENT', passwordHash: 'h' } });
     assert.equal((await call(cancelInvite(active.db), { user: SUPER, valid: { params: { id: 5n } } })).status, 409);
     const pm = setup({ '5': { role: 'SUPER_ADMIN', passwordHash: null } });
     assert.equal((await call(cancelInvite(pm.db), { user: MANAGER, valid: { params: { id: 5n } } })).status, 403);
@@ -310,7 +310,7 @@ describe('SCRUM-121: members and invitations', () => {
 
   test('the last active PM MBG can be neither deactivated nor demoted', async () => {
     const { db, calls } = setup({ '5': { role: 'SUPER_ADMIN' } }, { otherSuperAdmins: 0 });
-    for (const body of [{ status: 'INACTIVE' }, { role: 'INTERNAL' }]) {
+    for (const body of [{ status: 'INACTIVE' }, { role: 'MANAGEMENT' }]) {
       const out = await call(updateUser(db), { user: SUPER, valid: { params: { id: 5n }, body } });
       assert.equal(out.status, 409);
       assert.equal(out.body?.error, 'last_super_admin');

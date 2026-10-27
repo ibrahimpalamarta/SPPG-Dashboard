@@ -12,7 +12,7 @@ import { issueResetToken } from '../../auth/reset.js';
 import { mayManageRole } from '../../auth/escalation.js';
 import { permissionsFor, setRolePermissions } from '../../auth/rbac-store.js';
 import { listSessions, revokeUserSessions } from '../../auth/session.js';
-import { ROLES } from '../../auth/roles.js';
+import { KITCHEN_SCOPED_ROLES, ROLES } from '../../auth/roles.js';
 import { env } from '../../config/env.js';
 import { renderMail } from '../../lib/mail-template.js';
 import { sendMail, type SendMail } from '../../lib/mailer.js';
@@ -128,9 +128,9 @@ export const createUser = (db: Db = prisma, send: SendMail = sendMail): RequestH
     sendError(res, 'FORBIDDEN');
     return;
   }
-  if (body.role === Role.DATA_ADMIN && body.kitchenIds.length === 0) {
+  if (KITCHEN_SCOPED_ROLES.includes(body.role) && body.kitchenIds.length === 0) {
     sendError(res, 'VALIDATION_ERROR', {
-      fields: { 'body.kitchenIds': ['required when role is DATA_ADMIN'] },
+      fields: { 'body.kitchenIds': [`required when role is ${body.role}`] },
     });
     return;
   }
@@ -181,8 +181,8 @@ export const createUser = (db: Db = prisma, send: SendMail = sendMail): RequestH
  *
  *   1. A Super Admin cannot demote or deactivate itself. Locking the last
  *      administrator out of the backoffice needs a database round-trip to fix.
- *   2. A DATA_ADMIN must end up with at least one kitchen. Without one it
- *      silently sees no data at all.
+ *   2. A kitchen-scoped role (KITCHEN_SCOPED_ROLES) must end up with at least
+ *      one kitchen. Without one it silently sees no data at all.
  *   3. No privilege escalation: the actor must be allowed to manage both the
  *      account's current role and the role it is being moved to.
  *   4. SCRUM-121: the last active PM MBG (SUPER_ADMIN with a password) can be
@@ -226,9 +226,9 @@ export const updateUser = (db: Db = prisma): RequestHandler => async (req, res) 
 
   const currentKitchenIds = current.kitchenScopes.map((s) => s.kitchen.id);
   const nextKitchenIds = body.kitchenIds ?? currentKitchenIds;
-  if (nextRole === Role.DATA_ADMIN && nextKitchenIds.length === 0) {
+  if (KITCHEN_SCOPED_ROLES.includes(nextRole) && nextKitchenIds.length === 0) {
     sendError(res, 'VALIDATION_ERROR', {
-      fields: { 'body.kitchenIds': ['required when role is DATA_ADMIN'] },
+      fields: { 'body.kitchenIds': [`required when role is ${nextRole}`] },
     });
     return;
   }

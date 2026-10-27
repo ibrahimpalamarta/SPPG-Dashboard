@@ -12,7 +12,7 @@ const menuPlanRow = {
 
 describe('SCRUM-13 cost visibility', () => {
   test('the operational roles keep the cost columns', () => {
-    for (const role of ['SUPER_ADMIN', 'DATA_ADMIN', 'INTERNAL'] as const) {
+    for (const role of ['SUPER_ADMIN', 'MANAGEMENT', 'FINANCE', 'KEPALA_KITCHEN', 'DATA_ADMIN', 'DATA_STEWARD'] as const) {
       assert.equal(canSeeCost(role), true, role);
       const row = menuPlanForRole(menuPlanRow, role);
       assert.equal(row.hargaBahan, 12000, role);
@@ -20,8 +20,8 @@ describe('SCRUM-13 cost visibility', () => {
     }
   });
 
-  test('a PUBLIC-role token gets no cost columns', () => {
-    const row = menuPlanForRole(menuPlanRow, 'PUBLIC');
+  test('AHLI_GIZI gets no cost columns', () => {
+    const row = menuPlanForRole(menuPlanRow, 'AHLI_GIZI');
     assert.equal('hargaBahan' in row, false);
     assert.equal('totalHarga' in row, false);
     // The non-sensitive fields must survive the strip.
@@ -29,18 +29,13 @@ describe('SCRUM-13 cost visibility', () => {
     assert.equal(row.energi, 250);
   });
 
-  test('CMS_ADMIN manages content, not budgets, so it gets no cost columns', () => {
-    assert.equal(canSeeCost('CMS_ADMIN'), false);
-    assert.equal('hargaBahan' in menuPlanForRole(menuPlanRow, 'CMS_ADMIN'), false);
-  });
-
   test('daily_kitchens hides the exact beneficiary count but keeps meal counts', () => {
     const row = { mealsPrepared: 500, mealsDistributed: 480, jumlahPm: 473 };
 
-    const internal = dailyKitchenForRole(row, 'INTERNAL');
+    const internal = dailyKitchenForRole(row, 'MANAGEMENT');
     assert.equal(internal.jumlahPm, 473);
 
-    const outsider = dailyKitchenForRole(row, 'PUBLIC');
+    const outsider = dailyKitchenForRole(row, 'AHLI_GIZI');
     assert.equal('jumlahPm' in outsider, false);
     assert.equal(outsider.mealsPrepared, 500);
     assert.equal(outsider.mealsDistributed, 480);
@@ -48,7 +43,7 @@ describe('SCRUM-13 cost visibility', () => {
 
   test('stripping does not mutate the row it was given', () => {
     const row = { ...menuPlanRow };
-    menuPlanForRole(row, 'PUBLIC');
+    menuPlanForRole(row, 'AHLI_GIZI');
     assert.equal(row.hargaBahan, 12000);
   });
 });
