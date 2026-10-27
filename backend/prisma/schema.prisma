@@ -23,13 +23,15 @@ datasource db {
 
 /// Authorization roles, enforced from users.role. Which permissions a role holds
 /// lives in role_permissions and is edited through the admin API.
-/// CMS_ADMIN berasal dari ERD (USER.role) dan SCRUM-14.
+/// Daftar role mengikuti PRD Oktober 2026 §3.
 enum Role {
   SUPER_ADMIN
+  MANAGEMENT
+  FINANCE
+  KEPALA_KITCHEN
   DATA_ADMIN
-  CMS_ADMIN
-  INTERNAL
-  PUBLIC
+  AHLI_GIZI
+  DATA_STEWARD
 }
 
 /// Status keaktifan akun maupun dapur - ERD memakai ENUM(active,inactive)
