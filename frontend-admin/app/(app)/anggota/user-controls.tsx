@@ -131,7 +131,7 @@ function InviteSent({ state, onClose }: { state: UserActionState; onClose: () =>
         Link berlaku sampai {until}.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
-        <a href={`/aktivasi/${state.token}`} target="_blank" rel="noreferrer" className={`${secondaryButton} inline-flex h-10 items-center gap-2 px-4`}>
+        <a href={`${process.env.NEXT_PUBLIC_BASE_PATH}/aktivasi/${state.token}`} target="_blank" rel="noreferrer" className={`${secondaryButton} inline-flex h-10 items-center gap-2 px-4`}>
           <Eye className="size-4" aria-hidden="true" />
           Pratinjau halaman aktivasi
         </a>
