@@ -1,9 +1,10 @@
 "use client";
 
-import { Bell, ClipboardCheck, Menu, Plus, Search, Settings } from "lucide-react";
+import { Bell, ClipboardCheck, Menu, Plus, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavLinks, type NavItem } from "@/components/layout/app-sidebar";
+import { HeaderSearch } from "@/components/layout/header-search";
 
 const iconButton = "inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-emerald-300";
 
@@ -35,11 +36,7 @@ export function AppHeader({ items, isPm }: { items: readonly NavItem[]; isPm: bo
         <span className="font-medium text-slate-800">{title}</span>
       </div>
 
-      <label className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20">
-        <Search className="size-4 shrink-0" aria-hidden="true" />
-        <input type="search" disabled title="Segera hadir" placeholder="Cari file atau data..." aria-label="Cari file atau data" className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400" />
-        <kbd className="hidden rounded-md border border-slate-200 px-1.5 py-0.5 text-xs text-slate-400 sm:block">⌘K</kbd>
-      </label>
+      <HeaderSearch items={items} />
 
       <div className="flex items-center gap-3">
         <Link href="/pengaturan" aria-label="Pengaturan" className={iconButton}>
