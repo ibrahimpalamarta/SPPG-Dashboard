@@ -49,7 +49,7 @@ export default async function Page() {
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700">
             {sessions.map((s) => (
-              <tr key={s.id}>
+              <tr key={s.id} className="hover:bg-slate-50">
                 <td className="max-w-xs truncate px-5 py-2" title={s.userAgent ?? undefined}>
                   {s.userAgent || "Tidak diketahui"}
                   {s.ip && <span className="block text-xs text-slate-400">{s.ip}</span>}

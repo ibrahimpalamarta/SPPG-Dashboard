@@ -1,6 +1,6 @@
 import type { StagedSheet, StagingRow } from '../ingest/staging.js';
 import type { MappingOutput, MappingProfile } from './profiles.js';
-import { fieldReader, parseDate, parseNumber, text, type Issue } from './values.js';
+import { fieldReader, parseDate, parseNumber, text, type Issue, type Normalization } from './values.js';
 
 export type CashflowLine = {
   source_record_id: string;
@@ -31,7 +31,7 @@ export type CashflowTxn = {
 
 const REQUIRED = ['txn_date', 'txn_type', 'direction', 'category', 'description', 'counterparty', 'review_status'] as const;
 
-const upper = (s: string | null) => s && s.toUpperCase();
+const upper = (s: string) => s.toUpperCase();
 const rupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
 
 /**
@@ -45,6 +45,8 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
   const txns = new Map<string, CashflowTxn>();
   const totalsSeen = new Map<string, Set<number | null>>();
   const issues: Issue[] = [];
+  const normalized = new Map<string, Normalization>();
+  let lineCount = 0;
 
   for (const row of rows) {
     const f = readers.get(row.sheetName)!(row);
@@ -54,15 +56,29 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
       issues.push({ code: 'NO_TXN_ID', rule: 'DQ-001', sourceRecordId: id, message: `Baris ${row.sourceRowNumber} tanpa txn_id, tidak bisa dikelompokkan.` });
       continue;
     }
+    /** Counts a value the adapter read differently from how the file wrote it ("Rp65.000" → 65000, "keluar" → "KELUAR"). */
+    const note = <T extends string | number>(code: string, field: string, value: T | null): T | null => {
+      const raw = text(f[field]);
+      if (value !== null && raw !== null && raw !== String(value) && f[field]?.type !== 'date') {
+        const n = normalized.get(`${code}:${field}`);
+        if (n) n.count++;
+        else normalized.set(`${code}:${field}`, { code, field, count: 1, example: { raw, value } });
+      }
+      return value;
+    };
+    const money = (field: string) => note('CURRENCY_PARSED', field, parseNumber(f[field], true));
+    const fold = (field: string, to: (s: string) => string) => note('CASE_FOLDED', field, text(f[field]) && to(text(f[field])!));
+
+    lineCount++;
     const line: CashflowLine = {
       source_record_id: id,
       line_id: text(f.line_id),
       item_name: text(f.item_name),
       counterparty: text(f.counterparty),
-      qty: parseNumber(f.qty),
-      unit: text(f.unit)?.toLowerCase() ?? null,
-      unit_price: parseNumber(f.unit_price, true),
-      line_amount: parseNumber(f.line_amount, true),
+      qty: note('NUMBER_PARSED', 'qty', parseNumber(f.qty)),
+      unit: fold('unit', (s) => s.toLowerCase()),
+      unit_price: money('unit_price'),
+      line_amount: money('line_amount'),
     };
     if (line.qty === null || line.unit_price === null || line.line_amount === null) {
       issues.push({ code: 'MISSING_AMOUNT', rule: 'DQ-019', sourceRecordId: id, message: `${txnId} baris ${row.sourceRowNumber}: qty, harga satuan atau jumlah baris kosong/tidak terbaca.` });
@@ -73,7 +89,7 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
       issues.push({ code: 'LINE_AMOUNT_MISMATCH', rule: 'DQ-005', sourceRecordId: id, message: `${txnId} baris ${row.sourceRowNumber}: qty × harga satuan ≠ jumlah baris.` });
     }
 
-    const total = parseNumber(f.txn_total, true);
+    const total = money('txn_total');
     let txn = txns.get(txnId);
     if (!txn) {
       // Contract "Yes" columns (13_Upload_Contract); a gap is reported, never filled in (DQ-019).
@@ -82,18 +98,19 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
       if (missing.length) {
         issues.push({ code: 'MISSING_REQUIRED', rule: 'DQ-019', sourceRecordId: id, message: `${txnId} baris ${row.sourceRowNumber}: ${missing.join(', ')} kosong/tidak terbaca.` });
       }
+      const direction = fold('direction', upper);
       txn = {
         txn_id: txnId,
-        txn_date: parseDate(f.txn_date),
-        txn_type: upper(text(f.txn_type)),
-        direction: upper(text(f.direction)),
+        txn_date: note('DATE_PARSED', 'txn_date', parseDate(f.txn_date)),
+        txn_type: fold('txn_type', upper),
+        direction,
         category: text(f.category),
         description: text(f.description),
         txn_total: total,
-        is_external_spend: upper(text(f.direction)) === 'KELUAR',
-        review_status: upper(text(f.review_status)),
+        is_external_spend: direction === 'KELUAR',
+        review_status: fold('review_status', upper),
         review_note: text(f.review_note),
-        confidence: text(f.confidence)?.toLowerCase() ?? null,
+        confidence: fold('confidence', (s) => s.toLowerCase()),
         lines: [],
       };
       txns.set(txnId, txn);
@@ -121,5 +138,8 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
     totals[key] = (totals[key] ?? 0) + (txn.txn_total ?? 0);
   }
 
-  return { records: [...txns.values()], totals, issues };
+  if (lineCount > txns.size) {
+    normalized.set('LINES_GROUPED', { code: 'LINES_GROUPED', field: 'txn_id', count: txns.size, example: { raw: `${lineCount} baris item`, value: `${txns.size} transaksi` } });
+  }
+  return { records: [...txns.values()], totals, issues, normalized: [...normalized.values()] };
 }

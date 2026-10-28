@@ -18,8 +18,11 @@ import {
   getUploadBatch,
   downloadTemplate,
   listUploadBatches,
+  listUploadBatchHistory,
+  listUploadBatchRecords,
   updateUploadBatch,
 } from '../../controllers/upload/upload-batch.js';
+import { pageQuery } from '../../lib/pagination.js';
 
 export const uploadBatchRouter = Router();
 
@@ -30,6 +33,8 @@ uploadBatchRouter.get('/', validate({ query: uploadBatchListQuery }), wrap(listU
 uploadBatchRouter.get('/templates/:kind', validate({ params: templateParam }), wrap(downloadTemplate()));
 uploadBatchRouter.get('/:id', validate({ params: idParam }), wrap(getUploadBatch()));
 uploadBatchRouter.get('/:id/file', validate({ params: idParam }), wrap(downloadUploadBatchFile()));
+uploadBatchRouter.get('/:id/records', validate({ params: idParam, query: pageQuery }), wrap(listUploadBatchRecords()));
+uploadBatchRouter.get('/:id/history', validate({ params: idParam }), wrap(listUploadBatchHistory()));
 uploadBatchRouter.delete('/:id', requirePermission('batch:review'), validate({ params: idParam }), wrap(deleteUploadBatch()));
 
 // SCRUM-20: uploading needs upload:create; changing a batch's verdict is a

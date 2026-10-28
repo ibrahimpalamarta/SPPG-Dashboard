@@ -1,12 +1,12 @@
 import type { UploadDomain } from '@prisma/client';
 import { WorkbookError, readWorkbook } from './workbook.js';
-import { stageRows, type DomainParser, type ParseContext, type StagedBatch, type StagingRepository } from './staging.js';
+import { loose, stageRows, type DomainParser, type ParseContext, type StagedBatch, type StagedSheet, type StagingRepository } from './staging.js';
 import { cashflowParser } from './cashflow.js';
 import { menuParser } from './menu.js';
 import { inputMakerParser } from './input-maker.js';
 import { detectProfile, type Detection } from '../mapping/detect.js';
 import type { MappingOutput, MappingProfile } from '../mapping/profiles.js';
-import type { Issue } from '../mapping/values.js';
+import type { Issue, Normalization } from '../mapping/values.js';
 
 /**
  * The generic fallback: every sheet. Domains with no dedicated parser
@@ -23,18 +23,20 @@ const parsers: Partial<Record<UploadDomain, DomainParser>> = {
   INPUT_MAKER: inputMakerParser,
 };
 
-/** What the adapter made of the batch. Stored with the staging rows (B-MAPOUT); it also rides on the response. */
+/** One header of a staged sheet and the canonical field the profile reads it into (null: not used). */
+export type MappedColumn = { sheet: string; column: string; header: string; field: string | null };
+
+/** What the adapter made of the batch, stored on the batch for the Validasi Data page (B-MAPOUT) and returned on upload. */
 export type MappingSummary = {
   profileId: string;
   version: string;
   records: number;
   totals: Record<string, number>;
   issueCounts: Record<string, number>;
-  /** The first ISSUE_PREVIEW issues, enough to start reviewing. */
   issues: Issue[];
+  normalized: Normalization[];
+  columns: MappedColumn[];
 };
-
-const ISSUE_PREVIEW = 50;
 
 export type PipelineResult =
   | { ok: true; batch: StagedBatch; detection: Detection; mapping: MappingSummary | null }
@@ -68,7 +70,7 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
     const { profile } = detection;
     const out = profile.apply(batch.sheets, batch.rows, profile);
     await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, templateVersion: profile.version, loadedAt: ctx.loadedAt, domain: profile.domain, records: out.records });
-    return { ok: true, batch, detection, mapping: summarise(profile, out) };
+    return { ok: true, batch, detection, mapping: summarise(profile, out, batch.sheets) };
   } catch (err) {
     await staging.deleteBatch(ctx.uploadBatchId);
     if (err instanceof WorkbookError) return { ok: false, errorCode: err.code, errorSummary: err.message };
@@ -76,15 +78,24 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
   }
 }
 
-function summarise(profile: MappingProfile, out: MappingOutput): MappingSummary {
+function summarise(profile: MappingProfile, out: MappingOutput, sheets: StagedSheet[]): MappingSummary {
   const issueCounts: Record<string, number> = {};
   for (const i of out.issues) issueCounts[i.code] = (issueCounts[i.code] ?? 0) + 1;
+  const fields = new Map(Object.entries(profile.columns).map(([field, header]) => [loose(header), field]));
   return {
     profileId: profile.id,
     version: profile.version,
     records: out.records.length,
     totals: out.totals,
     issueCounts,
-    issues: out.issues.slice(0, ISSUE_PREVIEW),
+    issues: out.issues,
+    normalized: out.normalized ?? [],
+    columns: sheets
+      .filter((s) => s.headerRow !== null && !s.skipped)
+      .flatMap((s) =>
+        Object.entries(s.headers)
+          .filter(([, header]) => header.trim() !== '')
+          .map(([column, header]) => ({ sheet: s.name, column, header, field: fields.get(loose(header)) ?? null })),
+      ),
   };
 }

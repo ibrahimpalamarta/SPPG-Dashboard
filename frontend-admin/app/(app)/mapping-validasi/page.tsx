@@ -1,20 +1,26 @@
 import { Send } from "lucide-react";
 import type { Metadata } from "next";
+import { ColumnTable } from "@/components/mapping/column-table";
 import { FileSelect } from "@/components/mapping/file-select";
 import { FindingsPanel } from "@/components/mapping/findings-panel";
+import { HistoryList, type HistoryEntry } from "@/components/mapping/history-list";
+import { RecordsTable, type Txn } from "@/components/mapping/records-table";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { apiGet } from "@/lib/api";
 import { requirePage } from "@/lib/guard";
-import { batchFindings, type Batch } from "@/lib/mapping-validasi";
+import { batchFindings, tabs, type Batch, type BatchDetail } from "@/lib/mapping-validasi";
 import { DOMAINS, StatusBadge } from "@/lib/upload";
 
 export const metadata: Metadata = { title: "Validasi Data · SPPG Internal" };
 
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ batch?: string }> }) {
+const RECORDS_PAGE_SIZE = 20;
+
+export default async function Page({ searchParams }: { searchParams: Promise<{ batch?: string; recordsPage?: string }> }) {
   const [me, params] = await Promise.all([requirePage("/mapping-validasi"), searchParams]);
+  const recordsPage = Number(params.recordsPage) || 1;
   if (!me.permissions.includes("upload:view")) {
     return (
       <EmptyState title="Tidak ada akses">
@@ -35,7 +41,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
     );
   }
 
-  const findings = batchFindings(batch);
+  const [detail, records, history] = await Promise.all([
+    apiGet<BatchDetail>(`/upload-batches/${batch.id}`),
+    apiGet<{ data: Txn[]; meta: { page: number; totalPages: number; total: number } }>(
+      `/upload-batches/${batch.id}/records?pageSize=${RECORDS_PAGE_SIZE}&page=${recordsPage}`,
+    ),
+    apiGet<HistoryEntry[]>(`/upload-batches/${batch.id}/history`),
+  ]);
+  const findings = batchFindings(detail);
   const label = (b: Batch) => `${b.fileName} · ${b.kitchen.code ?? b.kitchen.name} · ${domainLabel(b.domain)} · ${b.rowCount} baris`;
   return (
     <div className="mx-auto max-w-400">
@@ -54,7 +67,24 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
             Kirim ke PM
           </button>
         </div>
-        <FindingsPanel key={batch.publicId} findings={findings} />
+        <FindingsPanel
+          key={batch.publicId}
+          findings={findings}
+          panels={{
+            [tabs[1]]: <ColumnTable result={detail.mappingResult} />,
+            [tabs[3]]: (
+              <RecordsTable
+                txns={records.data}
+                total={records.meta.total}
+                totals={detail.mappingResult?.mapping?.totals ?? {}}
+                page={records.meta.page}
+                totalPages={records.meta.totalPages}
+                hrefFor={(p) => `/mapping-validasi?batch=${batch.publicId}&recordsPage=${p}`}
+              />
+            ),
+            [tabs[4]]: <HistoryList entries={history} />,
+          }}
+        />
       </Card>
     </div>
   );

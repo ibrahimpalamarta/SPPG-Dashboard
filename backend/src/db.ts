@@ -45,6 +45,7 @@ export type Db = Pick<
   | 'ingredient'
   | 'akgTarget'
   | 'uploadBatch'
+  | 'financeTransaction'
   | 'menuPlan'
   | 'recipeCosting'
   | 'akgCompliance'
