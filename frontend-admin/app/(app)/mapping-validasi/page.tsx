@@ -1,7 +1,8 @@
-import { Send } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
+import Link from "next/link";
 import type { Metadata } from "next";
+import { BatchList } from "@/components/mapping/batch-list";
 import { ColumnTable } from "@/components/mapping/column-table";
-import { FileSelect } from "@/components/mapping/file-select";
 import { FindingsPanel } from "@/components/mapping/findings-panel";
 import { HistoryList, type HistoryEntry } from "@/components/mapping/history-list";
 import { RecordsTable, type Txn } from "@/components/mapping/records-table";
@@ -18,9 +19,12 @@ const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.l
 
 const RECORDS_PAGE_SIZE = 20;
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ batch?: string; recordsPage?: string }> }) {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ batch?: string; listPage?: string; recordsPage?: string }>;
+}) {
   const [me, params] = await Promise.all([requirePage("/mapping-validasi"), searchParams]);
-  const recordsPage = Number(params.recordsPage) || 1;
   if (!me.permissions.includes("upload:view")) {
     return (
       <EmptyState title="Tidak ada akses">
@@ -29,14 +33,24 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
     );
   }
 
+  if (!params.batch) {
+    return <BatchList page={Number(params.listPage) || 1} />;
+  }
+
+  const recordsPage = Number(params.recordsPage) || 1;
   const { data } = await apiGet<{ data: Batch[] }>("/upload-batches?pageSize=50");
   // FAILED never held usable data (incl. empty and replaced files), so there is nothing to map or validate.
-  const batches = data.filter((b) => b.status !== "FAILED");
-  const batch = batches.find((b) => b.publicId === params.batch) ?? batches[0];
+  const batch = data.find((b) => b.publicId === params.batch && b.status !== "FAILED");
   if (!batch) {
     return (
-      <EmptyState title="Belum ada file untuk dicek">
-        <p>Unggah file di menu Unggah Data. File yang gagal diproses tidak muncul di sini.</p>
+      <EmptyState title="File tidak ditemukan">
+        <p>
+          File ini tidak ada atau gagal diproses.{" "}
+          <Link href="/mapping-validasi" className="font-medium text-emerald-700 underline">
+            Kembali ke daftar file
+          </Link>
+          .
+        </p>
       </EmptyState>
     );
   }
@@ -49,14 +63,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
     apiGet<HistoryEntry[]>(`/upload-batches/${batch.id}/history`),
   ]);
   const findings = batchFindings(detail);
-  const label = (b: Batch) => `${b.fileName} · ${b.kitchen.code ?? b.kitchen.name} · ${domainLabel(b.domain)} · ${b.rowCount} baris`;
   return (
-    <div className="mx-auto max-w-400">
+    <div className="mx-auto max-w-400 space-y-4">
+      <Link href="/mapping-validasi" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900">
+        <ArrowLeft className="size-4" aria-hidden="true" />
+        Daftar file
+      </Link>
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 p-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Validasi Data</h1>
-            <FileSelect value={batch.publicId} options={batches.map((b) => ({ id: b.publicId, label: label(b) }))} />
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{batch.fileName}</h1>
+            <span className="text-slate-500">
+              {batch.kitchen.code ?? batch.kitchen.name} · {domainLabel(batch.domain)} · {batch.rowCount} baris
+            </span>
             <StatusBadge status={batch.status} errorCode={batch.errorCode} />
           </div>
           <button
