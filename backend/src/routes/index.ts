@@ -11,6 +11,7 @@ import { ingredientRouter } from './master/ingredient.js';
 import { akgTargetRouter } from './master/akg-target.js';
 import { uploadBatchRouter } from './upload/upload-batch.js';
 import { menuPlanRouter } from './menu/menu-plan.js';
+import { inboxRouter } from './inbox/inbox.js';
 import {
   akgComplianceRouter,
   dailyKitchenRouter,
@@ -55,6 +56,7 @@ apiRouter.use('/akg-targets', akgTargetRouter);
 // Upload & operational
 apiRouter.use('/upload-batches', uploadBatchRouter);
 apiRouter.use('/menu-plans', menuPlanRouter);
+apiRouter.use('/inbox', inboxRouter);
 
 // Pre-computed marts (read-only)
 apiRouter.use('/menu-nutritions', menuNutritionRouter);
