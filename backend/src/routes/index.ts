@@ -23,12 +23,17 @@ import { announcementRouter, documentRouter, galleryRouter } from './cms/cms.js'
 
 // Every authenticated route is rate limited: each request costs a session
 // lookup, and an unauthenticated flood would otherwise reach the database.
+// Keyed by the bearer token, not the IP: all of our traffic arrives from the
+// frontend server, so an IP key would charge every user behind it against one
+// shared budget (seen in practice: normal pagination on one user's session
+// 429'd everyone else's /api/me).
 const authLimiter = rateLimit({
   windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
   max: env.AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: ERRORS.TOO_MANY_REQUESTS.body,
+  keyGenerator: (req) => req.headers.authorization ?? req.ip ?? '',
 });
 
 export const apiRouter = Router();
