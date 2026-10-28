@@ -1,7 +1,6 @@
 import { Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { DeleteBatchButton } from "@/components/unggah/delete-batch-button";
 import { StatusBadge, DOMAINS } from "@/lib/upload";
 import { apiGet } from "@/lib/api";
 
@@ -27,7 +26,7 @@ const when = (iso: string | null) => (iso ? whenOf(iso) : "—");
 const whenOf = (iso: string) => new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
 
 /** Real upload history from GET /api/upload-batches, scoped by the backend to the user's dapur. */
-export async function UploadHistory({ canOpen, canDelete }: { canOpen: boolean; canDelete: boolean }) {
+export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
   const { data } = await apiGet<{ data: Batch[] }>("/upload-batches?pageSize=20");
 
   return (
@@ -58,7 +57,7 @@ export async function UploadHistory({ canOpen, canDelete }: { canOpen: boolean; 
               </tr>
             )}
             {data.map((b) => (
-              <tr key={b.publicId}>
+              <tr key={b.publicId} className="hover:bg-slate-50">
                 <td className="px-4 py-3">
                   <div className="flex items-start gap-3">
                     <FileText className="mt-0.5 size-4 shrink-0 text-slate-400" aria-hidden="true" />
@@ -88,7 +87,6 @@ export async function UploadHistory({ canOpen, canDelete }: { canOpen: boolean; 
                         Export
                       </a>
                     )}
-                    {canDelete && b.status !== "PUBLISHED" && <DeleteBatchButton id={b.id} fileName={b.fileName} />}
                   </div>
                 </td>
               </tr>
