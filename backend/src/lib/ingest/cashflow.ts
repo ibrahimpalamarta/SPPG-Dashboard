@@ -29,6 +29,8 @@ export const cashflowParser: DomainParser = (sheets, ctx) =>
     // amount already sits on the Transaksi_Kas row (tipe INSENTIF/PENGGAJIAN),
     // so finance loses nothing by not copying the people (PRD §2, OS8).
     if (PERSONAL_DATA_SHEETS.has(loose(sheet.name))) return 'Data pribadi (nama/rekening) tidak disalin ke staging';
+    // Per-transaction rollup of Transaksi_Kas: staging it would double-count and it lacks the line columns.
+    if (loose(sheet.name) === 'ringkasantransaksi') return 'Ringkasan turunan dari Transaksi_Kas, tidak disimpan ke staging';
     if (!headers.some((h) => loose(h) === 'txnid')) return 'Bukan sheet data transaksi (tidak ada kolom txn_id)';
     return null;
   });
