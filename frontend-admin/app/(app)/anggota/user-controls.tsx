@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Lock, Plus, Send, Users, X } from "lucide-react";
+import { ChevronDown, Eye, Lock, Plus, Send, Users, X } from "lucide-react";
 import { createContext, use, useActionState, useEffect, useState, type ReactNode } from "react";
 import { createUser, saveUser, type UserActionState } from "./actions";
 import { Field, FormMessage, field, primaryButton, secondaryButton } from "@/components/ui/form";
@@ -48,6 +48,46 @@ const RoleCard = ({ option, checked, onSelect }: { option: (typeof ROLE_OPTIONS)
   </label>
 );
 
+/** Dropdown of kitchens with "Semua Dapur"; "all" submits every kitchen id because the backend wants an explicit non-empty set. */
+function KitchenSelect({ kitchens, defaultIds }: { kitchens: Kitchen[]; defaultIds: string[] }) {
+  const [selected, setSelected] = useState(() => new Set(defaultIds));
+  const all = kitchens.length > 0 && selected.size === kitchens.length;
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  const summary = all ? "Semua Dapur" : selected.size === 0 ? "Pilih dapur" : selected.size === 1 ? kitchenLabel(kitchens.find((k) => selected.has(k.id))!) : `${selected.size} dapur dipilih`;
+  const row = "flex cursor-pointer items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50";
+  return (
+    <div className="space-y-1">
+      <span className="block font-medium text-slate-700">Dapur</span>
+      <details className="group rounded-lg border border-slate-200 bg-white">
+        <summary className="flex h-10 cursor-pointer list-none items-center justify-between px-3 text-sm text-slate-800">
+          {summary}
+          <ChevronDown className="size-4 text-slate-400 group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <div className="max-h-48 overflow-y-auto border-t border-slate-200 py-1">
+          <label className={`${row} font-medium`}>
+            <input type="checkbox" checked={all} onChange={() => setSelected(all ? new Set() : new Set(kitchens.map((k) => k.id)))} className="accent-emerald-700" />
+            Semua Dapur
+          </label>
+          {kitchens.map((k) => (
+            <label key={k.id} className={row}>
+              <input type="checkbox" checked={selected.has(k.id)} onChange={() => toggle(k.id)} className="accent-emerald-700" />
+              {kitchenLabel(k)}
+            </label>
+          ))}
+        </div>
+      </details>
+      {[...selected].map((id) => (
+        <input key={id} type="hidden" name="kitchenIds" value={id} />
+      ))}
+    </div>
+  );
+}
+
 /** Role cards plus, for a kitchen-scoped role, the kitchens it may see (at least one; the action checks). */
 function RoleFields({ kitchens, defaultRole, defaultKitchenIds = [] }: { kitchens: Kitchen[]; defaultRole: Role; defaultKitchenIds?: string[] }) {
   const [role, setRole] = useState<Role>(defaultRole);
@@ -59,17 +99,7 @@ function RoleFields({ kitchens, defaultRole, defaultKitchenIds = [] }: { kitchen
           <RoleCard key={o.role} option={o} checked={role === o.role} onSelect={() => setRole(o.role)} />
         ))}
       </fieldset>
-      {KITCHEN_SCOPED.includes(role) && (
-        <fieldset className="space-y-2">
-          <legend className="mb-1 font-medium text-slate-700">Dapur (pilih minimal satu)</legend>
-          {kitchens.map((k) => (
-            <label key={k.id} className="flex items-center gap-2 text-slate-700">
-              <input type="checkbox" name="kitchenIds" value={k.id} defaultChecked={defaultKitchenIds.includes(k.id)} className="accent-emerald-700" />
-              {kitchenLabel(k)}
-            </label>
-          ))}
-        </fieldset>
-      )}
+      {KITCHEN_SCOPED.includes(role) && <KitchenSelect kitchens={kitchens} defaultIds={defaultKitchenIds} />}
     </>
   );
 }
