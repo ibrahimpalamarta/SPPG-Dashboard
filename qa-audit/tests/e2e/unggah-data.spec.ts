@@ -16,7 +16,8 @@ test.describe('Unggah Data', () => {
   });
 
   test('[SCRUM-25] riwayat unggahan menampilkan profil mapping, validasi, dan publish @smoke', async ({ page }) => {
-    await page.goto('unggah-data');
+    // Upload history lives on Validasi Data now — Unggah Data itself only has the upload form.
+    await page.goto('mapping-validasi');
     for (const col of ['Profil mapping', 'Divalidasi', 'Dipublish']) await expect(page.getByRole('columnheader', { name: col })).toBeVisible();
   });
 
@@ -69,7 +70,7 @@ test.describe.serial('Unggah Data: unggah file', () => {
     await expect(page.getByText('Needs Review')).toBeVisible();
     await shot(page, 'SCRUM-5', 3, 'hasil-unggah');
     await shot(result(page), 'SCRUM-35', 1, 'hasil-cashflow-terbaca');
-    await page.goto('unggah-data');
+    await page.goto('mapping-validasi');
     const row = page.getByRole('row', { name: /cashflow-sukun\.csv/ });
     await expect(row).toBeVisible();
     await shot(row, 'SCRUM-22', 1, 'metadata-batch-di-riwayat');
@@ -101,7 +102,7 @@ test.describe.serial('Unggah Data: unggah file', () => {
     await shot(page, 'SCRUM-124', 2, 'file-pengganti-dipilih');
     await submit(page);
     await expect(page.getByText(/Profil terdeteksi:\s*MAP-SKN-CF-001/)).toBeVisible();
-    await page.goto('unggah-data');
+    await page.goto('mapping-validasi');
     const row = page.getByRole('row', { name: /kolom-beda\.csv/ });
     await expect(row.getByText('Diganti')).toBeVisible();
     await shot(row, 'SCRUM-124', 3, 'berkas-lama-diganti');

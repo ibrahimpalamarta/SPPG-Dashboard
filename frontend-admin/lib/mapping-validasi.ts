@@ -16,6 +16,7 @@ export type Finding = {
 export type Batch = {
   id: string;
   publicId: string;
+  storageKey: string | null;
   fileName: string;
   domain: string;
   status: string;
@@ -24,7 +25,11 @@ export type Batch = {
   rowCount: number;
   mappingProfileId: string | null;
   templateVersion: string | null;
+  validatedAt: string | null;
+  publishedAt: string | null;
+  uploadDate: string;
   kitchen: { code: string | null; name: string };
+  uploader: { fullName: string | null; email: string | null } | null;
 };
 
 export type MappedColumn = { sheet: string; column: string; header: string; field: string | null };
