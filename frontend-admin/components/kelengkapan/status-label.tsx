@@ -1,28 +1,22 @@
-import { Check } from "lucide-react";
-import { Badge, type Tone } from "@/components/ui/badge";
+import { Check, Circle, CircleDashed, CircleDot, CircleSmall, CircleX, Minus, type LucideIcon } from "lucide-react";
+import type { Tone } from "@/components/ui/badge";
 
-const dots: Record<Exclude<Tone, "red" | "green">, string> = {
-  pending: "border border-amber-400",
-  amber: "bg-amber-500",
-  blue: "bg-blue-500",
-  violet: "bg-violet-500",
-  slate: "bg-slate-400",
+// Plain geometric shapes only. Passive/done states are grey; "red" is the single highlighted state.
+const styles: Record<Tone, { icon: LucideIcon; icon$: string; text: string }> = {
+  green: { icon: Check, icon$: "text-slate-400", text: "text-slate-400" },
+  pending: { icon: CircleDashed, icon$: "text-slate-400", text: "text-slate-400" },
+  slate: { icon: Minus, icon$: "text-slate-400", text: "text-slate-400" },
+  blue: { icon: Circle, icon$: "text-slate-400", text: "text-slate-600" },
+  violet: { icon: CircleDot, icon$: "text-slate-400", text: "text-slate-600" },
+  amber: { icon: CircleSmall, icon$: "text-amber-500", text: "text-slate-600" },
+  red: { icon: CircleX, icon$: "text-red-600", text: "text-red-600 font-semibold" },
 };
 
-// Only "red" (needs action) keeps a badge; "green" gets a checkmark, the rest a dot.
 export function StatusLabel({ tone, children }: { tone: Tone; children: React.ReactNode }) {
-  if (tone === "red") return <Badge tone="red">{children}</Badge>;
-  if (tone === "green") {
-    return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-emerald-700">
-        <Check className="size-3.5" aria-hidden="true" />
-        {children}
-      </span>
-    );
-  }
+  const { icon: Icon, icon$, text } = styles[tone];
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-600">
-      <span className={`size-2 rounded-full ${dots[tone]}`} aria-hidden="true" />
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${text}`}>
+      <Icon className={`size-3.5 ${icon$}`} aria-hidden="true" />
       {children}
     </span>
   );

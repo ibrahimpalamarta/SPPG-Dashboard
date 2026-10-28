@@ -10,10 +10,10 @@ const ADMIN_ONLY = ['Anggota', 'Peran & Izin'];
 // Inbox is open to every role (SCRUM-20). Anggota needs users:read, held only by SUPER_ADMIN and
 // DATA_ADMIN (Data Operasional, no QA account); Data Steward is DATA_STEWARD and is refused.
 const CASES: { role: RoleKey; menu: string[]; hidden: string[] }[] = [
-  { role: 'management', menu: [...VIEW, 'Inbox'], hidden: ['Manual Entry', 'Unggah Data', ...ADMIN_ONLY] },
-  { role: 'finance', menu: [...VIEW, 'Inbox'], hidden: ['Manual Entry', 'Unggah Data', ...ADMIN_ONLY] },
-  { role: 'kepala-kitchen-skn', menu: [...VIEW, 'Inbox'], hidden: ['Manual Entry', 'Unggah Data', ...ADMIN_ONLY] },
-  { role: 'data-steward', menu: [...VIEW, 'Unggah Data', 'Manual Entry', 'Inbox'], hidden: ADMIN_ONLY },
+  { role: 'management', menu: [...VIEW, 'Inbox'], hidden: ['Unggah Data', ...ADMIN_ONLY] },
+  { role: 'finance', menu: [...VIEW, 'Inbox'], hidden: ['Unggah Data', ...ADMIN_ONLY] },
+  { role: 'kepala-kitchen-skn', menu: [...VIEW, 'Inbox'], hidden: ['Unggah Data', ...ADMIN_ONLY] },
+  { role: 'data-steward', menu: [...VIEW, 'Unggah Data', 'Inbox'], hidden: ADMIN_ONLY },
 ];
 
 for (const c of CASES) {

@@ -53,7 +53,7 @@ export function KitchenDetail() {
                       <Bell className="size-4" aria-hidden="true" />
                     </button>
                   ) : action === "Buka" ? (
-                    <button className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+                    <button className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
                       Buka
                       <ArrowRight className="size-3.5" aria-hidden="true" />
                     </button>

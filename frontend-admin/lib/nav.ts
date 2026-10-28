@@ -17,8 +17,6 @@ export const NAV = [
   { group: "Data", href: "/unggah-data", label: "Unggah Data", icon: "Upload", permission: "upload:create", alsoRole: "SUPER_ADMIN" },
   { group: "Data", href: "/mapping-validasi", label: "Validasi Data", icon: "Map", permission: "mapping:view" },
   { group: "Data", href: "/referensi-data", label: "Data Reference", icon: "BookOpen", permission: "reference:view" },
-  // Fallback terkontrol (PRD §4.2); the form itself is SCRUM-108.
-  { group: "Data", href: "/input-manual", label: "Manual Entry", icon: "PenLine", permission: "upload:create" },
   // Tugas review/dikembalikan untuk yang memasukkan data dan PM (isinya SCRUM-117).
   { group: "Data", href: "/inbox", label: "Inbox", icon: "Inbox", permission: "dashboard:view" },
   // Administrasi akun; hanya muncul bagi peran yang diberi izinnya.
