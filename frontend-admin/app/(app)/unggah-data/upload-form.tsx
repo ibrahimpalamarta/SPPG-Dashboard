@@ -28,14 +28,11 @@ const DOMAIN_CARDS: { value: string; label: string; note: string; icon: LucideIc
 
 const STEPS = ["Pilih Kitchen, jenis data & periode", "Pilih file", "Deteksi & validasi"];
 
-const formatSize = (bytes: number) => (bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
-
 export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitchenId?: string }) {
   const [result, action, pending] = useActionState<UploadResult | null, FormData>(uploadFile, null);
   const [step, setStep] = useState(1);
   const [kitchen, setKitchen] = useState(kitchenId ?? kitchens[0].id);
   const [domain, setDomain] = useState("CASHFLOW");
-  const [file, setFile] = useState<File | null>(null);
   // "Unggah ulang" goes back to the file step without dropping kitchen/domain.
   const [retry, setRetry] = useState(false);
   const current = result?.ok && !retry ? 3 : step;
@@ -119,12 +116,8 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
         <div hidden={current !== 2} className="space-y-4">
           <label className="block space-y-1 text-sm">
             <span className="font-semibold text-slate-800">File (.xlsx atau .csv, maks. 10 MB)</span>
-            <input type="file" name="file" accept=".xlsx,.csv" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium" />
+            <input type="file" name="file" accept=".xlsx,.csv" required className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium" />
           </label>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-slate-500">File dipilih</dt>
-            <dd className="text-slate-800">{file ? `${file.name} (${formatSize(file.size)})` : "—"}</dd>
-          </dl>
           {result && !result.ok && (
             <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
               {result.message}
