@@ -1,12 +1,15 @@
 import { Send } from "lucide-react";
 import type { Metadata } from "next";
+import { ColumnTable } from "@/components/mapping/column-table";
 import { FileSelect } from "@/components/mapping/file-select";
 import { FindingsPanel } from "@/components/mapping/findings-panel";
+import { HistoryList, type HistoryEntry } from "@/components/mapping/history-list";
+import { RecordsTable, type Txn } from "@/components/mapping/records-table";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { apiGet } from "@/lib/api";
 import { requirePage } from "@/lib/guard";
-import { batchFindings, type Batch } from "@/lib/mapping-validasi";
+import { batchFindings, tabs, type Batch, type BatchDetail } from "@/lib/mapping-validasi";
 import { DOMAINS, StatusBadge } from "@/lib/upload";
 
 export const metadata: Metadata = { title: "Validasi Data · SPPG Internal" };
@@ -35,7 +38,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
     );
   }
 
-  const findings = batchFindings(batch);
+  // ponytail: first 100 transactions only; add paging to "Hasil data" when a file needs more on screen.
+  const [detail, records, history] = await Promise.all([
+    apiGet<BatchDetail>(`/upload-batches/${batch.id}`),
+    apiGet<{ data: Txn[]; meta: { total: number } }>(`/upload-batches/${batch.id}/records?pageSize=100`),
+    apiGet<HistoryEntry[]>(`/upload-batches/${batch.id}/history`),
+  ]);
+  const findings = batchFindings(detail);
   const label = (b: Batch) => `${b.fileName} · ${b.kitchen.code ?? b.kitchen.name} · ${domainLabel(b.domain)} · ${b.rowCount} baris`;
   return (
     <div className="mx-auto max-w-400">
@@ -54,7 +63,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
             Kirim ke PM
           </button>
         </div>
-        <FindingsPanel key={batch.publicId} findings={findings} />
+        <FindingsPanel
+          key={batch.publicId}
+          findings={findings}
+          panels={{
+            [tabs[1]]: <ColumnTable result={detail.mappingResult} />,
+            [tabs[3]]: <RecordsTable txns={records.data} total={records.meta.total} totals={detail.mappingResult?.mapping?.totals ?? {}} />,
+            [tabs[4]]: <HistoryList entries={history} />,
+          }}
+        />
       </Card>
     </div>
   );

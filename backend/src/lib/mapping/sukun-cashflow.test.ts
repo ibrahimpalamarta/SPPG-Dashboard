@@ -38,6 +38,16 @@ describe('MAP-SKN-CF-001 adapter (SCRUM-27/55)', () => {
       ],
     );
     assert.deepEqual(mapping?.issues, []);
+    // Each clean-up is logged once per field with its first example; values already clean ("17000", "BELANJA") are not.
+    const n = Object.fromEntries(mapping!.normalized.map((x) => [`${x.code}:${x.field}`, [x.count, x.example.raw, x.example.value]]));
+    assert.deepEqual(n['CURRENCY_PARSED:unit_price'], [1, 'Rp40.000', 40000]);
+    assert.deepEqual(n['CURRENCY_PARSED:txn_total'], [2, 'Rp327.000', 327000]);
+    assert.deepEqual(n['NUMBER_PARSED:qty'], [1, '7,75', 7.75]);
+    assert.deepEqual(n['CASE_FOLDED:txn_type'], [1, 'belanja', 'BELANJA']);
+    assert.deepEqual(n['CASE_FOLDED:unit'], [1, 'KG', 'kg']);
+    assert.deepEqual(n['DATE_PARSED:txn_date'], [1, '05/03/2026', '2026-03-05']);
+    assert.deepEqual(n['LINES_GROUPED:txn_id'], [1, '2 baris item', '1 transaksi']);
+    assert.equal(n['CASE_FOLDED:review_status'], undefined);
   });
 
   test('lines that do not add up, or disagree on the total, are reported, not fixed', async () => {

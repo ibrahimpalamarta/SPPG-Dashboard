@@ -446,6 +446,10 @@ model UploadBatch {
   mappingProfileId String? @map("mapping_profile_id")
   templateVersion  String? @map("template_version")
 
+  /// Hasil mapping untuk halaman Validasi Data (B-MAPOUT): sheet, kolom file →
+  /// field kanonik, issue, normalisasi, total. NULL bila file gagal dibaca.
+  mappingResult Json? @map("mapping_result")
+
   rowCount Int          @default(0) @map("row_count")
   status   UploadStatus @default(PROCESSING)
 
