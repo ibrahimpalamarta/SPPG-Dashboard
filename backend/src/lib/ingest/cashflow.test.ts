@@ -66,6 +66,16 @@ describe('cashflowParser (SCRUM-35)', () => {
     assert.equal(JSON.stringify(out.batch.rows).includes('Nama Contoh'), false);
   });
 
+  test('skips the Ringkasan_Transaksi rollup even though it carries txn_id', async () => {
+    const wb = new ExcelJS.Workbook();
+    wb.addWorksheet('Transaksi_Kas').addRow(['id', 'txn_id']).worksheet.addRow(['L1', 'T1']);
+    wb.addWorksheet('Ringkasan_Transaksi').addRow(['txn_id', 'total']).worksheet.addRow(['T1', 10]);
+    const out = await parseToStaging(Buffer.from((await wb.xlsx.writeBuffer()) as unknown as ArrayBuffer), ctx, new InMemoryStagingRepository());
+    assert.ok(out.ok);
+    assert.match(out.batch.sheets.find((s) => s.name === 'Ringkasan_Transaksi')!.skipped!, /Ringkasan/);
+    assert.equal(out.batch.rows.length, 1);
+  });
+
   test('raw values are identical to the source: no currency, decimal or date normalisation', async () => {
     const out = await parseToStaging(await sukunWorkbook(), ctx, new InMemoryStagingRepository());
     assert.ok(out.ok);
