@@ -36,7 +36,7 @@ const ROLE_OPTIONS = [
 ] as const;
 
 const RoleCard = ({ option, defaultChecked }: { option: (typeof ROLE_OPTIONS)[number]; defaultChecked: boolean }) => (
-  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50">
+  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 has-checked:border-emerald-600 has-checked:bg-emerald-50">
     <input type="radio" name="role" value={option.role} defaultChecked={defaultChecked} required className="mt-1 accent-emerald-700" />
     <span>
       <span className="block font-semibold text-slate-800">{ROLE_LABELS[option.role]}</span>
