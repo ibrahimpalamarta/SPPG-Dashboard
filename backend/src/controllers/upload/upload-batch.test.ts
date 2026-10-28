@@ -5,7 +5,7 @@ import ExcelJS from 'exceljs';
 import type { Db } from '../../db.js';
 import type { Role } from '../../auth/roles.js';
 import type { AppUser } from '../../auth/user.js';
-import { createUploadBatch, listUploadBatches, updateUploadBatch } from './upload-batch.js';
+import { createUploadBatch, listUploadBatchHistory, listUploadBatchRecords, listUploadBatches, updateUploadBatch } from './upload-batch.js';
 import { InMemoryStagingRepository } from '../../lib/ingest/staging.js';
 import { fixture } from '../../lib/ingest/fixtures.js';
 
@@ -337,6 +337,10 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.deepEqual(calls.audits, ['upload_batch.created', 'upload_batch.profile_detected']);
     assert.equal((out.body?.mapping as { records: number }).records, 15);
     assert.deepEqual(out.body?.columnDiff, []);
+    // Kept on the batch for the Validasi Data page (B-MAPOUT).
+    const stored = final.mappingResult as { mapping: { issues: unknown[]; columns: { header: string; field: string | null }[] } };
+    assert.equal(stored.mapping.issues.length, 12);
+    assert.deepEqual(stored.mapping.columns.find((c) => c.header === 'jumlah_baris'), { sheet: 'Transaksi_Kas', column: 'M', header: 'jumlah_baris', field: 'line_amount' });
   });
 
   test('a file missing a profile column is quarantined with the diff (SCRUM-94)', async () => {
@@ -350,6 +354,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.match(String(final.errorSummary), /Kolom tidak ditemukan: jumlah_baris\./);
     assert.deepEqual(out.body?.columnDiff, [{ sheet: 'Transaksi_Kas', missing: ['jumlah_baris'], unexpected: ['jml'] }]);
     assert.equal(out.body?.mapping, null);
+    assert.deepEqual((final.mappingResult as { columnDiff: unknown }).columnDiff, out.body?.columnDiff);
   });
 
   test('a re-upload closes the quarantined batch it replaces as SUPERSEDED (SCRUM-124)', async () => {
@@ -383,6 +388,41 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.equal(out.status, 403);
     assert.equal(out.body?.error, 'forbidden_kitchen');
     assert.equal(calls.created, undefined);
+  });
+});
+
+describe('Validasi Data records/history (B-MAPOUT)', () => {
+  const handlers = [listUploadBatchRecords, listUploadBatchHistory];
+  const req = (role: Role, kitchenId: bigint | null) => ({ user: userWith(role, kitchenId), valid: { params: { id: 9n }, query: { page: 1, pageSize: 25 } } });
+
+  test('404 when the batch does not exist', async () => {
+    for (const handler of handlers) {
+      const { db } = fakeDb();
+      assert.equal((await run(handler(db), req('SUPER_ADMIN', null))).status, 404);
+    }
+  });
+
+  test('another dapur’s batch is refused', async () => {
+    for (const handler of handlers) {
+      const { db } = fakeDb({ findUnique: async () => ({ id: 9n, publicId: 'pub-1', kitchenId: 4n }) });
+      assert.equal((await run(handler(db), req('DATA_ADMIN', 3n))).status, 403);
+    }
+  });
+
+  test('records are the batch’s transactions, history its audit rows', async () => {
+    const where: unknown[] = [];
+    const capture = async (args: { where: unknown }) => {
+      where.push(args.where);
+      return [];
+    };
+    const db = {
+      uploadBatch: { findUnique: async () => ({ id: 9n, publicId: 'pub-1', kitchenId: 3n }) },
+      financeTransaction: { findMany: capture, count: async () => 0 },
+      auditLog: { findMany: capture },
+    } as unknown as Db;
+    assert.equal((await run(listUploadBatchRecords(db), req('DATA_ADMIN', 3n))).status, 200);
+    assert.equal((await run(listUploadBatchHistory(db), req('DATA_ADMIN', 3n))).status, 200);
+    assert.deepEqual(where, [{ uploadBatchId: 'pub-1' }, { entity: 'upload_batches', entityId: 9n }]);
   });
 });
 

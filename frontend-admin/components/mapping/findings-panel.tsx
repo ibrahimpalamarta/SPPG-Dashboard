@@ -1,11 +1,11 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { severityMeta, tabs, type Finding, type Severity } from "@/lib/mapping-validasi";
 
-// Tabs that list findings, mapped to the severities they show; the other tabs are placeholders.
+// Tabs that list findings, mapped to the severities they show; the other tabs render a panel.
 const tabSeverities: Partial<Record<string, Severity[]>> = {
   [tabs[0]]: ["blocker", "check"],
   [tabs[2]]: ["auto"],
@@ -13,12 +13,13 @@ const tabSeverities: Partial<Record<string, Severity[]>> = {
 
 const inTab = (findings: Finding[], t: string) => findings.filter((f) => tabSeverities[t]?.includes(f.severity));
 
-export function FindingsPanel({ findings }: { findings: Finding[] }) {
+export function FindingsPanel({ findings, panels }: { findings: Finding[]; panels: Partial<Record<string, ReactNode>> }) {
   const [tab, setTab] = useState(tabs[0]);
   const [selectedId, setSelectedId] = useState(findings[0]?.id);
 
   const visible = inTab(findings, tab);
   const selected = visible.find((f) => f.id === selectedId) ?? visible[0];
+  const panel = tabSeverities[tab] ? null : panels[tab];
 
   return (
     <div>
@@ -37,7 +38,9 @@ export function FindingsPanel({ findings }: { findings: Finding[] }) {
         ))}
       </div>
 
-      {!selected ? (
+      {panel ? (
+        panel
+      ) : !selected ? (
         <p className="py-16 text-center text-sm text-slate-500">{tabSeverities[tab] ? "Tidak ada temuan." : `Tab “${tab}” belum tersedia.`}</p>
       ) : (
         <div className="grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
@@ -71,6 +74,13 @@ export function FindingsPanel({ findings }: { findings: Finding[] }) {
               <dd className="font-medium text-slate-900">{selected.rows}</dd>
             </dl>
             <p className="text-sm text-slate-700">{selected.description}</p>
+            {selected.details && (
+              <ul className="max-h-80 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+                {selected.details.map((d, i) => (
+                  <li key={i}>{d}</li>
+                ))}
+              </ul>
+            )}
 
             {selected.severity === "check" && (
               <>

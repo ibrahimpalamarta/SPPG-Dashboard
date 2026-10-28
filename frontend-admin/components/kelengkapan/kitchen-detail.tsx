@@ -7,9 +7,6 @@ import { deliveries, detail } from "@/lib/mock/kelengkapan-data";
 const actionButton =
   "inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600";
 
-const iconButton =
-  "inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600";
-
 export function KitchenDetail() {
   return (
     <Card className="p-6">
@@ -48,12 +45,8 @@ export function KitchenDetail() {
                 <td className="px-4 py-3">{issue ? <Badge tone={issue.tone}>{issue.label}</Badge> : <span className="text-slate-400">Tidak ada</span>}</td>
                 <td className="px-4 py-3 font-mono text-xs text-slate-600">{approvedAt ?? "—"}</td>
                 <td className="px-4 py-3">
-                  {action === "Ingatkan" ? (
-                    <button aria-label={`Ingatkan ${type}`} title="Ingatkan" className={iconButton}>
-                      <Bell className="size-4" aria-hidden="true" />
-                    </button>
-                  ) : action === "Buka" ? (
-                    <button className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+                  {action === "Buka" ? (
+                    <button className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
                       Buka
                       <ArrowRight className="size-3.5" aria-hidden="true" />
                     </button>

@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Integrasi · SPPG Internal" };
 
 const STATUS = {
   none: { label: "Tidak tersedia", className: "bg-slate-100 text-slate-600" },
-  manual: { label: "Manual export", className: "bg-amber-50 text-amber-700" },
+  manual: { label: "Manual export", className: "bg-slate-100 text-slate-600" },
   upload: { label: "Upload aktif", className: "bg-emerald-50 text-emerald-700" },
 } as const;
 

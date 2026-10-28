@@ -8,7 +8,7 @@ type Expense = { label: string; amount: string; percent: number; color: string }
 export const filters = ["SKN · Sukun", "P13 · 31 Jul–13 Agu 2026"];
 
 export const stats: Stat[] = [
-  { icon: Users, label: "Penerima Manfaat / hari", value: "Belum ada data", status: "Belum ada data" },
+  { icon: Users, label: "Penerima Manfaat / hari", value: "-", status: "Belum ada data" },
   { icon: WalletCards, label: "Saldo Rekening · per 27 Agu 2026", value: "Rp186,4 jt", status: "Belum resmi" },
   { icon: RefreshCw, label: "Transfer EFI Terakhir · 07 Agu 2026", value: "Rp30,0 jt", status: "Belum resmi" },
 ];

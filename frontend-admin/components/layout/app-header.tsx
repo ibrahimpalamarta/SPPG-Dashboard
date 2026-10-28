@@ -1,20 +1,15 @@
 "use client";
 
-import { Bell, ClipboardCheck, Menu, Plus, Search, Settings } from "lucide-react";
+import { Bell, Menu, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NavLinks, type NavItem } from "@/components/layout/app-sidebar";
+import { NavLinks, UserMenu, type AppUser, type NavItem } from "@/components/layout/app-sidebar";
+import { HeaderSearch } from "@/components/layout/header-search";
 
 const iconButton = "inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-emerald-300";
 
-export function AppHeader({ items, isPm }: { items: readonly NavItem[]; isPm: boolean }) {
+export function AppHeader({ items, user }: { items: readonly NavItem[]; user: AppUser }) {
   const pathname = usePathname();
-  // Tombol aksi per peran: PM -> Review Pekerjaan (inbox), peran yang boleh unggah -> Unggah Data.
-  const action = isPm
-    ? { href: "/inbox", label: "Review Pekerjaan", Icon: ClipboardCheck }
-    : items.some((n) => n.href === "/unggah-data")
-      ? { href: "/unggah-data", label: "Unggah Data", Icon: Plus }
-      : null;
   const title = items.find((n) => n.href === pathname)?.label ?? (pathname === "/keamanan" ? "Keamanan akun" : pathname === "/pengaturan" ? "Pengaturan" : undefined);
 
   return (
@@ -26,6 +21,9 @@ export function AppHeader({ items, isPm }: { items: readonly NavItem[]; isPm: bo
         </summary>
         <nav className="absolute left-0 top-11 z-10 flex w-64 flex-col gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-lg" aria-label="Menu utama">
           <NavLinks items={items} />
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            <UserMenu user={user} />
+          </div>
         </nav>
       </details>
 
@@ -35,11 +33,7 @@ export function AppHeader({ items, isPm }: { items: readonly NavItem[]; isPm: bo
         <span className="font-medium text-slate-800">{title}</span>
       </div>
 
-      <label className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20">
-        <Search className="size-4 shrink-0" aria-hidden="true" />
-        <input type="search" disabled title="Segera hadir" placeholder="Cari file atau data..." aria-label="Cari file atau data" className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400" />
-        <kbd className="hidden rounded-md border border-slate-200 px-1.5 py-0.5 text-xs text-slate-400 sm:block">⌘K</kbd>
-      </label>
+      <HeaderSearch items={items} />
 
       <div className="flex items-center gap-3">
         <Link href="/pengaturan" aria-label="Pengaturan" className={iconButton}>
@@ -48,12 +42,6 @@ export function AppHeader({ items, isPm }: { items: readonly NavItem[]; isPm: bo
         <button type="button" disabled title="Segera hadir" aria-label="Notifikasi" className={`${iconButton} disabled:cursor-not-allowed disabled:opacity-60`}>
           <Bell className="size-5" aria-hidden="true" />
         </button>
-        {action && pathname !== action.href && (
-          <Link href={action.href} className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800">
-            <action.Icon className="size-4" aria-hidden="true" />
-            {action.label}
-          </Link>
-        )}
       </div>
     </header>
   );

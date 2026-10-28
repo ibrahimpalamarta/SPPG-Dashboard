@@ -45,6 +45,7 @@ export type Db = Pick<
   | 'ingredient'
   | 'akgTarget'
   | 'uploadBatch'
+  | 'financeTransaction'
   | 'menuPlan'
   | 'recipeCosting'
   | 'akgCompliance'
@@ -55,4 +56,5 @@ export type Db = Pick<
   | 'cmsAnnouncement'
   | 'cmsDocument'
   | 'galleryImage'
+  | 'referenceEntry'
 >;

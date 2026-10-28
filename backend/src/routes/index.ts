@@ -9,8 +9,10 @@ import { adminRouter } from './admin/admin.js';
 import { kitchenRouter } from './master/kitchen.js';
 import { ingredientRouter } from './master/ingredient.js';
 import { akgTargetRouter } from './master/akg-target.js';
+import { referenceEntryRouter } from './master/reference-entry.js';
 import { uploadBatchRouter } from './upload/upload-batch.js';
 import { menuPlanRouter } from './menu/menu-plan.js';
+import { inboxRouter } from './inbox/inbox.js';
 import {
   akgComplianceRouter,
   dailyKitchenRouter,
@@ -23,12 +25,17 @@ import { announcementRouter, documentRouter, galleryRouter } from './cms/cms.js'
 
 // Every authenticated route is rate limited: each request costs a session
 // lookup, and an unauthenticated flood would otherwise reach the database.
+// Keyed by the bearer token, not the IP: all of our traffic arrives from the
+// frontend server, so an IP key would charge every user behind it against one
+// shared budget (seen in practice: normal pagination on one user's session
+// 429'd everyone else's /api/me).
 const authLimiter = rateLimit({
   windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
   max: env.AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: ERRORS.TOO_MANY_REQUESTS.body,
+  keyGenerator: (req) => req.headers.authorization ?? req.ip ?? '',
 });
 
 export const apiRouter = Router();
@@ -46,10 +53,12 @@ apiRouter.use('/admin', adminRouter);
 apiRouter.use('/kitchens', kitchenRouter);
 apiRouter.use('/ingredients', ingredientRouter);
 apiRouter.use('/akg-targets', akgTargetRouter);
+apiRouter.use('/reference-entries', referenceEntryRouter);
 
 // Upload & operational
 apiRouter.use('/upload-batches', uploadBatchRouter);
 apiRouter.use('/menu-plans', menuPlanRouter);
+apiRouter.use('/inbox', inboxRouter);
 
 // Pre-computed marts (read-only)
 apiRouter.use('/menu-nutritions', menuNutritionRouter);

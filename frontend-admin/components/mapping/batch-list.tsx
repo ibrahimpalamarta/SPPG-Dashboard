@@ -1,44 +1,39 @@
 import { Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { StatusBadge, DOMAINS } from "@/lib/upload";
+import { Pager } from "@/components/ui/pager";
 import { apiGet } from "@/lib/api";
+import { DOMAINS, StatusBadge } from "@/lib/upload";
+import type { Batch } from "@/lib/mapping-validasi";
 
-type Batch = {
-  id: string;
-  publicId: string;
-  storageKey: string | null;
-  fileName: string;
-  domain: string;
-  status: string;
-  errorCode: string | null;
-  mappingProfileId: string | null;
-  validatedAt: string | null;
-  publishedAt: string | null;
-  uploadDate: string;
-  kitchen: { code: string | null; name: string };
-  uploader: { fullName: string | null; email: string | null } | null;
-};
+const PAGE_SIZE = 20;
 
 const actionButton = "inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50";
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
-const when = (iso: string | null) => (iso ? whenOf(iso) : "—");
-const whenOf = (iso: string) => new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—");
 
-/** Real upload history from GET /api/upload-batches, scoped by the backend to the user's dapur. */
-export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
-  const { data } = await apiGet<{ data: Batch[] }>("/upload-batches?pageSize=20");
+/** Landing list for Validasi Data — also doubles as the upload history (file, dapur, waktu, status, export). */
+export async function BatchList({ page }: { page: number }) {
+  const { data, meta } = await apiGet<{ data: Batch[]; meta: { page: number; totalPages: number } }>(
+    `/upload-batches?pageSize=${PAGE_SIZE}&page=${page}`,
+  );
+  // FAILED never held usable data (incl. empty and replaced files), so there is nothing to map or validate.
+  const batches = data.filter((b) => b.status !== "FAILED");
 
   return (
-    <section>
-      <h2 className="text-lg font-semibold text-slate-900">Upload History</h2>
-      <Card className="mt-4 overflow-x-auto">
+    <div className="mx-auto max-w-400 space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Validasi Data</h1>
+        <p className="mt-1 text-slate-500">Pilih file untuk dicek dan dimapping.</p>
+      </div>
+      <Card className="overflow-x-auto">
         <table className="w-full min-w-5xl text-left">
           <thead className="border-b border-slate-200 bg-slate-50 text-sm text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">File</th>
               <th className="px-4 py-3 font-medium">Dapur</th>
               <th className="px-4 py-3 font-medium">Jenis data</th>
+              <th className="px-4 py-3 font-medium">Baris</th>
               <th className="px-4 py-3 font-medium">Diunggah oleh</th>
               <th className="px-4 py-3 font-medium">Waktu</th>
               <th className="px-4 py-3 font-medium">Status</th>
@@ -49,14 +44,14 @@ export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
-            {data.length === 0 && (
+            {batches.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-6 text-center text-slate-500">
-                  Belum ada unggahan.
+                <td colSpan={11} className="px-4 py-6 text-center text-slate-500">
+                  Belum ada file untuk dicek. Unggah file di menu Unggah Data.
                 </td>
               </tr>
             )}
-            {data.map((b) => (
+            {batches.map((b) => (
               <tr key={b.publicId} className="hover:bg-slate-50">
                 <td className="px-4 py-3">
                   <div className="flex items-start gap-3">
@@ -66,6 +61,7 @@ export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
                 </td>
                 <td className="px-4 py-3 text-slate-700">{b.kitchen.code ?? b.kitchen.name}</td>
                 <td className="px-4 py-3 text-slate-700">{domainLabel(b.domain)}</td>
+                <td className="px-4 py-3 text-slate-700">{b.rowCount}</td>
                 <td className="px-4 py-3 text-slate-700">{b.uploader?.fullName ?? b.uploader?.email ?? "—"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-500">{when(b.uploadDate)}</td>
                 <td className="px-4 py-3">
@@ -76,11 +72,9 @@ export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
                 <td className="whitespace-nowrap px-4 py-3 text-slate-500">{when(b.publishedAt)}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
-                    {canOpen && b.status !== "FAILED" && b.status !== "SUPERSEDED" && (
-                      <Link href={`/mapping-validasi?batch=${b.publicId}`} aria-label={`Buka ${b.fileName}`} className={actionButton}>
-                        Buka
-                      </Link>
-                    )}
+                    <Link href={`/mapping-validasi?batch=${b.publicId}`} aria-label={`Buka ${b.fileName}`} className={actionButton}>
+                      Buka
+                    </Link>
                     {b.storageKey && (
                       <a href={`/unggah-data/batch/${b.id}/file`} aria-label={`Export ${b.fileName}`} className={actionButton}>
                         <Download className="size-4" aria-hidden="true" />
@@ -94,6 +88,7 @@ export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
           </tbody>
         </table>
       </Card>
-    </section>
+      <Pager page={meta.page} totalPages={meta.totalPages} hrefFor={(p) => `/mapping-validasi?listPage=${p}`} />
+    </div>
   );
 }

@@ -375,8 +375,10 @@ lewat `trackEvent` (`src/lib/events.ts`).
 > ada di `src/lib/ingest/fixtures/`.
 >
 > Profil mapping ada di `src/lib/mapping/profiles.ts` (registry = config di repo,
-> B-REG). Profil dipilih dari kitchen + domain + source + header; hasil adapter
-> belum disimpan (B-MAPOUT), hanya ringkasannya ikut response.
+> B-REG). Profil dipilih dari kitchen + domain + source + header. Hasil adapter
+> (sheet, kolom → field, issue, normalisasi, total) disimpan di
+> `upload_batches.mapping_result` dan dibaca halaman Validasi Data lewat
+> `GET /api/upload-batches/:id`, `/:id/records` (transaksi Cashflow) dan `/:id/history`.
 
 ### Yang belum terisi datanya
 

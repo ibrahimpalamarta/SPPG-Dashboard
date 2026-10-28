@@ -5,6 +5,9 @@ import type { MappingProfile } from './profiles.js';
 /** One thing an adapter noticed and did not fix. The raw row stays in staging. */
 export type Issue = { code: string; /** Data Quality rule id (08_Data_Quality_Rules), so Jira and reviewers see which rule fired. */ rule?: string; sourceRecordId?: string; message: string };
 
+/** One kind of clean-up an adapter applied to a field, counted over the file, with the first value it changed. */
+export type Normalization = { code: string; field: string; count: number; example: { raw: string; value: string | number } };
+
 /**
  * Canonical field → cell of one staged row, found through the profile's
  * source header (compared `loose`, so "Berat Kotor (g)" and "berat kotor g"

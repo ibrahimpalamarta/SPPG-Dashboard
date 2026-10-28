@@ -1,12 +1,12 @@
 import type { SourceSystem, UploadDomain } from '@prisma/client';
 import type { StagedSheet, StagingRow } from '../ingest/staging.js';
-import type { Issue } from './values.js';
+import type { Issue, Normalization } from './values.js';
 import { applySukunCashflow } from './sukun-cashflow.js';
 import { applySukunMenu } from './sukun-menu.js';
 import { applySukunRab } from './sukun-rab.js';
 import { applyInputMaker } from './input-maker.js';
 
-export type MappingOutput = { records: unknown[]; totals: Record<string, number>; issues: Issue[] };
+export type MappingOutput = { records: unknown[]; totals: Record<string, number>; issues: Issue[]; normalized?: Normalization[] };
 
 /**
  * SCRUM-26. One source layout of one kitchen. Detection (SCRUM-39) picks a

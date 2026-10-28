@@ -1,11 +1,11 @@
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import { createHash } from 'node:crypto';
 import type { z } from 'zod';
 import { Prisma, UploadStatus } from '@prisma/client';
 import { prisma, type Db } from '../../db.js';
 import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
-import { pageArgs, paginated } from '../../lib/pagination.js';
+import { pageArgs, paginated, type PageQuery } from '../../lib/pagination.js';
 import { kitchenScope, kitchenWhere } from '../../lib/scope.js';
 import { CSV_MIME, XLSX_MIME, deleteObject, getObject, putObject, type DeleteObject, type GetObject, type PutObject } from '../../lib/s3.js';
 import { dateFilter } from '../../schemas/common.js';
@@ -16,7 +16,7 @@ import { canTransition } from '../../lib/upload-status.js';
 import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
 import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
 import type { ColumnDiff } from '../../lib/mapping/detect.js';
-import { InMemoryStagingRepository, PrismaStagingRepository, type StagingRepository } from '../../lib/ingest/staging.js';
+import { InMemoryStagingRepository, PrismaStagingRepository, type StagedSheet, type StagingRepository } from '../../lib/ingest/staging.js';
 import type {
   uploadBatchCreate,
   uploadBatchCreateQuery,
@@ -52,6 +52,8 @@ export const listUploadBatches = (db: Db = prisma): RequestHandler => async (req
     db.uploadBatch.findMany({
       where,
       include: withUploader,
+      // Issues can run to thousands per batch; read them from GET /:id.
+      omit: { mappingResult: true },
       orderBy: { uploadDate: 'desc' },
       ...pageArgs(q),
     }),
@@ -84,6 +86,51 @@ export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, r
     return;
   }
   sendJson(res, row);
+};
+
+/** The batch in the caller's dapur, or null once a 404/403 has been sent. */
+async function scopedBatch(db: Db, req: Request, res: Response) {
+  const { id } = req.valid!.params as { id: bigint };
+  const row = await db.uploadBatch.findUnique({ where: { id }, select: { id: true, publicId: true, kitchenId: true } });
+  if (!row) {
+    sendError(res, 'NOT_FOUND');
+    return null;
+  }
+  if (!kitchenScope(req.user!, row.kitchenId).ok) {
+    sendError(res, 'FORBIDDEN_KITCHEN');
+    return null;
+  }
+  return row;
+}
+
+/** Validasi Data "Hasil data": the mapped Cashflow transactions with their lines. Other domains have none here yet. */
+export const listUploadBatchRecords = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const batch = await scopedBatch(db, req, res);
+  if (!batch) return;
+  const q = req.valid!.query as PageQuery;
+  const where = { uploadBatchId: batch.publicId };
+  const [rows, total] = await Promise.all([
+    db.financeTransaction.findMany({
+      where,
+      include: { lines: { orderBy: { id: 'asc' } } },
+      orderBy: [{ txnDate: 'asc' }, { txnId: 'asc' }],
+      ...pageArgs(q),
+    }),
+    db.financeTransaction.count({ where }),
+  ]);
+  sendJson(res, paginated(rows, total, q));
+};
+
+/** Validasi Data "Riwayat": the batch's audit trail, oldest first. */
+export const listUploadBatchHistory = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const batch = await scopedBatch(db, req, res);
+  if (!batch) return;
+  const rows = await db.auditLog.findMany({
+    where: { entity: 'upload_batches', entityId: batch.id },
+    include: { user: { select: { id: true, email: true, fullName: true } } },
+    orderBy: { timestamp: 'asc' },
+  });
+  sendJson(res, rows);
 };
 
 /** Upload history "Export": the original file as stored, nothing regenerated. */
@@ -268,9 +315,11 @@ export const createUploadBatch =
         where: { id: batch.id },
         data: { ...data, durationMs: Date.now() - started },
         include: withUploader,
+        // The response carries it flat below.
+        omit: { mappingResult: true },
       });
 
-    let sheets: unknown[] = [];
+    let sheets: StagedSheet[] = [];
     let columnDiff: ColumnDiff[] = [];
     let mapping: MappingSummary | null = null;
     const ingest = async () => {
@@ -304,20 +353,24 @@ export const createUploadBatch =
       sheets = parsed.batch.sheets;
       const rowCount = parsed.batch.rows.length;
       const { detection } = parsed;
+      if (!detection.ok) columnDiff = detection.diff;
+      else mapping = parsed.mapping;
+      // Read back by the Validasi Data page (B-MAPOUT).
+      const mappingResult = { sheets, columnDiff, mapping } as Prisma.InputJsonObject;
       if (!detection.ok) {
-        columnDiff = detection.diff;
         return finish({
           storageKey,
           rowCount,
+          mappingResult,
           status: UploadStatus.NEEDS_MAPPING_UPDATE,
           errorCode: detection.errorCode,
           errorSummary: notRecognised(detection.diff),
         });
       }
-      mapping = parsed.mapping;
       return finish({
         storageKey,
         rowCount,
+        mappingResult,
         status: UploadStatus.NEEDS_REVIEW,
         mappingProfileId: detection.profile.id,
         templateVersion: detection.profile.version,
@@ -369,8 +422,7 @@ export const createUploadBatch =
       error_code: row.errorCode,
     });
 
-    // `sheets`, `columnDiff` and `mapping` are not persisted yet (B-SCHEMA,
-    // B-MAPOUT); they ride on the response so the upload page can show them.
+    // Same content as `mappingResult`, flat, for the upload page.
     sendJson(
       res,
       {

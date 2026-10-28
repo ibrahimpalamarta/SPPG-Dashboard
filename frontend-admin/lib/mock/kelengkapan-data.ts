@@ -14,7 +14,7 @@ const s = (label: string, tone: Tone): Status => ({ label, tone });
 const entered = s("Sudah masuk", "green");
 const sent = s("Sudah dikirim", "blue");
 const checking = s("Belum selesai dicek", "violet");
-const draft = s("Masuk · draft", "amber");
+const draft = s("Draft", "amber");
 const missing = s("Belum masuk", "pending");
 const failed = s("Ada error", "red");
 const optional = s("Opsional", "slate");
