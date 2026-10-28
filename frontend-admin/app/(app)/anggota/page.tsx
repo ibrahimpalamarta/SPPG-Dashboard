@@ -67,6 +67,15 @@ const PERMISSION_LABELS: Record<Permission, string> = {
 };
 
 const lastLogin = (iso: string | null) => (iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "Belum pernah login");
+
+/** Every kitchen (or none, for a role whose scope is never narrowed) reads as "Semua dapur"; several collapse to a count with the codes in a tooltip. */
+function KitchenCell({ scopes, total }: { scopes: UserRow["kitchenScopes"]; total: number }) {
+  const codes = scopes.map((s) => s.kitchen.code ?? s.kitchen.name);
+  if (codes.length === 0 || codes.length === total) return <span>Semua dapur</span>;
+  if (codes.length === 1) return <span>{codes[0]}</span>;
+  return <span title={codes.join(", ")}>{codes.length} Dapur</span>;
+}
+
 const initials = (u: UserRow) => (u.fullName ?? u.email ?? "?").split(/[\s@]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 
 // A handful of muted tones, picked deterministically from the name so avatars aren't all the same color.
@@ -161,7 +170,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
                   </div>
                 </td>
                 <td className="px-4 py-3 text-slate-700">{ROLE_LABELS[u.role]}</td>
-                <td className="px-4 py-3">{u.kitchenScopes.map((s) => s.kitchen.code ?? s.kitchen.name).join(", ") || "Semua dapur"}</td>
+                <td className="px-4 py-3">
+                  <KitchenCell scopes={u.kitchenScopes} total={kitchens.length} />
+                </td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-1.5">
                     <span className={`size-1.5 rounded-full ${STATUS[u.memberStatus][1]}`} aria-hidden="true" />
