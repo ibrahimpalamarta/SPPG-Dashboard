@@ -1,4 +1,7 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { Eye, EyeOff } from "lucide-react";
+import { useState, type InputHTMLAttributes, type ReactNode } from "react";
 
 export const field = "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20";
 export const primaryButton = "h-10 rounded-lg bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60";
@@ -10,6 +13,24 @@ export function Field({ label, children }: { label: string; children: ReactNode 
       <span className="font-medium text-slate-700">{label}</span>
       {children}
     </label>
+  );
+}
+
+/** Password input with a show/hide toggle, styled like `field`. */
+export function PasswordField(props: InputHTMLAttributes<HTMLInputElement>) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative">
+      <input {...props} type={shown ? "text" : "password"} className={`${field} pr-10`} />
+      <button
+        type="button"
+        onClick={() => setShown((v) => !v)}
+        className="absolute right-2 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+        aria-label={shown ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+      >
+        {shown ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+      </button>
+    </div>
   );
 }
 

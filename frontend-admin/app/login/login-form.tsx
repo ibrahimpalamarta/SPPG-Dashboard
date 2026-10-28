@@ -35,7 +35,7 @@ export function LoginForm({ returnTo, notice }: { returnTo?: string; notice?: st
         <>
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">Email</span>
-            <input type="email" name="email" autoComplete="username" required autoFocus placeholder="nama@sppg.internal" className={input} />
+            <input type="email" name="email" autoComplete="username" required autoFocus defaultValue={state.email} placeholder="nama@sppg.internal" className={input} />
           </label>
 
           <div>

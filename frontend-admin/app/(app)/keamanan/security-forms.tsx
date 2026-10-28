@@ -2,20 +2,20 @@
 
 import { useActionState } from "react";
 import { changePassword, disableMfa, enableMfa, startMfaSetup, type FormState, type MfaSetupState } from "./actions";
-import { Field, FormMessage, field, primaryButton, secondaryButton } from "@/components/ui/form";
+import { Field, FormMessage, PasswordField, field, primaryButton, secondaryButton } from "@/components/ui/form";
 
 export function ChangePasswordForm() {
   const [state, action, pending] = useActionState<FormState, FormData>(changePassword, {});
   return (
     <form action={action} className="space-y-3">
       <Field label="Password saat ini">
-        <input type="password" name="currentPassword" autoComplete="current-password" required className={field} />
+        <PasswordField name="currentPassword" autoComplete="current-password" required />
       </Field>
       <Field label="Password baru">
-        <input type="password" name="newPassword" autoComplete="new-password" minLength={12} required className={field} />
+        <PasswordField name="newPassword" autoComplete="new-password" minLength={12} required />
       </Field>
       <Field label="Ulangi password baru">
-        <input type="password" name="confirm" autoComplete="new-password" minLength={12} required className={field} />
+        <PasswordField name="confirm" autoComplete="new-password" minLength={12} required />
       </Field>
       <FormMessage tone={state.ok ? "ok" : "error"}>{state.message}</FormMessage>
       <button type="submit" disabled={pending} className={primaryButton}>
@@ -79,7 +79,7 @@ export function DisableMfa() {
     <form action={action} className="space-y-3">
       <p className="text-sm text-emerald-700">Verifikasi dua langkah aktif.</p>
       <Field label="Password">
-        <input type="password" name="password" autoComplete="current-password" required className={field} />
+        <PasswordField name="password" autoComplete="current-password" required />
       </Field>
       <Field label="Kode verifikasi atau kode pemulihan">
         <input name="code" autoComplete="one-time-code" required className={field} />

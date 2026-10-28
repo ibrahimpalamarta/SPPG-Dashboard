@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Sun, UserRound } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { field } from "@/components/ui/form";
 import { getMe } from "@/lib/me";
 import { ROLE_LABELS } from "@/lib/roles";
 
@@ -63,12 +62,6 @@ export default async function Page() {
             <button type="button" aria-pressed="true" className={`${segment} bg-white text-slate-900 shadow-sm`}>Terang</button>
             <button type="button" disabled title="Segera hadir" className={`${segment} text-slate-400`}>Gelap</button>
           </div>
-          <label className="block space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Bahasa label</span>
-            <select disabled className={field}>
-              <option>Bahasa Indonesia (istilah teknis PRD/BRD)</option>
-            </select>
-          </label>
         </Card>
       </div>
     </div>
