@@ -1,7 +1,6 @@
 import { Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Pager } from "@/components/ui/pager";
 import { apiGet } from "@/lib/api";
 import { DOMAINS, StatusBadge } from "@/lib/upload";
@@ -20,14 +19,6 @@ export async function BatchList({ page }: { page: number }) {
   );
   // FAILED never held usable data (incl. empty and replaced files), so there is nothing to map or validate.
   const batches = data.filter((b) => b.status !== "FAILED");
-
-  if (batches.length === 0) {
-    return (
-      <EmptyState title="Belum ada file untuk dicek">
-        <p>Unggah file di menu Unggah Data. File yang gagal diproses tidak muncul di sini.</p>
-      </EmptyState>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-400 space-y-4">
@@ -53,6 +44,13 @@ export async function BatchList({ page }: { page: number }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
+            {batches.length === 0 && (
+              <tr>
+                <td colSpan={11} className="px-4 py-6 text-center text-slate-500">
+                  Belum ada file untuk dicek. Unggah file di menu Unggah Data.
+                </td>
+              </tr>
+            )}
             {batches.map((b) => (
               <tr key={b.publicId} className="hover:bg-slate-50">
                 <td className="px-4 py-3">
