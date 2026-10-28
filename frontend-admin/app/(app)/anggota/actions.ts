@@ -22,6 +22,8 @@ async function allKitchenIds(): Promise<string[]> {
   return data.map((k) => k.id);
 }
 
+const NO_KITCHENS: UserActionState = { message: "Belum ada dapur terdaftar. Tambahkan dapur di Data Reference dulu." };
+
 const untilDate = (iso: unknown) => new Date(String(iso)).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
 function failure(res: Awaited<ReturnType<typeof apiSend>>): UserActionState {
@@ -39,11 +41,13 @@ export async function createUser(_prev: UserActionState, form: FormData): Promis
   const email = text(form, "email");
   const role = text(form, "role");
   const picked = ids(form);
+  const kitchenIds = role === "DATA_ADMIN" && picked.length === 0 ? await allKitchenIds() : picked;
+  if (role === "DATA_ADMIN" && kitchenIds.length === 0) return NO_KITCHENS;
   const res = await apiSend("/admin/users", "POST", {
     email,
     fullName: text(form, "fullName"),
     role,
-    kitchenIds: role === "DATA_ADMIN" && picked.length === 0 ? await allKitchenIds() : picked,
+    kitchenIds,
     message: text(form, "message") || undefined,
   });
   if (!res.ok) return failure(res);
@@ -56,6 +60,7 @@ export async function saveUser(id: string, hasKitchens: boolean, _prev: UserActi
   const role = text(form, "role");
   // Only a member with no kitchens yet needs them filled; otherwise the backend keeps the current scope.
   const kitchenIds = role === "DATA_ADMIN" && !hasKitchens ? await allKitchenIds() : undefined;
+  if (kitchenIds?.length === 0) return NO_KITCHENS;
   const res = await apiSend(`/admin/users/${id}`, "PATCH", {
     // A disabled control (your own row) is not submitted: leave the field out, don't send "".
     fullName: text(form, "fullName") || undefined,
