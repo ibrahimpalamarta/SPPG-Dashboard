@@ -43,12 +43,12 @@ variable "timezone" {
 variable "start_cron" {
   description = "When to start RDS. Runs ~10 minutes before the ECS start, because a stopped instance takes several minutes to reach 'available'."
   type        = string
-  default     = "cron(50 6 ? * MON-FRI *)"
+  default     = "cron(50 7 ? * MON-FRI *)"
 }
 
 variable "ecs_start_cron" {
   type    = string
-  default = "cron(0 7 ? * MON-FRI *)"
+  default = "cron(0 8 ? * MON-FRI *)"
 }
 
 variable "ecs_stop_cron" {
