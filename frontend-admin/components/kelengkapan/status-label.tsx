@@ -1,24 +1,22 @@
-import { Check, CircleDashed, Hourglass, Minus, Pencil, Send, type LucideIcon } from "lucide-react";
-import { Badge, type Tone } from "@/components/ui/badge";
+import { Check, Circle, CircleDashed, CircleDot, CircleSmall, CircleX, Minus, type LucideIcon } from "lucide-react";
+import type { Tone } from "@/components/ui/badge";
 
-// Shape + muted colour: passive/done states are grey, in-progress states keep a faint tint.
-const icons: Record<Exclude<Tone, "red">, { icon: LucideIcon; className: string }> = {
-  green: { icon: Check, className: "text-slate-400" },
-  pending: { icon: CircleDashed, className: "text-slate-400" },
-  slate: { icon: Minus, className: "text-slate-400" },
-  blue: { icon: Send, className: "text-blue-500" },
-  violet: { icon: Hourglass, className: "text-violet-500" },
-  amber: { icon: Pencil, className: "text-amber-500" },
+// Plain geometric shapes only. Passive/done states are grey; "red" is the single highlighted state.
+const styles: Record<Tone, { icon: LucideIcon; icon$: string; text: string }> = {
+  green: { icon: Check, icon$: "text-slate-400", text: "text-slate-400" },
+  pending: { icon: CircleDashed, icon$: "text-slate-400", text: "text-slate-400" },
+  slate: { icon: Minus, icon$: "text-slate-400", text: "text-slate-400" },
+  blue: { icon: Circle, icon$: "text-blue-500", text: "text-slate-600" },
+  violet: { icon: CircleDot, icon$: "text-violet-500", text: "text-slate-600" },
+  amber: { icon: CircleSmall, icon$: "text-amber-500", text: "text-slate-600" },
+  red: { icon: CircleX, icon$: "text-red-600", text: "text-red-600 font-semibold" },
 };
 
-// Only "red" (needs action) keeps a badge; every other status is an icon + grey text.
 export function StatusLabel({ tone, children }: { tone: Tone; children: React.ReactNode }) {
-  if (tone === "red") return <Badge tone="red">{children}</Badge>;
-  const { icon: Icon, className } = icons[tone];
-  const passive = tone === "green" || tone === "pending" || tone === "slate";
+  const { icon: Icon, icon$, text } = styles[tone];
   return (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${passive ? "text-slate-400" : "text-slate-600"}`}>
-      <Icon className={`size-3.5 ${className}`} aria-hidden="true" />
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${text}`}>
+      <Icon className={`size-3.5 ${icon$}`} aria-hidden="true" />
       {children}
     </span>
   );
