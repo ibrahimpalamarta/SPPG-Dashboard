@@ -7,39 +7,11 @@ import { SampleDataNote } from "@/components/ui/sample-data-note";
 import { SourceLink } from "@/components/ui/source-link";
 import { apiGet } from "@/lib/api";
 import { requirePage } from "@/lib/guard";
-import {
-  alurLangkah,
-  aturanCek,
-  asalAngka,
-  daftarKode,
-  formatFile,
-  kamusData,
-  keputusan,
-  TABS,
-  type TabId,
-} from "@/lib/mock/referensi-data";
-import { KitchenForm } from "./kitchen-form";
+import type { AturanFields, KamusFields, KodeFields, ReferenceEntry } from "@/lib/reference-entries";
+import { alurLangkah, asalAngka, formatFile, TABS, type TabId } from "@/lib/mock/referensi-data";
+import { EditEntryButton } from "./edit-entry-button";
 
 export const metadata: Metadata = { title: "Data Reference · SPPG Internal" };
-
-type KitchenRow = {
-  id: string;
-  code: string | null;
-  name: string;
-  status: "ACTIVE" | "INACTIVE";
-  bucket: 1 | 2 | null;
-  rolloutStatus: "PILOT_PHASE_1" | "PHASE_1_COMPARISON" | "PHASE_2A" | "PHASE_2B" | null;
-};
-
-// PRD §14 stage names.
-const ROLLOUT_LABELS: Record<NonNullable<KitchenRow["rolloutStatus"]>, string> = {
-  PILOT_PHASE_1: "Pilot Phase 1",
-  PHASE_1_COMPARISON: "Pembanding Phase 1",
-  PHASE_2A: "Phase 2a",
-  PHASE_2B: "Phase 2b",
-};
-
-const MISSING = <span className="text-slate-400">Belum ditetapkan</span>;
 
 const th = "px-4 py-3 font-medium";
 const td = "px-4 py-3";
@@ -63,8 +35,9 @@ function Table({ head, children }: { head: string[]; children: React.ReactNode }
   );
 }
 
-function Kamus({ q }: { q: string }) {
-  const rows = kamusData.filter((r) => r[0].toLowerCase().includes(q.toLowerCase()));
+async function Kamus({ q, canEdit }: { q: string; canEdit: boolean }) {
+  const { data } = await apiGet<{ data: ReferenceEntry<KamusFields>[] }>("/reference-entries?kind=KAMUS");
+  const rows = data.filter((r) => r.fields.nama.toLowerCase().includes(q.toLowerCase()));
   return (
     <div className="space-y-4">
       <form className="relative max-w-sm">
@@ -78,22 +51,35 @@ function Kamus({ q }: { q: string }) {
           className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm"
         />
       </form>
-      <Table head={["Nama data", "Artinya", "Contoh", "Wajib", "Aturan", "Kerahasiaan"]}>
-        {rows.map(([nama, arti, contoh, wajib, aturan, rahasia]) => (
-          <tr key={nama}>
-            <td className={`${td} font-semibold text-slate-900`}>{nama}</td>
-            <td className={td}>{arti}</td>
-            <td className={td}>{contoh}</td>
-            <td className={td}>{wajib}</td>
-            <td className={td}>{aturan}</td>
+      <Table head={["Nama data", "Artinya", "Contoh", "Wajib", "Aturan", "Kerahasiaan", ...(canEdit ? [""] : [])]}>
+        {rows.map((r) => (
+          <tr key={r.id}>
+            <td className={`${td} font-semibold text-slate-900`}>{r.fields.nama}</td>
+            <td className={td}>{r.fields.artinya}</td>
+            <td className={td}>{r.fields.contoh}</td>
+            <td className={td}>{r.fields.wajib}</td>
+            <td className={td}>{r.fields.aturan}</td>
             <td className={td}>
-              <Badge tone={rahasia === "Rahasia" ? "red" : "slate"}>{rahasia}</Badge>
+              <Badge tone={r.fields.kerahasiaan === "Rahasia" ? "red" : "slate"}>{r.fields.kerahasiaan}</Badge>
             </td>
+            {canEdit && (
+              <td className={td}>
+                <EditEntryButton
+                  id={r.id}
+                  title={r.fields.nama}
+                  inputs={[
+                    { name: "artinya", label: "Artinya", defaultValue: r.fields.artinya, multiline: true },
+                    { name: "contoh", label: "Contoh", defaultValue: r.fields.contoh },
+                    { name: "aturan", label: "Aturan", defaultValue: r.fields.aturan, multiline: true },
+                  ]}
+                />
+              </td>
+            )}
           </tr>
         ))}
         {rows.length === 0 && (
           <tr>
-            <td colSpan={6} className={`${td} text-center text-slate-500`}>
+            <td colSpan={canEdit ? 7 : 6} className={`${td} text-center text-slate-500`}>
               Tidak ada data yang cocok.
             </td>
           </tr>
@@ -152,17 +138,30 @@ function Alur() {
   );
 }
 
-function Aturan() {
+async function Aturan({ canEdit }: { canEdit: boolean }) {
+  const { data } = await apiGet<{ data: ReferenceEntry<AturanFields>[] }>("/reference-entries?kind=ATURAN");
   return (
-    <Table head={["Yang dicek", "Aturan", "Tingkat", "Jika tidak sesuai"]}>
-      {aturanCek.map(([cek, aturan, [label, tone], akibat]) => (
-        <tr key={cek}>
-          <td className={`${td} font-semibold text-slate-900`}>{cek}</td>
-          <td className={td}>{aturan}</td>
+    <Table head={["Yang dicek", "Aturan", "Tingkat", "Jika tidak sesuai", ...(canEdit ? [""] : [])]}>
+      {data.map((r) => (
+        <tr key={r.id}>
+          <td className={`${td} font-semibold text-slate-900`}>{r.fields.cek}</td>
+          <td className={td}>{r.fields.aturan}</td>
           <td className={td}>
-            <Badge tone={tone}>{label}</Badge>
+            <Badge tone={r.fields.tingkatTone}>{r.fields.tingkat}</Badge>
           </td>
-          <td className={td}>{akibat}</td>
+          <td className={td}>{r.fields.akibat}</td>
+          {canEdit && (
+            <td className={td}>
+              <EditEntryButton
+                id={r.id}
+                title={r.fields.cek}
+                inputs={[
+                  { name: "aturan", label: "Aturan", defaultValue: r.fields.aturan, multiline: true },
+                  { name: "akibat", label: "Jika tidak sesuai", defaultValue: r.fields.akibat },
+                ]}
+              />
+            </td>
+          )}
         </tr>
       ))}
     </Table>
@@ -170,73 +169,24 @@ function Aturan() {
 }
 
 async function Kode({ canEdit }: { canEdit: boolean }) {
-  // Six dapur at launch; one page of 100 is the whole master.
-  const { data } = await apiGet<{ data: KitchenRow[] }>("/kitchens?pageSize=100");
+  const { data } = await apiGet<{ data: ReferenceEntry<KodeFields>[] }>("/reference-entries?kind=KODE");
   return (
-    <div className="space-y-6">
-      <Table head={["Daftar", "Pilihan", "Catatan"]}>
-        {daftarKode.map(([daftar, pilihan, catatan]) => (
-          <tr key={daftar}>
-            <td className={`${td} font-semibold text-slate-900`}>{daftar}</td>
-            <td className={td}>{pilihan.join(" · ")}</td>
-            <td className={td}>{catatan}</td>
-          </tr>
-        ))}
-      </Table>
-
-      <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Master dapur</h2>
-        <table className="w-full text-left text-sm">
-          <thead className="text-xs text-slate-500">
-            <tr>
-              <th className="px-4 py-2 font-medium">Kode</th>
-              <th className="px-4 py-2 font-medium">Nama</th>
-              <th className="px-4 py-2 font-medium">Bucket</th>
-              <th className="px-4 py-2 font-medium">Tahap rollout</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-            </tr>
-          </thead>
-          {data.map((k) => (
-            <tbody key={k.id} className="border-t border-slate-100 text-slate-700">
-              <tr className="hover:bg-slate-50">
-                <td className="px-4 py-2 font-mono">{k.code ?? MISSING}</td>
-                <td className="px-4 py-2">{k.name}</td>
-                <td className="px-4 py-2">{k.bucket ?? MISSING}</td>
-                <td className="px-4 py-2">{k.rolloutStatus ? ROLLOUT_LABELS[k.rolloutStatus] : MISSING}</td>
-                <td className="px-4 py-2">{k.status === "ACTIVE" ? "Aktif" : "Nonaktif"}</td>
-              </tr>
-              {canEdit && (
-                <tr>
-                  <td colSpan={5} className="px-4 pb-3">
-                    <details>
-                      <summary className="cursor-pointer text-xs font-medium text-emerald-700">Ubah</summary>
-                      <div className="mt-3">
-                        <KitchenForm id={k.id} name={k.name} status={k.status} />
-                      </div>
-                    </details>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          ))}
-        </table>
-      </section>
-    </div>
-  );
-}
-
-function Keputusan() {
-  return (
-    <Table head={["Kode", "Yang perlu diputuskan", "Penanggung jawab", "Yang tertunda", "Status"]}>
-      {keputusan.map(([kode, apa, pj, tertunda, selesai]) => (
-        <tr key={kode}>
-          <td className={`${td} font-mono text-xs`}>{kode}</td>
-          <td className={td}>{apa}</td>
-          <td className={td}>{pj}</td>
-          <td className={td}>{tertunda}</td>
-          <td className={td}>
-            <Badge tone={selesai ? "green" : "amber"}>{selesai ? "Sudah diputuskan" : "Belum diputuskan"}</Badge>
-          </td>
+    <Table head={["Daftar", "Pilihan", "Catatan", ...(canEdit ? [""] : [])]}>
+      {data.map((r) => (
+        <tr key={r.id}>
+          <td className={`${td} font-semibold text-slate-900`}>{r.fields.daftar}</td>
+          <td className={td}>{r.fields.pilihan.join(" · ")}</td>
+          <td className={td}>{r.fields.catatan}</td>
+          {canEdit && (
+            <td className={td}>
+              <EditEntryButton
+                id={r.id}
+                title={r.fields.daftar}
+                inputs={[{ name: "catatan", label: "Catatan", defaultValue: r.fields.catatan }]}
+                list={{ name: "pilihan", label: "Pilihan (satu per baris)", defaultValue: r.fields.pilihan }}
+              />
+            </td>
+          )}
         </tr>
       ))}
     </Table>
@@ -281,12 +231,11 @@ export default async function Page({ searchParams }: PageProps<"/referensi-data"
           ))}
         </nav>
 
-        {tab === "kamus" && <Kamus q={q} />}
+        {tab === "kamus" && <Kamus q={q} canEdit={canEdit} />}
         {tab === "format" && <Format />}
         {tab === "alur" && <Alur />}
-        {tab === "aturan" && <Aturan />}
+        {tab === "aturan" && <Aturan canEdit={canEdit} />}
         {tab === "kode" && <Kode canEdit={canEdit} />}
-        {tab === "keputusan" && <Keputusan />}
       </Card>
     </div>
   );

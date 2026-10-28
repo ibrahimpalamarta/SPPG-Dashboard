@@ -9,6 +9,7 @@ import { adminRouter } from './admin/admin.js';
 import { kitchenRouter } from './master/kitchen.js';
 import { ingredientRouter } from './master/ingredient.js';
 import { akgTargetRouter } from './master/akg-target.js';
+import { referenceEntryRouter } from './master/reference-entry.js';
 import { uploadBatchRouter } from './upload/upload-batch.js';
 import { menuPlanRouter } from './menu/menu-plan.js';
 import { inboxRouter } from './inbox/inbox.js';
@@ -52,6 +53,7 @@ apiRouter.use('/admin', adminRouter);
 apiRouter.use('/kitchens', kitchenRouter);
 apiRouter.use('/ingredients', ingredientRouter);
 apiRouter.use('/akg-targets', akgTargetRouter);
+apiRouter.use('/reference-entries', referenceEntryRouter);
 
 // Upload & operational
 apiRouter.use('/upload-batches', uploadBatchRouter);
