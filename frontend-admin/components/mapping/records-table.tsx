@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Pager } from "@/components/ui/pager";
 
 export type Txn = {
   txnId: string;
@@ -23,8 +24,22 @@ export type Txn = {
 const rupiah = (n: number | null) => (n === null ? "—" : `Rp${n.toLocaleString("id-ID")}`);
 const dateOf = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("id-ID", { dateStyle: "medium", timeZone: "UTC" }) : "—");
 
-/** "Hasil data": mapped Cashflow transactions (one total each) with their item lines. */
-export function RecordsTable({ txns, total, totals }: { txns: Txn[]; total: number; totals: Record<string, number> }) {
+/** "Hasil data": mapped Cashflow transactions (one total each) with their item lines, paged. */
+export function RecordsTable({
+  txns,
+  total,
+  totals,
+  page,
+  totalPages,
+  hrefFor,
+}: {
+  txns: Txn[];
+  total: number;
+  totals: Record<string, number>;
+  page: number;
+  totalPages: number;
+  hrefFor: (page: number) => string;
+}) {
   if (total === 0) return <p className="py-16 text-center text-sm text-slate-500">Belum ada hasil data untuk file ini.</p>;
 
   return (
@@ -69,7 +84,7 @@ export function RecordsTable({ txns, total, totals }: { txns: Txn[]; total: numb
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {t.lines.map((l) => (
-                      <tr key={l.id}>
+                      <tr key={l.id} className="hover:bg-slate-50">
                         <td className="py-2 pr-4 text-slate-800">{l.itemName ?? "—"}</td>
                         <td className="py-2 pr-4 text-slate-600">{l.counterparty ?? "—"}</td>
                         <td className="py-2 pr-4 text-right">{l.qty === null ? "—" : `${l.qty.toLocaleString("id-ID")} ${l.unit ?? ""}`}</td>
@@ -84,11 +99,7 @@ export function RecordsTable({ txns, total, totals }: { txns: Txn[]; total: numb
           </li>
         ))}
       </ul>
-      {total > txns.length && (
-        <p className="text-slate-500">
-          Menampilkan {txns.length} dari {total} transaksi.
-        </p>
-      )}
+      <Pager page={page} totalPages={totalPages} hrefFor={hrefFor} />
     </div>
   );
 }

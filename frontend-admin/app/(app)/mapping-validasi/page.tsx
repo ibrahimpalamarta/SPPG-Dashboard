@@ -16,8 +16,11 @@ export const metadata: Metadata = { title: "Validasi Data · SPPG Internal" };
 
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ batch?: string }> }) {
+const RECORDS_PAGE_SIZE = 20;
+
+export default async function Page({ searchParams }: { searchParams: Promise<{ batch?: string; recordsPage?: string }> }) {
   const [me, params] = await Promise.all([requirePage("/mapping-validasi"), searchParams]);
+  const recordsPage = Number(params.recordsPage) || 1;
   if (!me.permissions.includes("upload:view")) {
     return (
       <EmptyState title="Tidak ada akses">
@@ -38,10 +41,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
     );
   }
 
-  // ponytail: first 100 transactions only; add paging to "Hasil data" when a file needs more on screen.
   const [detail, records, history] = await Promise.all([
     apiGet<BatchDetail>(`/upload-batches/${batch.id}`),
-    apiGet<{ data: Txn[]; meta: { total: number } }>(`/upload-batches/${batch.id}/records?pageSize=100`),
+    apiGet<{ data: Txn[]; meta: { page: number; totalPages: number; total: number } }>(
+      `/upload-batches/${batch.id}/records?pageSize=${RECORDS_PAGE_SIZE}&page=${recordsPage}`,
+    ),
     apiGet<HistoryEntry[]>(`/upload-batches/${batch.id}/history`),
   ]);
   const findings = batchFindings(detail);
@@ -68,7 +72,16 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
           findings={findings}
           panels={{
             [tabs[1]]: <ColumnTable result={detail.mappingResult} />,
-            [tabs[3]]: <RecordsTable txns={records.data} total={records.meta.total} totals={detail.mappingResult?.mapping?.totals ?? {}} />,
+            [tabs[3]]: (
+              <RecordsTable
+                txns={records.data}
+                total={records.meta.total}
+                totals={detail.mappingResult?.mapping?.totals ?? {}}
+                page={records.meta.page}
+                totalPages={records.meta.totalPages}
+                hrefFor={(p) => `/mapping-validasi?batch=${batch.publicId}&recordsPage=${p}`}
+              />
+            ),
             [tabs[4]]: <HistoryList entries={history} />,
           }}
         />

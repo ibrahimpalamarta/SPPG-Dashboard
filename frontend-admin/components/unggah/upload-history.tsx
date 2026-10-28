@@ -1,8 +1,11 @@
 import { Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
+import { Pager } from "@/components/ui/pager";
 import { StatusBadge, DOMAINS } from "@/lib/upload";
 import { apiGet } from "@/lib/api";
+
+const PAGE_SIZE = 20;
 
 type Batch = {
   id: string;
@@ -26,11 +29,11 @@ const when = (iso: string | null) => (iso ? whenOf(iso) : "—");
 const whenOf = (iso: string) => new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
 
 /** Real upload history from GET /api/upload-batches, scoped by the backend to the user's dapur. */
-export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
-  const { data } = await apiGet<{ data: Batch[] }>("/upload-batches?pageSize=20");
+export async function UploadHistory({ canOpen, page }: { canOpen: boolean; page: number }) {
+  const { data, meta } = await apiGet<{ data: Batch[]; meta: { page: number; totalPages: number } }>(`/upload-batches?pageSize=${PAGE_SIZE}&page=${page}`);
 
   return (
-    <section>
+    <section id="upload-history">
       <h2 className="text-lg font-semibold text-slate-900">Upload History</h2>
       <Card className="mt-4 overflow-x-auto">
         <table className="w-full min-w-5xl text-left">
@@ -94,6 +97,7 @@ export async function UploadHistory({ canOpen }: { canOpen: boolean }) {
           </tbody>
         </table>
       </Card>
+      <Pager page={meta.page} totalPages={meta.totalPages} hrefFor={(p) => `/unggah-data?page=${p}#upload-history`} />
     </section>
   );
 }

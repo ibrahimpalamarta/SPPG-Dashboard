@@ -147,7 +147,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
           </thead>
           {shown.map((u) => (
             <tbody key={u.id} className="border-t border-slate-100 text-slate-700">
-              <tr>
+              <tr className="hover:bg-slate-50">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarTone(u)}`} aria-hidden="true">

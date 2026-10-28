@@ -198,7 +198,7 @@ async function Kode({ canEdit }: { canEdit: boolean }) {
           </thead>
           {data.map((k) => (
             <tbody key={k.id} className="border-t border-slate-100 text-slate-700">
-              <tr>
+              <tr className="hover:bg-slate-50">
                 <td className="px-4 py-2 font-mono">{k.code ?? MISSING}</td>
                 <td className="px-4 py-2">{k.name}</td>
                 <td className="px-4 py-2">{k.bucket ?? MISSING}</td>

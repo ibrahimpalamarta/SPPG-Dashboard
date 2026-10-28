@@ -30,7 +30,7 @@ export function HistoryList({ entries }: { entries: HistoryEntry[] }) {
   return (
     <ol className="divide-y divide-slate-100 text-sm">
       {entries.map((e) => (
-        <li key={e.id} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-6 py-4">
+        <li key={e.id} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-6 py-4 hover:bg-slate-50">
           <span>
             <span className="block font-semibold text-slate-900">{actionLabel[e.action] ?? e.action}</span>
             <span className="text-slate-500">{detailOf(e)}</span>

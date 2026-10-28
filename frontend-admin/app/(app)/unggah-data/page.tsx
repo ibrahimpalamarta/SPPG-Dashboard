@@ -7,8 +7,9 @@ import { UploadForm } from "./upload-form";
 
 export const metadata: Metadata = { title: "Unggah Data · SPPG Internal" };
 
-export default async function Page() {
-  const me = await requirePage("/unggah-data");
+export default async function Page({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const [me, params] = await Promise.all([requirePage("/unggah-data"), searchParams]);
+  const page = Number(params.page) || 1;
 
   return (
     <div className="mx-auto max-w-400 space-y-6">
@@ -48,7 +49,7 @@ export default async function Page() {
       ) : (
         <UploadForm kitchens={me.kitchens} kitchenId={me.kitchens[0]?.id} />
       )}
-      <UploadHistory canOpen={me.permissions.includes("mapping:view")} />
+      <UploadHistory canOpen={me.permissions.includes("mapping:view")} page={page} />
     </div>
   );
 }
