@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, BookOpen, Coins, FileText, Package, UserRound, Utensils, Wallet, WalletCards, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Coins, FileText, Package, Utensils, Wallet, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { startTransition, useActionState, useState } from "react";
 import { uploadFile, type UploadResult } from "./actions";
@@ -16,8 +16,7 @@ const choice = (selected: boolean) =>
 // Domains with an official empty template (SCRUM-125); the rest upload an ordinary file.
 const TEMPLATES: Record<string, string> = { CASHFLOW: "cashflow", MENU: "menu" };
 
-// `value` mirrors backend UploadDomain; no value = no backend support yet (Manual Entry / not ingested).
-const DOMAIN_CARDS: { value?: string; label: string; note: string; icon: LucideIcon }[] = [
+const DOMAIN_CARDS: { value: string; label: string; note: string; icon: LucideIcon }[] = [
   { value: "CASHFLOW", label: "Cashflow", note: "Catatan uang masuk & keluar", icon: Wallet },
   { value: "RAB", label: "RAB", note: "Rencana anggaran per periode", icon: Utensils },
   { value: "PO", label: "Purchase Order", note: "Daftar pesanan ke supplier", icon: FileText },
@@ -25,8 +24,6 @@ const DOMAIN_CARDS: { value?: string; label: string; note: string; icon: LucideI
   { value: "VENDOR_PAYMENT", label: "Pembayaran Supplier", note: "Bukti bayar ke supplier (Input Maker / EFI)", icon: Coins },
   { value: "MENU", label: "Master Menu", note: "Menu & gizi yang direncanakan", icon: BookOpen },
   { value: "GOODS_RECEIPT", label: "Penerimaan Barang", note: "Barang yang diterima dapur", icon: Package },
-  { label: "Saldo Rekening", note: "Belum bisa diunggah. Laporan saldo harian (VA / LapKeu).", icon: WalletCards },
-  { label: "Jumlah Penerima Manfaat", note: "Belum ada file. Isi lewat Manual Entry.", icon: UserRound },
 ];
 
 const STEPS = ["Pilih Kitchen, jenis data & periode", "Pilih file", "Deteksi & validasi"];
@@ -87,7 +84,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
             <legend className="text-sm font-semibold text-slate-800">2. Pilih jenis data</legend>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {DOMAIN_CARDS.map(({ value, label, note, icon: Icon }) => (
-                <button key={label} type="button" disabled={!value} aria-pressed={value === domain} onClick={() => value && setDomain(value)} className={choice(value === domain)}>
+                <button key={label} type="button" aria-pressed={value === domain} onClick={() => setDomain(value)} className={choice(value === domain)}>
                   <span className="flex items-center gap-2 font-semibold">
                     <Icon className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
                     {label}
