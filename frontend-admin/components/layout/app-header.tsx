@@ -3,12 +3,12 @@
 import { Bell, Menu, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NavLinks, type NavItem } from "@/components/layout/app-sidebar";
+import { NavLinks, UserMenu, type AppUser, type NavItem } from "@/components/layout/app-sidebar";
 import { HeaderSearch } from "@/components/layout/header-search";
 
 const iconButton = "inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-emerald-300";
 
-export function AppHeader({ items }: { items: readonly NavItem[] }) {
+export function AppHeader({ items, user }: { items: readonly NavItem[]; user: AppUser }) {
   const pathname = usePathname();
   const title = items.find((n) => n.href === pathname)?.label ?? (pathname === "/keamanan" ? "Keamanan akun" : pathname === "/pengaturan" ? "Pengaturan" : undefined);
 
@@ -21,6 +21,9 @@ export function AppHeader({ items }: { items: readonly NavItem[] }) {
         </summary>
         <nav className="absolute left-0 top-11 z-10 flex w-64 flex-col gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-lg" aria-label="Menu utama">
           <NavLinks items={items} />
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            <UserMenu user={user} />
+          </div>
         </nav>
       </details>
 
