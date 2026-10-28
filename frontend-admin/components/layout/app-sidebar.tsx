@@ -10,7 +10,7 @@ import { ROLE_LABELS, type Role } from "@/lib/roles";
 
 const ICONS = { Activity, BookOpen, Inbox, LayoutDashboard, Map, PenLine, Plug, ShieldCheck, Upload, Users, Wallet };
 
-export type NavItem = (typeof NAV)[number];
+export type NavItem = Omit<(typeof NAV)[number], "label"> & { label: string };
 
 export function NavLinks({ items }: { items: readonly NavItem[] }) {
   const pathname = usePathname();

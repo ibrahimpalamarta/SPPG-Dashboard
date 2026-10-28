@@ -13,7 +13,7 @@ export const NAV = [
   { group: "Dashboard", href: "/overview", label: "Overview", icon: "LayoutDashboard", permission: "dashboard:view" },
   { group: "Dashboard", href: "/finance", label: "Finance & Cost", icon: "Wallet", permission: "dashboard:view" },
   { group: "Dashboard", href: "/kesehatan-data", label: "Kelengkapan Data", icon: "Activity", permission: "dashboard:view" },
-  { group: "Data", href: "/unggah-data", label: "Unggah Data", icon: "Upload", permission: "upload:view" },
+  { group: "Data", href: "/unggah-data", label: "Unggah Data", icon: "Upload", permission: "upload:create" },
   { group: "Data", href: "/mapping-validasi", label: "Validasi Data", icon: "Map", permission: "mapping:view" },
   { group: "Data", href: "/referensi-data", label: "Data Reference", icon: "BookOpen", permission: "reference:view" },
   // Fallback terkontrol (PRD §4.2); the form itself is SCRUM-108.

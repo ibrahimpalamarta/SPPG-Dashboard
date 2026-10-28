@@ -1,12 +1,12 @@
 import { AppHeader } from "@/components/layout/app-header";
-import { AppSidebar } from "@/components/layout/app-sidebar";
+import { AppSidebar, type NavItem } from "@/components/layout/app-sidebar";
 import { getMe } from "@/lib/me";
 import { NAV } from "@/lib/nav";
 import { ROLE_LABELS } from "@/lib/roles";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const me = await getMe();
-  const items = NAV.filter((n) => me.permissions.includes(n.permission));
+  const items: NavItem[] = NAV.filter((n) => me.permissions.includes(n.permission)).map((n) => (n.href === "/inbox" && me.role === "SUPER_ADMIN" ? { ...n, label: "Review Pekerjaan" } : n));
   const user = { name: me.fullName ?? ROLE_LABELS[me.role], email: me.email, role: me.role };
 
   return (
