@@ -6,7 +6,7 @@ import { createUser, saveUser, type UserActionState } from "./actions";
 import { Field, FormMessage, field, primaryButton, secondaryButton } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import type { Kitchen } from "@/lib/me";
-import { ROLES, ROLE_LABELS } from "@/lib/roles";
+import { ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
 
 export type UserRow = {
   id: string;
@@ -30,20 +30,54 @@ function Result({ state }: { state: UserActionState }) {
   );
 }
 
-const ROLE_OPTIONS = [
-  { role: "DATA_ADMIN", description: "Akses semua Overview dan seluruh fitur: unggah data, mapping & validasi, finance, kesehatan data, manual entry." },
-  { role: "SUPER_ADMIN", description: "Mereview data dan pekerjaan yang diinput Data Operasional, lalu menyetujui (publish) atau mengembalikannya." },
-] as const;
+const ROLE_OPTIONS: { role: Role; description: string }[] = [
+  { role: "SUPER_ADMIN", description: "Mengelola anggota, hak akses, dan Data Reference, serta mereview dan mempublish batch." },
+  { role: "MANAGEMENT", description: "Melihat Overview, Finance, dan Data Health semua dapur secara agregat, tanpa data pribadi." },
+  { role: "FINANCE", description: "Melihat dan memvalidasi KPI finansial semua dapur serta rekonsiliasi." },
+  { role: "DATA_STEWARD", description: "Lintas dapur: mengelola mapping profile, antrean validasi, dan publish." },
+  { role: "KEPALA_KITCHEN", description: "Melihat dashboard dapur sendiri dan meninjau issue serta status data." },
+  { role: "DATA_ADMIN", description: "PIC dapur sendiri: unggah file, review validasi, dan mengajukan koreksi." },
+  { role: "AHLI_GIZI", description: "Dapur sendiri: mendukung mapping menu dan review data menu." },
+];
 
-const RoleCard = ({ option, defaultChecked }: { option: (typeof ROLE_OPTIONS)[number]; defaultChecked: boolean }) => (
+/** Mirrors backend KITCHEN_SCOPED_ROLES: these see only their assigned kitchens, none assigned means none visible. */
+const KITCHEN_SCOPED: readonly Role[] = ["KEPALA_KITCHEN", "DATA_ADMIN", "AHLI_GIZI"];
+
+const RoleCard = ({ option, checked, onSelect }: { option: (typeof ROLE_OPTIONS)[number]; checked: boolean; onSelect: () => void }) => (
   <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50">
-    <input type="radio" name="role" value={option.role} defaultChecked={defaultChecked} required className="mt-1 accent-emerald-700" />
+    <input type="radio" name="role" value={option.role} checked={checked} onChange={onSelect} required className="mt-1 accent-emerald-700" />
     <span>
       <span className="block font-semibold text-slate-800">{ROLE_LABELS[option.role]}</span>
       <span className="block text-slate-500">{option.description}</span>
     </span>
   </label>
 );
+
+/** Role cards plus, for a kitchen-scoped role, the kitchens it may see (at least one; the action checks). */
+function RoleFields({ kitchens, defaultRole, defaultKitchenIds = [] }: { kitchens: Kitchen[]; defaultRole: Role; defaultKitchenIds?: string[] }) {
+  const [role, setRole] = useState<Role>(defaultRole);
+  return (
+    <>
+      <fieldset className="space-y-2">
+        <legend className="mb-1 font-medium text-slate-700">Role</legend>
+        {ROLE_OPTIONS.map((o) => (
+          <RoleCard key={o.role} option={o} checked={role === o.role} onSelect={() => setRole(o.role)} />
+        ))}
+      </fieldset>
+      {KITCHEN_SCOPED.includes(role) && (
+        <fieldset className="space-y-2">
+          <legend className="mb-1 font-medium text-slate-700">Dapur (pilih minimal satu)</legend>
+          {kitchens.map((k) => (
+            <label key={k.id} className="flex items-center gap-2 text-slate-700">
+              <input type="checkbox" name="kitchenIds" value={k.id} defaultChecked={defaultKitchenIds.includes(k.id)} className="accent-emerald-700" />
+              {kitchenLabel(k)}
+            </label>
+          ))}
+        </fieldset>
+      )}
+    </>
+  );
+}
 
 export function CreateUserForm({ kitchens }: { kitchens: Kitchen[] }) {
   const [open, setOpen] = useState(false);
@@ -139,22 +173,7 @@ function InviteModal({ open, onClose, kitchens }: { open: boolean; onClose: () =
         <Field label="Email kerja">
           <input type="email" name="email" required placeholder="nama@instansi.go.id" className={field} />
         </Field>
-        <fieldset className="space-y-2">
-          <legend className="mb-1 font-medium text-slate-700">Role</legend>
-          {ROLE_OPTIONS.map((o) => (
-            <RoleCard key={o.role} option={o} defaultChecked={o.role === "DATA_ADMIN"} />
-          ))}
-        </fieldset>
-        <Field label="Dapur (wajib untuk Data Operasional)">
-          <select name="kitchenIds" defaultValue="" className={field}>
-            <option value="">Semua dapur</option>
-            {kitchens.map((k) => (
-              <option key={k.id} value={k.id}>
-                {kitchenLabel(k)}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <RoleFields kitchens={kitchens} defaultRole="DATA_ADMIN" />
         <Field label="Pesan (opsional)">
           <textarea name="message" maxLength={500} rows={3} placeholder="Contoh: Untuk membantu upload Cashflow Lawang mulai 23 Nov" className={`${field} h-auto py-2`} />
         </Field>
@@ -164,10 +183,10 @@ function InviteModal({ open, onClose, kitchens }: { open: boolean; onClose: () =
   );
 }
 
-export function RoleForm({ user }: { user: UserRow }) {
+export function RoleForm({ user, kitchens }: { user: UserRow; kitchens: Kitchen[] }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<UserActionState, FormData>(async (prev, form) => {
-    const next = await saveUser(user.id, user.kitchenScopes.length > 0, prev, form);
+    const next = await saveUser(user.id, prev, form);
     if (next.ok) setOpen(false);
     return next;
   }, {});
@@ -194,9 +213,7 @@ export function RoleForm({ user }: { user: UserRow }) {
         }
       >
         <form id={`role-${user.id}`} action={action} className="space-y-3">
-          {ROLE_OPTIONS.map((o) => (
-            <RoleCard key={o.role} option={o} defaultChecked={user.role === o.role} />
-          ))}
+          <RoleFields kitchens={kitchens} defaultRole={user.role} defaultKitchenIds={user.kitchenScopes.map((s) => s.kitchen.id)} />
           <Result state={state} />
         </form>
         <p className="text-slate-500">Perubahan berlaku pada login berikutnya dan tercatat di audit log.</p>
