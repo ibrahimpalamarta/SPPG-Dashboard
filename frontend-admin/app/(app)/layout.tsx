@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex min-h-screen bg-[#f7f8fa] text-slate-900">
-      <AppSidebar items={items} user={user} kitchens={me.kitchens} />
+      <AppSidebar items={items} user={user} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader items={items} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8">

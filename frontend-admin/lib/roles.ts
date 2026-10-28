@@ -30,11 +30,11 @@ export const ROLES = [
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
-  SUPER_ADMIN: "Admin Sistem (PM MBG)",
+  SUPER_ADMIN: "Project Manager",
   MANAGEMENT: "Management",
   FINANCE: "Finance",
   KEPALA_KITCHEN: "Kepala Kitchen",
-  DATA_ADMIN: "PIC/Data Admin Kitchen",
+  DATA_ADMIN: "Data Operasional",
   AHLI_GIZI: "Ahli Gizi",
   DATA_STEWARD: "Data Steward",
 };

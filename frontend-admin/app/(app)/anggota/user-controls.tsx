@@ -31,13 +31,8 @@ function Result({ state }: { state: UserActionState }) {
 }
 
 const ROLE_OPTIONS: { role: Role; description: string }[] = [
-  { role: "SUPER_ADMIN", description: "Mengelola anggota, hak akses, dan Data Reference, serta mereview dan mempublish batch." },
-  { role: "MANAGEMENT", description: "Melihat Overview, Finance, dan Data Health semua dapur secara agregat, tanpa data pribadi." },
-  { role: "FINANCE", description: "Melihat dan memvalidasi KPI finansial semua dapur serta rekonsiliasi." },
-  { role: "DATA_STEWARD", description: "Lintas dapur: mengelola mapping profile, antrean validasi, dan publish." },
-  { role: "KEPALA_KITCHEN", description: "Melihat dashboard dapur sendiri dan meninjau issue serta status data." },
-  { role: "DATA_ADMIN", description: "PIC dapur sendiri: unggah file, review validasi, dan mengajukan koreksi." },
-  { role: "AHLI_GIZI", description: "Dapur sendiri: mendukung mapping menu dan review data menu." },
+  { role: "DATA_ADMIN", description: "Dapur sendiri: unggah file, review validasi, dan mengajukan review ke Project Manager." },
+  { role: "SUPER_ADMIN", description: "Mereview dan mempublish batch, mengelola anggota, hak akses, dan Data Reference." },
 ];
 
 /** Mirrors backend KITCHEN_SCOPED_ROLES: these see only their assigned kitchens, none assigned means none visible. */
