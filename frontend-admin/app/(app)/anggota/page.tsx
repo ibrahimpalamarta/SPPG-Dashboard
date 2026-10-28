@@ -186,7 +186,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
                         <ActionButton action={setStatus.bind(null, u.id, "ACTIVE")} label="Aktifkan kembali" />
                       ) : (
                         <>
-                          <RoleForm user={u} />
+                          <RoleForm user={u} kitchens={kitchens} />
                           <ActionButton action={setStatus.bind(null, u.id, "INACTIVE")} label="Nonaktifkan" confirm={{ title: `Nonaktifkan ${u.fullName ?? u.email}?`, subtitle: `${ROLE_LABELS[u.role]} · ${u.email}`, body: "Akses langsung dicabut. Akun tidak dihapus: histori upload, resolusi issue, dan review tetap bisa ditelusuri. Anggota bisa diaktifkan kembali kapan saja.", label: "Nonaktifkan" }} />
                         </>
                       )}
