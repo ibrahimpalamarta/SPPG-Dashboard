@@ -5,13 +5,12 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/login/actions";
-import type { Kitchen } from "@/lib/me";
 import type { NAV } from "@/lib/nav";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 
 const ICONS = { Activity, BookOpen, Inbox, LayoutDashboard, Map, PenLine, Plug, ShieldCheck, Upload, Users, Wallet };
 
-export type NavItem = (typeof NAV)[number];
+export type NavItem = Omit<(typeof NAV)[number], "label"> & { label: string };
 
 export function NavLinks({ items }: { items: readonly NavItem[] }) {
   const pathname = usePathname();
@@ -32,8 +31,7 @@ export function NavLinks({ items }: { items: readonly NavItem[] }) {
   });
 }
 
-export function AppSidebar({ items, user, kitchens }: { items: readonly NavItem[]; user: { name: string; email: string | null; role: Role }; kitchens: Kitchen[] }) {
-  const kitchenLabel = kitchens.length === 0 ? "Tanpa dapur" : kitchens.map((k) => (k.rolloutStatus === "PILOT_PHASE_1" ? `Pilot ${k.name}` : k.name)).join(", ");
+export function AppSidebar({ items, user }: { items: readonly NavItem[]; user: { name: string; email: string | null; role: Role } }) {
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-slate-200 bg-white lg:flex lg:flex-col" aria-label="Navigasi utama">
       <div className="flex h-full flex-col px-4 py-5">
@@ -41,7 +39,7 @@ export function AppSidebar({ items, user, kitchens }: { items: readonly NavItem[
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-700 text-sm font-bold text-white" aria-hidden="true">SI</div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-800">SPPG Internal</p>
-            <p className="truncate text-xs text-slate-400" title={kitchenLabel}>{kitchenLabel}</p>
+            <p className="truncate text-xs text-slate-400">Backoffice</p>
           </div>
         </div>
 
