@@ -1,12 +1,12 @@
 import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar, type NavItem } from "@/components/layout/app-sidebar";
 import { getMe } from "@/lib/me";
-import { NAV } from "@/lib/nav";
+import { NAV, canOpen } from "@/lib/nav";
 import { ROLE_LABELS } from "@/lib/roles";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const me = await getMe();
-  const items: NavItem[] = NAV.filter((n) => me.permissions.includes(n.permission));
+  const items: NavItem[] = NAV.filter((n) => canOpen(n, me));
   const user = { name: me.fullName ?? ROLE_LABELS[me.role], email: me.email, role: me.role };
 
   return (

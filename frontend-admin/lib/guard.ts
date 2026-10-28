@@ -1,5 +1,5 @@
 import { forbidden } from "next/navigation";
-import { NAV, type NavHref } from "@/lib/nav";
+import { NAV, canOpen, type NavHref } from "@/lib/nav";
 import { getMe, type Me } from "@/lib/me";
 
 /**
@@ -10,6 +10,6 @@ import { getMe, type Me } from "@/lib/me";
 export async function requirePage(href: NavHref): Promise<Me> {
   const me = await getMe();
   const page = NAV.find((n) => n.href === href)!;
-  if (!me.permissions.includes(page.permission)) forbidden();
+  if (!canOpen(page, me)) forbidden();
   return me;
 }
