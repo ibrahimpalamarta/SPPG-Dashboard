@@ -44,7 +44,7 @@ const ROLE_OPTIONS: { role: Role; description: string }[] = [
 const KITCHEN_SCOPED: readonly Role[] = ["KEPALA_KITCHEN", "DATA_ADMIN", "AHLI_GIZI"];
 
 const RoleCard = ({ option, checked, onSelect }: { option: (typeof ROLE_OPTIONS)[number]; checked: boolean; onSelect: () => void }) => (
-  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50">
+  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 has-checked:border-emerald-600 has-checked:bg-emerald-50">
     <input type="radio" name="role" value={option.role} checked={checked} onChange={onSelect} required className="mt-1 accent-emerald-700" />
     <span>
       <span className="block font-semibold text-slate-800">{ROLE_LABELS[option.role]}</span>
