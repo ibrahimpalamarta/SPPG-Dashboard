@@ -20,7 +20,7 @@ export const skn = {
     { label: "Purchase Order", status: "Belum selesai dicek", tone: "violet" },
     { label: "Pembayaran Supplier", status: "Sudah masuk", tone: "green" },
     { label: "Jumlah Penerima Manfaat", status: "Belum masuk", tone: "pending" },
-    { label: "Saldo Rekening", status: "Masuk · draft", tone: "amber" },
+    { label: "Saldo Rekening", status: "Draft", tone: "amber" },
   ] satisfies { label: string; status: string; tone: Tone }[],
 };
 

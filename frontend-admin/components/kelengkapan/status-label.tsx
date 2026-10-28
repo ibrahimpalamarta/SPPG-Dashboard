@@ -6,8 +6,8 @@ const styles: Record<Tone, { icon: LucideIcon; icon$: string; text: string }> = 
   green: { icon: Check, icon$: "text-slate-400", text: "text-slate-400" },
   pending: { icon: CircleDashed, icon$: "text-slate-400", text: "text-slate-400" },
   slate: { icon: Minus, icon$: "text-slate-400", text: "text-slate-400" },
-  blue: { icon: Circle, icon$: "text-blue-500", text: "text-slate-600" },
-  violet: { icon: CircleDot, icon$: "text-violet-500", text: "text-slate-600" },
+  blue: { icon: Circle, icon$: "text-slate-400", text: "text-slate-600" },
+  violet: { icon: CircleDot, icon$: "text-slate-400", text: "text-slate-600" },
   amber: { icon: CircleSmall, icon$: "text-amber-500", text: "text-slate-600" },
   red: { icon: CircleX, icon$: "text-red-600", text: "text-red-600 font-semibold" },
 };
