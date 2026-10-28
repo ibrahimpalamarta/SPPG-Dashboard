@@ -34,7 +34,7 @@ export async function UploadHistory({ canOpen, canDelete }: { canOpen: boolean; 
     <section>
       <h2 className="text-lg font-semibold text-slate-900">Upload History</h2>
       <Card className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[64rem] text-left">
+        <table className="w-full min-w-5xl text-left">
           <thead className="border-b border-slate-200 bg-slate-50 text-sm text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">File</th>
