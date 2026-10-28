@@ -56,4 +56,5 @@ export type Db = Pick<
   | 'cmsAnnouncement'
   | 'cmsDocument'
   | 'galleryImage'
+  | 'referenceEntry'
 >;

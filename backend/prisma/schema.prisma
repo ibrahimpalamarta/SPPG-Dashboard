@@ -130,6 +130,13 @@ enum DocumentFileType {
   XLSX
 }
 
+/// Tab Data Reference yang isinya baris `ReferenceEntry`.
+enum ReferenceEntryKind {
+  KAMUS
+  ATURAN
+  KODE
+}
+
 // ---------------------------------------------------------------------------
 // Identitas & audit
 // ---------------------------------------------------------------------------
@@ -359,6 +366,22 @@ model Ingredient {
   menuPlans MenuPlan[]
 
   @@map("ingredients")
+}
+
+/// Baris tab Kamus Data / Aturan Cek Data / Daftar Kode di Data Reference.
+/// `fields` menyimpan kolom tabel masing-masing tab (beda bentuk per `kind`)
+/// karena ketiganya baris teks referensi, bukan entitas dengan query sendiri.
+model ReferenceEntry {
+  id        BigInt             @id @default(autoincrement()) @map("reference_entry_id")
+  kind      ReferenceEntryKind
+  sortOrder Int                @map("sort_order")
+  fields    Json
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([kind, sortOrder])
+  @@map("reference_entries")
 }
 
 /// Tabel rujukan AKG - 12 kelompok sasaran, Tabel 2 SOP-OPR-001
