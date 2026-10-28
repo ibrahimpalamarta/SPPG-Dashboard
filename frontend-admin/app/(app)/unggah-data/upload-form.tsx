@@ -61,14 +61,14 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
       {retry && result?.ok && result.status === "NEEDS_MAPPING_UPDATE" && <input type="hidden" name="replaces" value={result.batchId} />}
 
       <Card className="space-y-6 p-6">
-        <ol className="flex items-center gap-4 text-sm">
-          {STEPS.map((label, i) => (
-            <li key={label} className={`flex items-center gap-3 ${i > 0 ? "flex-1" : ""}`}>
-              {i > 0 && <span className="hidden h-px flex-1 bg-slate-200 sm:block" aria-hidden="true" />}
+        <ol className="flex items-center gap-3 text-sm">
+          {STEPS.flatMap((label, i) => [
+            i > 0 && <span key={`line-${label}`} className={`hidden h-px flex-1 sm:block ${current >= i + 1 ? "bg-slate-900" : "bg-slate-200"}`} aria-hidden="true" />,
+            <li key={label} className="flex shrink-0 items-center gap-3">
               <span className={`grid size-8 shrink-0 place-items-center rounded-full border text-sm font-semibold ${current >= i + 1 ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 text-slate-500"}`}>{i + 1}</span>
               <span className={`hidden whitespace-nowrap font-semibold sm:inline ${current >= i + 1 ? "text-slate-900" : "text-slate-500"}`}>{label}</span>
-            </li>
-          ))}
+            </li>,
+          ])}
         </ol>
 
         <div hidden={current !== 1} className="space-y-6">

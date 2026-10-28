@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { apiFetch, publicPost } from "@/lib/api";
 import { clearSessionCookie, setSessionCookie } from "@/lib/session";
 
-export type LoginState = { step: "password" | "mfa"; message?: string; mfaToken?: string };
+export type LoginState = { step: "password" | "mfa"; message?: string; mfaToken?: string; email?: string };
 
 /** Only same-app paths: `//evil.com` and `https://…` would make login an open redirect. */
 const safeReturnTo = (v: FormDataEntryValue | null) => (typeof v === "string" && /^\/(?!\/)[^\\]*$/.test(v) ? v : "/overview");
@@ -26,8 +26,11 @@ async function complete(res: Awaited<ReturnType<typeof publicPost>>, returnTo: s
 }
 
 export async function login(_prev: LoginState, form: FormData): Promise<LoginState> {
-  const res = await publicPost("/auth/login", { email: text(form, "email"), password: text(form, "password") });
-  return complete(res, safeReturnTo(form.get("returnTo")), "password");
+  const email = text(form, "email");
+  const res = await publicPost("/auth/login", { email, password: text(form, "password") });
+  const next = await complete(res, safeReturnTo(form.get("returnTo")), "password");
+  // Keep the email filled in so a wrong password doesn't make the user retype it.
+  return { ...next, email };
 }
 
 export async function verifyMfa(prev: LoginState, form: FormData): Promise<LoginState> {
