@@ -38,7 +38,7 @@ ${quote ? `<p style="margin:0 0 20px;padding:12px 16px;background:#f8fafc;border
 <a href="${escapeHtml(button.url)}" style="display:inline-block;padding:12px 24px;font-family:${FONT};font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">${escapeHtml(button.label)}</a>
 </td></tr></table>
 <p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;">${escapeHtml(note)}</p>
-<p style="margin:0;padding-top:16px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#94a3b8;">Tombol tidak berfungsi? Salin tautan ini ke browser:<br><span style="word-break:break-all;color:#64748b;">${escapeHtml(button.url)}</span></p>
+<p style="margin:0;padding-top:16px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#94a3b8;">Tombol tidak berfungsi? Buka tautan ini:<br><a href="${escapeHtml(button.url)}" style="word-break:break-all;color:#047857;">${escapeHtml(button.url)}</a></p>
 </td></tr>
 </table>
 </td></tr>

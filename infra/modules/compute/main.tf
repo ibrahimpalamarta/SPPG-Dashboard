@@ -461,8 +461,9 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "S3_BUCKET", value = var.assets_bucket_name },
         { name = "AWS_REGION", value = var.aws_region },
         # Activation and reset links point at the admin app, which shares the
-        # API's origin (ALB, or the certificate's domain).
-        { name = "ADMIN_BASE_URL", value = var.frontend_api_base_url != "" ? var.frontend_api_base_url : "http://${aws_lb.this.dns_name}" },
+        # API's origin (ALB, or the certificate's domain) under its basePath
+        # "/admin"; drop the suffix together with basePath (host-based routing).
+        { name = "ADMIN_BASE_URL", value = "${var.frontend_api_base_url != "" ? var.frontend_api_base_url : "http://${aws_lb.this.dns_name}"}/admin" },
         ],
         var.email_from == "" ? [] : [{ name = "EMAIL_FROM", value = var.email_from }],
         # Staging has no sppg_public role while the public dashboard is parked;
