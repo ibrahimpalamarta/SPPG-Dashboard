@@ -1,0 +1,36 @@
+name: Sync Staging from Develop
+
+# Fires right after staging scales down for the night (21:00 WIB = 14:00 UTC,
+# see infra/modules/scheduler), so develop's day of commits lands on staging
+# and gets deployed before the next working-hours window opens.
+on:
+  schedule:
+    - cron: "0 14 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Merge develop into staging
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if ! git merge --no-ff origin/develop -m "Merge develop into staging"; then
+            git merge --abort
+            echo "::error::develop has conflicts with staging — resolve manually, nothing was pushed."
+            exit 1
+          fi
+
+          git push origin staging
