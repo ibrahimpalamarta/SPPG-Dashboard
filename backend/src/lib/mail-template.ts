@@ -16,7 +16,7 @@ export type MailContent = {
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const FONT = "Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const FONT = "Roboto, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 export function renderMail({ title, intro, quote, button, note }: MailContent): { text: string; html: string } {
   const text = [title, intro, quote && `Pesan dari pengundang:\n${quote}`, `${button.label}:\n${button.url}`, note]
