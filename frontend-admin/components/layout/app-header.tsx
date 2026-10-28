@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ClipboardCheck, Menu, Plus, Settings } from "lucide-react";
+import { Bell, Menu, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavLinks, type NavItem } from "@/components/layout/app-sidebar";
@@ -8,14 +8,8 @@ import { HeaderSearch } from "@/components/layout/header-search";
 
 const iconButton = "inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-emerald-300";
 
-export function AppHeader({ items, isPm }: { items: readonly NavItem[]; isPm: boolean }) {
+export function AppHeader({ items }: { items: readonly NavItem[] }) {
   const pathname = usePathname();
-  // Tombol aksi per peran: PM -> Review Pekerjaan (inbox), peran yang boleh unggah -> Unggah Data.
-  const action = isPm
-    ? { href: "/inbox", label: "Review Pekerjaan", Icon: ClipboardCheck }
-    : items.some((n) => n.href === "/unggah-data")
-      ? { href: "/unggah-data", label: "Unggah Data", Icon: Plus }
-      : null;
   const title = items.find((n) => n.href === pathname)?.label ?? (pathname === "/keamanan" ? "Keamanan akun" : pathname === "/pengaturan" ? "Pengaturan" : undefined);
 
   return (
@@ -45,12 +39,6 @@ export function AppHeader({ items, isPm }: { items: readonly NavItem[]; isPm: bo
         <button type="button" disabled title="Segera hadir" aria-label="Notifikasi" className={`${iconButton} disabled:cursor-not-allowed disabled:opacity-60`}>
           <Bell className="size-5" aria-hidden="true" />
         </button>
-        {action && pathname !== action.href && (
-          <Link href={action.href} className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800">
-            <action.Icon className="size-4" aria-hidden="true" />
-            {action.label}
-          </Link>
-        )}
       </div>
     </header>
   );

@@ -15,7 +15,7 @@ type Status = UserRow["memberStatus"];
 const card = "space-y-3 rounded-xl border border-slate-200 bg-white p-5";
 
 const STATUS: Record<Status, [string, string]> = {
-  PENDING: ["Menunggu aktivasi", "bg-amber-400"],
+  PENDING: ["Menunggu aktivasi", "bg-slate-400"],
   ACTIVE: ["Aktif", "bg-emerald-500"],
   EXPIRED: ["Kedaluwarsa", "bg-red-500"],
   INACTIVE: ["Nonaktif", "bg-slate-400"],
@@ -70,7 +70,7 @@ const lastLogin = (iso: string | null) => (iso ? new Date(iso).toLocaleString("i
 const initials = (u: UserRow) => (u.fullName ?? u.email ?? "?").split(/[\s@]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 
 // A handful of muted tones, picked deterministically from the name so avatars aren't all the same color.
-const AVATAR_TONES = ["bg-rose-100 text-rose-700", "bg-amber-100 text-amber-700", "bg-emerald-100 text-emerald-700", "bg-sky-100 text-sky-700", "bg-violet-100 text-violet-700", "bg-slate-200 text-slate-700"];
+const AVATAR_TONES = ["bg-emerald-100 text-emerald-700", "bg-slate-200 text-slate-700"];
 const avatarTone = (u: UserRow) => AVATAR_TONES[(u.fullName ?? u.email ?? "?").charCodeAt(0) % AVATAR_TONES.length];
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
