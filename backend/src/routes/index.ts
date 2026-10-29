@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import rateLimit from 'express-rate-limit';
 import { env } from '../config/env.js';
 import { requireAuth } from '../auth/guard.js';
@@ -29,22 +29,27 @@ import { announcementRouter, documentRouter, galleryRouter } from './cms/cms.js'
 // frontend server, so an IP key would charge every user behind it against one
 // shared budget (seen in practice: normal pagination on one user's session
 // 429'd everyone else's /api/me).
-const authLimiter = rateLimit({
+const limiterOptions = {
   windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
   max: env.AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: ERRORS.TOO_MANY_REQUESTS.body,
-  keyGenerator: (req) => req.headers.authorization ?? req.ip ?? '',
-});
+  keyGenerator: (req: Request) => req.headers.authorization ?? req.ip ?? '',
+};
+const authLimiter = rateLimit(limiterOptions);
+// Separate instance/budget: the shell calls /me on every navigation, so a
+// data-heavy page's burst of other requests must not be able to exhaust it
+// and 429 the one call the layout needs to render at all.
+const meLimiter = rateLimit(limiterOptions);
 
 export const apiRouter = Router();
 
-apiRouter.use(authLimiter);
-
 // /me is how the shell learns it must send the user to MFA enrolment, so it is
 // the one route open to a session that has not enrolled yet.
-apiRouter.use('/me', requireAuth(prisma, { allowUnenrolled: true }), meRouter);
+apiRouter.use('/me', meLimiter, requireAuth(prisma, { allowUnenrolled: true }), meRouter);
+
+apiRouter.use(authLimiter);
 
 apiRouter.use(requireAuth());
 apiRouter.use('/admin', adminRouter);
