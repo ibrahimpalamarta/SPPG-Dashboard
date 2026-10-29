@@ -34,7 +34,7 @@ export default async function Page({
   }
 
   if (!params.batch) {
-    return <BatchList page={Number(params.listPage) || 1} />;
+    return <BatchList page={Number(params.listPage) || 1} canDelete={me.permissions.includes("batch:review")} />;
   }
 
   const recordsPage = Number(params.recordsPage) || 1;
