@@ -18,8 +18,13 @@
 import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Prisma } from '@prisma/client';
-import { prisma } from '../src/db.js';
+import { PrismaClient, type Prisma } from '@prisma/client';
+
+// Its own client, not `../src/db.js`: that module's `config/env.ts` also
+// demands S3_BUCKET, MFA_ENCRYPTION_KEY and (in production) DATABASE_URL_PUBLIC
+// — none of which seeding reference data needs. Pulling it in would force the
+// one-off migrate/seed ECS task to carry the whole app's secrets just to seed.
+const prisma = new PrismaClient();
 
 type Seeder = (db: Prisma.TransactionClient) => Promise<void>;
 
