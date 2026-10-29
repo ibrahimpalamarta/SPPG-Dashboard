@@ -167,7 +167,7 @@ export class PrismaStagingRepository implements StagingRepository {
         });
       }
       if (mapped) await writeCanonical(tx, uploadBatchId, mapped);
-    });
+    }, { timeout: 20_000 });
   }
 
   async deleteBatch(uploadBatchId: string) {
