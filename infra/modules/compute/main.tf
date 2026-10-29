@@ -505,6 +505,11 @@ resource "aws_ecs_task_definition" "backend" {
 # Same image as the backend, different command: the deploy workflow runs this
 # as a one-off task before rolling the service, because RDS is only reachable
 # from inside the VPC. No service owns it; it exists purely to be run-task'd.
+#
+# Also runs the seed runner right after: it's idempotent (seed_history dedup,
+# see prisma/seed.ts), so every environment that deploys through this task
+# gets reference data (Kamus Data/Aturan Cek Data/Daftar Kode) seeded exactly
+# once instead of only when someone remembers to run `npm run seed` by hand.
 resource "aws_ecs_task_definition" "migrate" {
   family                   = "${local.prefix}-migrate"
   requires_compatibilities = ["FARGATE"]
@@ -519,7 +524,7 @@ resource "aws_ecs_task_definition" "migrate" {
       name      = "migrate"
       image     = "${var.ecr_backend_repository_url}:${var.backend_image_tag}"
       essential = true
-      command   = ["npx", "prisma", "migrate", "deploy"]
+      command   = ["sh", "-c", "npx prisma migrate deploy && node --import tsx prisma/seed.ts --force"]
       secrets = [
         { name = "DATABASE_URL", valueFrom = "${var.db_secret_arn}:url::" },
       ]
