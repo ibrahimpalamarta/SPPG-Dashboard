@@ -30,6 +30,7 @@ export async function deleteBatch(id: string): Promise<string | null> {
   if (res.status === 409) return "Batch yang sudah dipublish tidak bisa dihapus.";
   if (!res.ok && res.status !== 404) return "Gagal menghapus. Coba lagi beberapa saat lagi.";
   revalidatePath("/unggah-data");
+  revalidatePath("/mapping-validasi");
   return null;
 }
 
