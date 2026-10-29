@@ -2,6 +2,7 @@ import { Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Pager } from "@/components/ui/pager";
+import { DeleteBatchButton } from "@/components/mapping/delete-batch-button";
 import { apiGet } from "@/lib/api";
 import { DOMAINS, StatusBadge } from "@/lib/upload";
 import type { Batch } from "@/lib/mapping-validasi";
@@ -13,7 +14,7 @@ const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.l
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—");
 
 /** Landing list for Validasi Data — also doubles as the upload history (file, dapur, waktu, status, export). */
-export async function BatchList({ page }: { page: number }) {
+export async function BatchList({ page, canDelete }: { page: number; canDelete: boolean }) {
   const { data, meta } = await apiGet<{ data: Batch[]; meta: { page: number; totalPages: number } }>(
     `/upload-batches?pageSize=${PAGE_SIZE}&page=${page}`,
   );
@@ -81,6 +82,7 @@ export async function BatchList({ page }: { page: number }) {
                         Export
                       </a>
                     )}
+                    {canDelete && <DeleteBatchButton id={b.id} fileName={b.fileName} />}
                   </div>
                 </td>
               </tr>
