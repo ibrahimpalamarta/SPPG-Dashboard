@@ -89,7 +89,7 @@ const schema = z.object({
     .pipe(z.array(z.enum(ROLES))),
 
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60_000),
-  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(500),
 
   // The public dashboard is unauthenticated, so its limiter is separate: no
   // session lookup and no write behind it, but also no caller identity to
