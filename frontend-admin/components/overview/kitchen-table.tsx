@@ -1,6 +1,8 @@
 import { HeartPulse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { InsightBox } from "@/components/ui/insight-box";
+import { kitchenInsight } from "@/lib/insight";
 import { completenessColor, dateLabel, type KitchenCompleteness } from "@/lib/kpi";
 
 const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
@@ -54,6 +56,7 @@ export function KitchenTable({ kitchens }: { kitchens: KitchenCompleteness[] }) 
           </tbody>
         </table>
       </div>
+      <InsightBox>{kitchenInsight(kitchens)}</InsightBox>
     </Card>
   );
 }

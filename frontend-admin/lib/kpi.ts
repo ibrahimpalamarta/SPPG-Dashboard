@@ -58,6 +58,13 @@ export const rpFull = (n: number) => `Rp${full.format(n)}`;
 export const pct = (share: number) => percent.format(share);
 export const dateLabel = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 
+/** Spend of the current calendar month (Jakarta) from the published daily series; `days` is how many days have spend. */
+export function monthSpend(k: FinanceKpi) {
+  const month = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }).slice(0, 7);
+  const rows = k.daily.filter(({ date }) => date.startsWith(month));
+  return { total: rows.reduce((n, { amount }) => n + amount, 0), days: rows.length };
+}
+
 /** Donut colours for the expense mix, in rank order; the unmapped slice is always slate. */
 const MIX_COLORS = ["#10b981", "#34d399", "#6ee7b7", "#a7f3d0", "#d1fae5"];
 

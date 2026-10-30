@@ -1,8 +1,8 @@
-import { RefreshCw, Users, WalletCards } from "lucide-react";
+import { CircleDollarSign, RefreshCw, Users, WalletCards } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatCard, type Stat } from "@/components/overview/stat-card";
-import { portionsInsight, runwayInsight } from "@/lib/insight";
-import { dateLabel, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
+import { efiInsight, monthSpendInsight, portionsInsight, runwayInsight } from "@/lib/insight";
+import { dateLabel, monthSpend, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
 
 const count = new Intl.NumberFormat("id-ID");
 
@@ -38,6 +38,15 @@ function stats(finance: FinanceKpi | null, menu: MenuKpi): Stat[] {
       label: efi.latest ? `Transfer EFI Terakhir · ${dateLabel(efi.latest.date)}` : "Transfer EFI Terakhir",
       value: efi.latest?.amount != null ? rp(efi.latest.amount) : "-",
       status: efi.latest ? undefined : "Belum ada data",
+      insight: efiInsight(finance),
+    });
+    const spend = monthSpend(finance);
+    out.push({
+      icon: CircleDollarSign,
+      label: "Pengeluaran · Bulan ini",
+      value: spend.days ? rp(spend.total) : "-",
+      status: spend.days ? undefined : "Belum ada data",
+      insight: monthSpendInsight(finance),
     });
   }
   return out;
@@ -49,7 +58,7 @@ export function WelcomeCard({ name, finance, menu }: { name: string; finance: Fi
     <Card className="p-6 sm:p-7">
       <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Selamat Datang, {name}!</h1>
       {items.length > 0 && (
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {items.map((stat) => (
             <StatCard key={stat.label} {...stat} />
           ))}

@@ -1,6 +1,8 @@
 import { AlertTriangle, HeartPulse } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { InsightBox } from "@/components/ui/insight-box";
 import { SourceLink } from "@/components/ui/source-link";
+import { nutritionInsight } from "@/lib/insight";
 import type { MenuKpi } from "@/lib/kpi";
 
 const count = new Intl.NumberFormat("id-ID");
@@ -105,6 +107,8 @@ export function NutritionInfo({ menu }: { menu: MenuKpi }) {
           </div>
         </div>
       )}
+
+      <InsightBox>{nutritionInsight(nutrition)}</InsightBox>
     </Card>
   );
 }

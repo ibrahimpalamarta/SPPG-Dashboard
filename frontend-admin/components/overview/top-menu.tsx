@@ -1,6 +1,8 @@
 import { Utensils } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { InsightBox } from "@/components/ui/insight-box";
 import { SourceLink } from "@/components/ui/source-link";
+import { topMenuInsight } from "@/lib/insight";
 import type { MenuKpi } from "@/lib/kpi";
 
 /** SCRUM-115: ranked by distinct serving days in the two-week window (OD-13 basis). */
@@ -32,6 +34,7 @@ export function TopMenu({ menus }: { menus: MenuKpi["topMenus"] }) {
           ))}
         </ol>
       )}
+      <InsightBox>{topMenuInsight(menus)}</InsightBox>
       <div className="mt-auto flex justify-end border-t border-slate-100 pt-4">
         <SourceLink />
       </div>

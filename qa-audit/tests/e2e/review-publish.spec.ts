@@ -166,12 +166,13 @@ test.describe.serial('Review dan publish', () => {
     });
   });
 
-  test('[SCRUM-103][SCRUM-65] Overview menampilkan "Belum ada data", bukan 0, untuk Penerima Manfaat dan Saldo @smoke @kpi', async ({ browser }) => {
+  test('[SCRUM-103][SCRUM-65] Overview menampilkan "Belum ada data", bukan 0, untuk Penerima Manfaat, Saldo, dan Pengeluaran @smoke @kpi', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
       await page.goto('overview');
       const main = page.getByRole('main');
       await expect(main.getByText('Penerima Manfaat / hari')).toBeVisible();
-      await expect(main.getByText('Belum ada data', { exact: true })).toHaveCount(2);
+      // Penerima Manfaat, Saldo, dan Pengeluaran · Bulan ini (fixture Feb 2026, bukan bulan berjalan).
+      await expect(main.getByText('Belum ada data', { exact: true })).toHaveCount(3);
       await shot(page, 'SCRUM-103', 1, 'overview-belum-ada-data');
     });
   });
@@ -187,6 +188,18 @@ test.describe.serial('Review dan publish', () => {
       // Porsi tersalurkan tidak ada di sumber Sukun: label, bukan 0.
       await expect(main.getByText(/Belum ada data porsi tersalurkan/)).toBeVisible();
       await shot(page, 'SCRUM-74', 1, 'top-5-menu-dan-gizi');
+    });
+  });
+
+  test('[SCRUM-149] Overview: setiap kotak punya AI Insight, termasuk kartu Pengeluaran · Bulan ini @smoke @kpi', async ({ browser }) => {
+    await sebagai(browser, 'admin', async (page) => {
+      await page.goto('overview');
+      const main = page.getByRole('main');
+      await expect(main.getByText('Pengeluaran · Bulan ini')).toBeVisible();
+      // 4 kartu KPI + Top 5 Supplier + Komposisi + Top 5 Menu + Informasi Gizi + perbandingan dapur.
+      await expect(main.getByText('AI Insight', { exact: true })).toHaveCount(9);
+      await expect(main.getByText(/^Belum ada data pengeluaran bulan ini/)).toBeVisible();
+      await shot(page, 'SCRUM-149', 1, 'overview-ai-insight');
     });
   });
 
