@@ -2,6 +2,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { shot } from './evidence.js';
 import { storageState, type RoleKey } from './roles.js';
+import { pilih } from './ui.js';
 
 // Alur sesudah unggah (skenario C-F dokumen pengujian manual): Data Operasional mem-publish sendiri
 // (Setujui & Publish, SCRUM-151), Admin hanya melihat, koreksi. Satu database dipakai bersama dan tiap langkah memakai hasil
@@ -30,7 +31,7 @@ const MENU: Jenis = { domain: 'Master Menu' };
 // koreksi batch Published (SCRUM-96) field disisipkan ke form; server action dan backend tetap asli.
 async function unggah(page: Page, name: string, buffer: Buffer, jenis = CASHFLOW, replaces?: string) {
   await page.goto('unggah-data');
-  if (jenis.domain) await page.getByRole('combobox', { name: 'Jenis data' }).first().selectOption({ label: jenis.domain });
+  if (jenis.domain) await pilih(page, 'Jenis data', jenis.domain);
   await page.locator('input[type=file]').setInputFiles({ name, mimeType: 'text/csv', buffer });
   if (replaces) {
     await page.locator('input[type=file]').evaluate((el, id) => {
@@ -128,14 +129,14 @@ test.describe.serial('Review dan publish', () => {
     });
   });
 
-  test('[SCRUM-137][SCRUM-148] Admin melihat file di Upload History, hanya lihat dengan Export @smoke @rbac', async ({ browser }) => {
+  test('[SCRUM-137][SCRUM-148] Admin melihat file di Validasi Data, hanya lihat tanpa Setujui & Publish @smoke @rbac', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
-      await page.goto('upload-history');
+      await page.goto('mapping-validasi');
       const baris = page.getByRole('row', { name: new RegExp(`^${FILE.replace('.', '\\.')}`) });
       await expect(baris.getByText('Dipublish')).toBeVisible();
-      await expect(baris.getByRole('link', { name: `Export ${FILE}` })).toBeVisible();
-      await expect(page.getByRole('link', { name: `Buka ${FILE}` })).toHaveCount(0);
-      await shot(page, 'SCRUM-148', 1, 'upload-history-admin');
+      await shot(page, 'SCRUM-148', 1, 'validasi-data-admin');
+      await bukaBatch(page, FILE);
+      await expect(page.getByRole('button', { name: 'Setujui & Publish' })).toHaveCount(0);
     });
   });
 
@@ -205,7 +206,7 @@ test.describe.serial('Review dan publish', () => {
     const baru = await unggahKirimPublish(browser, nama, koreksi, CASHFLOW, batchAwal);
     expect(baru).not.toBe(batchAwal);
     await sebagai(browser, 'admin', async (page) => {
-      await page.goto('upload-history');
+      await page.goto('mapping-validasi');
       await shot(page, 'SCRUM-96', 1, 'batch-lama-diganti');
       await expect(page.getByRole('row', { name: new RegExp(`^${FILE.replace('.', '\\.')}`) }).getByText('Diganti')).toBeVisible();
       await expect(page.getByRole('row', { name: new RegExp(`^${nama.replace('.', '\\.')}`) }).getByText('Dipublish')).toBeVisible();
@@ -214,9 +215,9 @@ test.describe.serial('Review dan publish', () => {
     });
   });
 
-  test('[SCRUM-148] Admin tidak bisa membuka Validasi Data untuk mem-publish @smoke @rbac', async ({ browser }) => {
+  test('[SCRUM-148] Admin membuka Validasi Data tapi tidak bisa mem-publish @smoke @rbac', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
-      expect((await page.goto(`mapping-validasi?batch=${batchAwal}`))?.status()).toBe(403);
+      expect((await page.goto(`mapping-validasi?batch=${batchAwal}`))?.status()).toBe(200);
       await expect(page.getByRole('button', { name: 'Setujui & Publish' })).toHaveCount(0);
     });
   });
