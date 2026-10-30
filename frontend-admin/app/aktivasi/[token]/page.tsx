@@ -17,7 +17,7 @@ export default async function Page({ params }: PageProps<"/aktivasi/[token]">) {
     return (
       <AuthCard title="Aktivasi akun">
         <p role="alert" className="text-sm text-red-700">
-          {res.status === 429 ? "Terlalu banyak percobaan. Coba lagi beberapa menit lagi." : "Tautan undangan kedaluwarsa atau dibatalkan. Minta Project Manager MBG mengirim ulang undangan."}
+          {res.status === 429 ? "Terlalu banyak percobaan. Coba lagi beberapa menit lagi." : "Tautan undangan kedaluwarsa atau dibatalkan. Minta Admin mengirim ulang undangan."}
         </p>
         <Link href="/login" className="text-sm font-medium text-emerald-700">
           Ke halaman masuk

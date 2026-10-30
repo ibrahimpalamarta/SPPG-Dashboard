@@ -2,6 +2,10 @@ import type { Prisma, UploadDomain } from '@prisma/client';
 import type { CashflowTxn } from './sukun-cashflow.js';
 import type { RabDailyBudget } from './sukun-rab.js';
 import type { InputMakerLine } from './input-maker.js';
+import type { MenuRecipeLine } from './sukun-menu.js';
+import type { Issue } from './values.js';
+import { classify } from '../validation/rules.js';
+import { classifySla } from './payment-sla.js';
 
 /** What an adapter produced for a batch, ready to store (B-MAPOUT: stored at upload). */
 export type MappedRecords = {
@@ -11,6 +15,8 @@ export type MappedRecords = {
   loadedAt: Date;
   domain: UploadDomain;
   records: unknown[];
+  /** Stored as validation_issue rows (SCRUM-33/51). */
+  issues?: Issue[];
 };
 
 // Postgres caps a statement at 65535 bind parameters; the widest row here has ~13.
@@ -23,7 +29,7 @@ async function insertChunked<T>(rows: T[], insert: (chunk: T[]) => Promise<unkno
 /**
  * Replaces the canonical rows of one batch: Cashflow → finance_transaction(+_line),
  * RAB → rab_daily_budget + rab_ingredient_budget, Input Maker →
- * vendor_payment_workflow. Runs inside the staging
+ * vendor_payment_workflow, Menu → menu_recipe_line. Runs inside the staging
  * transaction, so staging and canonical rows are never half-written. Other
  * domains have no canonical table yet.
  */
@@ -32,6 +38,8 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
   await tx.financeTransaction.deleteMany({ where: { uploadBatchId } });
   await tx.rabDailyBudget.deleteMany({ where: { uploadBatchId } });
   await tx.vendorPaymentWorkflow.deleteMany({ where: { uploadBatchId } });
+  await tx.menuRecipeLine.deleteMany({ where: { uploadBatchId } });
+  await tx.validationIssue.deleteMany({ where: { uploadBatchId } });
 
   // PRD §7.2 traceability: kitchen_id, source_system and source_file_name are the batch's.
   const batch = await tx.uploadBatch.findUniqueOrThrow({
@@ -47,11 +55,25 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
     templateVersion: mapped.templateVersion,
     loadedAt: mapped.loadedAt,
   };
+  await insertChunked(classify(mapped.issues ?? []), (chunk) =>
+    tx.validationIssue.createMany({
+      data: chunk.map((i) => ({
+        uploadBatchId,
+        kitchenId: batch.kitchenId,
+        code: i.code,
+        ruleId: i.rule ?? null,
+        severity: i.severity,
+        action: i.action,
+        sourceRecordId: i.sourceRecordId ?? null,
+        message: i.message,
+      })),
+    }),
+  );
   if (mapped.domain === 'CASHFLOW') {
     const txns = mapped.records as CashflowTxn[];
     await insertChunked(txns, (chunk) =>
       tx.financeTransaction.createMany({
-        data: chunk.map(({ lines, txn_date, txn_type, direction, category, description, txn_total, is_external_spend, review_status, review_note, confidence, txn_id }) => ({
+        data: chunk.map(({ lines, txn_date, txn_type, direction, category, category_normalized, description, txn_total, is_external_spend, is_internal_transfer, is_efi_transfer, review_status, review_note, confidence, txn_id }) => ({
           ...trace,
           // The transaction is traced to its first source row.
           sourceRecordId: lines[0]!.source_record_id,
@@ -60,9 +82,12 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
           txnType: txn_type,
           direction,
           category,
+          categoryNormalized: category_normalized,
           description,
           txnTotal: txn_total,
           isExternalSpend: is_external_spend,
+          isInternalTransfer: is_internal_transfer,
+          isEfiTransfer: is_efi_transfer,
           reviewStatus: review_status,
           reviewNote: review_note,
           confidence,
@@ -103,6 +128,38 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
           checklist: l.checklist,
           supplierInvoiceLink: l.supplier_invoice_link,
           paymentInvoiceLink: l.payment_invoice_link,
+          // SCRUM-48: no step times in Input Maker, so UNKNOWN until a source carries them.
+          slaStatus: classifySla({ receivedAt: null, makerInputAt: null, approvedAt: null, paidAt: null }),
+        })),
+      }),
+    );
+  } else if (mapped.domain === 'MENU') {
+    await insertChunked(mapped.records as MenuRecipeLine[], (chunk) =>
+      tx.menuRecipeLine.createMany({
+        data: chunk.map((l) => ({
+          ...trace,
+          sourceRecordId: l.source_record_id,
+          period: l.period,
+          servingDate: l.serving_date ? new Date(l.serving_date) : null,
+          menuType: l.menu_type,
+          portionSegment: l.portion_segment,
+          menuName: l.menu_name,
+          ingredient: l.ingredient,
+          urtUnit: l.urt_unit,
+          urtQty: l.urt_qty,
+          grossWeightG: l.gross_weight_g,
+          netWeightG: l.net_weight_g,
+          ediblePortionPct: l.edible_portion_pct,
+          energyKcal: l.energy_kcal,
+          proteinG: l.protein_g,
+          fatG: l.fat_g,
+          carbohydrateG: l.carbohydrate_g,
+          fiberG: l.fiber_g,
+          plannedPortions: l.beneficiaries,
+          ingredientNeedKg: l.ingredient_need_kg,
+          packagedNeedPax: l.packaged_need_pax,
+          unitPrice: l.unit_price,
+          lineTotal: l.line_total,
         })),
       }),
     );
@@ -118,6 +175,7 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
           budgetDate: new Date(d.budget_date),
           portionSegment: d.portion_segment,
           plannedCost: d.planned_cost,
+          missingLineTotals: d.missing_line_totals,
           packageCount: d.package_count,
         })),
         select: { id: true, budgetDate: true, portionSegment: true },

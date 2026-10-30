@@ -11,6 +11,10 @@ export type Finding = {
   description: string;
   /** One line per affected row, shown under the description. */
   details?: string[];
+  /** Adapter issue code: set on findings that can be marked as checked (SCRUM-51). */
+  code?: string;
+  /** Set once every issue of the code is resolved, with the reviewer's note. */
+  resolvedNote?: string | null;
 };
 
 export type Batch = {
@@ -43,51 +47,66 @@ export type MappingResult = {
     version: string;
     records: number;
     totals: Record<string, number>;
-    issues: { code: string; rule?: string; message: string }[];
+    issues: { code: string; rule?: string; message: string; severity?: "CRITICAL" | "HIGH" | "MEDIUM" }[];
     normalized: { code: string; field: string; count: number; example: { raw: string; value: string | number } }[];
     columns: MappedColumn[];
   } | null;
 };
 
-export type BatchDetail = Batch & { mappingResult: MappingResult | null };
+/** Per issue code: how many are open or resolved, and the note they were resolved with (backend validation_issues). */
+export type IssueStatus = { code: string; status: "OPEN" | "RESOLVED"; note: string | null; count: number };
 
-/** Severity per adapter issue code (backend `lib/mapping/sukun-cashflow.ts`); an unknown code is "check". */
-const issueMeta: Record<string, { severity: Severity; title: string; description: string }> = {
+export type BatchDetail = Batch & { mappingResult: MappingResult | null; issueStatus: IssueStatus[] };
+
+/** Copy per adapter issue code; severity comes from the backend rule (`lib/validation/rules.ts`). */
+const issueMeta: Record<string, { title: string; description: string }> = {
   NO_TXN_ID: {
-    severity: "blocker",
     title: "Baris tanpa ID transaksi",
     description: "Baris ini tidak punya txn_id sehingga tidak bisa dikelompokkan ke transaksi. Lengkapi txn_id di file lalu unggah ulang.",
   },
   LINES_NOT_TOTAL: {
-    severity: "blocker",
     title: "Jumlah baris tidak sama dengan total",
     description: "Penjumlahan jumlah_baris dalam satu transaksi berbeda dari kolom total. Total tidak dikoreksi otomatis.",
   },
   TOTAL_INCONSISTENT: {
-    severity: "blocker",
     title: "Total berbeda antar baris",
     description: "Baris-baris dari satu transaksi menulis nilai total yang berbeda, sehingga total transaksi tidak pasti.",
   },
   MISSING_REQUIRED: {
-    severity: "blocker",
     title: "Kolom wajib kosong",
     description: "Kolom wajib transaksi kosong atau tidak terbaca. Data kosong tidak diisi otomatis dan tidak dianggap 0.",
   },
   MISSING_AMOUNT: {
-    severity: "check",
     title: "Qty, harga, atau jumlah kosong",
     description: "Qty, harga satuan, atau jumlah baris kosong/tidak terbaca. Pastikan nilainya memang kosong di sumber.",
   },
   LINE_AMOUNT_MISMATCH: {
-    severity: "check",
     title: "Qty × harga tidak sama dengan jumlah baris",
     description: "Perkalian qty dan harga satuan berbeda lebih dari Rp0,5 dari jumlah baris.",
   },
   NEEDS_REVIEW: {
-    severity: "check",
     title: "Transaksi belum terkonfirmasi",
     description: "status_review belum TERKONFIRMASI. Transaksi ditahan dari KPI sampai dikonfirmasi.",
   },
+  INVALID_DATE: { title: "Tanggal kosong atau tidak terbaca", description: "Baris tanpa tanggal layanan yang valid tidak bisa dipakai." },
+  MISSING_VALUE: { title: "Nilai gizi, berat, porsi, atau harga kosong", description: "Nilai kosong tetap kosong dan tidak dianggap 0." },
+  NO_LINE_TOTAL: { title: "Total Harga kosong", description: "Biaya rencana hari itu ditandai tidak lengkap, bukan dihitung 0." },
+  IMPLAUSIBLE_VALUE: { title: "Nilai di luar batas wajar", description: "Nilai negatif atau persentase di luar 0–100. Tidak dikoreksi otomatis." },
+  DAY_MISMATCH: { title: "Nama hari tidak cocok dengan tanggal", description: "Kolom Hari berbeda dari hari tanggal layanan." },
+  INGREDIENT_NEEDS_REVIEW: { title: "Satu sel berisi beberapa bahan", description: "Kolom Bahan berisi lebih dari satu bahan dan perlu dipisah." },
+  URT_LOOKS_LIKE_DATE: { title: "Jumlah URT mirip tanggal Excel", description: "Kemungkinan pecahan (mis. 1/2) yang diubah Excel menjadi tanggal." },
+  DUPLICATE_LINE: { title: "Baris duplikat", description: "Tanggal, porsi, menu, dan bahan yang sama muncul lagi; baris pertama yang dipakai." },
+  MISSING_DATE: { title: "Tanggal kosong", description: "TANGGAL kosong atau tidak terbaca." },
+  UNMAPPED_CATEGORY: {
+    title: "Kategori belum ada di Daftar Kode",
+    description: "Kategori mentah tidak cocok dengan daftar Kategori pengeluaran di Data Reference, jadi belum masuk Komposisi Pengeluaran.",
+  },
+  RECON_SUM_MISMATCH: { title: "Total tidak cocok dengan Ringkasan_Transaksi", description: "Σ total transaksi berbeda dari Σ total di sheet ringkasan." },
+  RECON_COUNT_MISMATCH: { title: "Jumlah transaksi tidak cocok dengan ringkasan", description: "Banyaknya txn_id di Transaksi_Kas berbeda dari Ringkasan_Transaksi." },
+  RECON_TXN_MISSING: { title: "Transaksi hanya ada di salah satu sheet", description: "txn_id ada di Transaksi_Kas atau Ringkasan_Transaksi saja." },
+  RECON_TOTAL_MISMATCH: { title: "Total transaksi berbeda dari ringkasan", description: "Total satu transaksi berbeda dari baris ringkasannya." },
+  RECON_STATUS_MISMATCH: { title: "Status review berbeda dari ringkasan", description: "status_review di Transaksi_Kas berbeda dari Ringkasan_Transaksi." },
+  RECON_NO_SUMMARY: { title: "Tidak ada sheet Ringkasan_Transaksi", description: "Total transaksi tidak bisa dicocokkan karena file tidak membawa sheet ringkasan." },
 };
 
 const normalizedTitle: Record<string, string> = {
@@ -96,6 +115,7 @@ const normalizedTitle: Record<string, string> = {
   DATE_PARSED: "Tanggal diseragamkan",
   CASE_FOLDED: "Huruf besar/kecil diseragamkan",
   LINES_GROUPED: "Baris item dikelompokkan per transaksi",
+  UNIT_NORMALIZED: "Satuan diseragamkan",
 };
 
 export const severityMeta: Record<Severity, { label: string; tone: Tone; statusLabel: string }> = {
@@ -135,11 +155,15 @@ export function batchFindings(b: BatchDetail): Finding[] {
   if (!mapping) return out;
   const byCode = Map.groupBy(mapping.issues, (i) => i.code);
   for (const [code, issues] of byCode) {
-    const meta = issueMeta[code] ?? { severity: "check", title: code, description: "Temuan dari profil mapping." };
+    const meta = issueMeta[code] ?? { title: code, description: "Temuan dari profil mapping." };
     const rule = issues[0]?.rule;
+    const status = b.issueStatus.filter((s) => s.code === code);
+    const resolved = status.length > 0 && status.every((s) => s.status === "RESOLVED");
     out.push({
       id: `issue-${code}`,
-      severity: meta.severity,
+      severity: issues[0]?.severity === "CRITICAL" ? "blocker" : "check",
+      code,
+      resolvedNote: resolved ? (status[0]?.note ?? "") : null,
       title: meta.title,
       section: rule ? `Aturan ${rule}` : "Isi data",
       rows: `${issues.length} temuan`,

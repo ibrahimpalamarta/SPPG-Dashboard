@@ -96,6 +96,20 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
       },
     },
     rabIngredientBudget: { createMany: async ({ data }: { data: { dailyBudgetId: bigint }[] }) => void calls.push(`ing:${data.map((d) => d.dailyBudgetId).join(',')}`) },
+    validationIssue: {
+      deleteMany: del('issue'),
+      createMany: async ({ data }: { data: Record<string, unknown>[] }) => {
+        calls.push(`issue:${data.length}`);
+        traced.push(...data);
+      },
+    },
+    menuRecipeLine: {
+      deleteMany: del('menu'),
+      createMany: async ({ data }: { data: Record<string, unknown>[] }) => {
+        calls.push(`menu:${data.length}`);
+        traced.push(...data);
+      },
+    },
   };
   const repo = new PrismaStagingRepository({ $transaction: async (fn: (t: unknown) => Promise<void>) => fn(tx) } as unknown as PrismaClient);
   const empty: StagedBatch = { domain: 'CASHFLOW', sheets: [], rows: [] };
@@ -104,15 +118,15 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
   test('Cashflow: headers first, then lines, after the old canonical rows are cleared', async () => {
     calls.length = 0;
     const line = (id: string) => ({ source_record_id: id, line_id: null, item_name: null, counterparty: null, qty: 1, unit: 'kg', unit_price: 5, line_amount: 5 });
-    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, description: null, txn_total: 10, is_external_spend: true, review_status: null, review_note: null, confidence: null, lines: [line('a'), line('b')] };
+    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, category_normalized: null, description: null, txn_total: 10, is_external_spend: true, is_internal_transfer: false, is_efi_transfer: false, review_status: null, review_note: null, confidence: null, lines: [line('a'), line('b')] };
     await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', templateVersion: '1', loadedAt, domain: 'CASHFLOW', records: [txn] });
-    assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'pay:delete', 'txn:1', 'line:2']);
+    assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'pay:delete', 'menu:delete', 'issue:delete', 'txn:1', 'line:2']);
   });
 
   test('every canonical record carries the PRD §7.2 traceability fields', async () => {
     traced.length = 0;
     const line = { source_record_id: 'SKN:CASHFLOW:abc:Transaksi_Kas:2', line_id: null, item_name: null, counterparty: null, qty: 1, unit: 'kg', unit_price: 5, line_amount: 5 };
-    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, description: null, txn_total: 5, is_external_spend: true, review_status: null, review_note: null, confidence: null, lines: [line] };
+    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, category_normalized: null, description: null, txn_total: 5, is_external_spend: true, is_internal_transfer: false, is_efi_transfer: false, review_status: null, review_note: null, confidence: null, lines: [line] };
     await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', templateVersion: '1', loadedAt, domain: 'CASHFLOW', records: [txn] });
     assert.deepEqual(traced[0], {
       uploadBatchId: 'b-1',
@@ -128,9 +142,12 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
       txnType: 'BELANJA',
       direction: 'KELUAR',
       category: null,
+      categoryNormalized: null,
       description: null,
       txnTotal: 5,
       isExternalSpend: true,
+      isInternalTransfer: false,
+      isEfiTransfer: false,
       reviewStatus: null,
       reviewNote: null,
       confidence: null,
@@ -159,11 +176,41 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
     traced.length = 0;
     const rec = { source_record_id: 'SKN:INPUT_MAKER:abc:P1:3', payment_request_id: 'PAY-SKN-0123456789ab', line_no: '1', request_date: '2026-03-05', description: 'Beras', category: 'Bahan Baku', supplier: 'UD Maju', request_amount: 1500000, checklist: true, supplier_invoice_link: null, payment_invoice_link: null };
     await repo.replaceBatch('b-1', { ...empty, domain: 'INPUT_MAKER' }, { profileId: 'MAP-SKN-PAY-001', templateVersion: '1', loadedAt, domain: 'INPUT_MAKER', records: [rec] });
-    assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'pay:delete', 'pay:1']);
+    assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'pay:delete', 'menu:delete', 'issue:delete', 'pay:1']);
     const [row] = traced;
     assert.equal(row?.paymentRequestId, 'PAY-SKN-0123456789ab');
     assert.equal(row?.requestAmount, 1500000);
     assert.equal(row?.mappingProfileId, 'MAP-SKN-PAY-001');
     for (const k of ['paidAt', 'paidAmount', 'paymentReference', 'approvedAt', 'makerInputAt']) assert.ok(!(k in row!), k);
+  });
+
+  test('issues are stored with their severity and action, traceable to the source row (SCRUM-51)', async () => {
+    calls.length = 0;
+    traced.length = 0;
+    const issues = [
+      { code: 'NO_TXN_ID', rule: 'DQ-001', sourceRecordId: 'SKN:CASHFLOW:abc:Transaksi_Kas:9', message: 'tanpa txn_id' },
+      { code: 'SOMETHING_NEW', message: 'kode belum terdaftar' },
+    ];
+    await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', templateVersion: '1', loadedAt, domain: 'CASHFLOW', records: [], issues });
+    assert.ok(calls.includes('issue:2'));
+    assert.deepEqual(traced.map((t) => [t.code, t.severity, t.action, t.sourceRecordId, t.kitchenId]), [
+      ['NO_TXN_ID', 'CRITICAL', 'REJECT', 'SKN:CASHFLOW:abc:Transaksi_Kas:9', 7n],
+      // Unregistered codes are reviewed, never waved through.
+      ['SOMETHING_NEW', 'HIGH', 'REVIEW', null, 7n],
+    ]);
+  });
+
+  test('Menu: recipe lines are stored with planned portions and NULLs kept (SCRUM-73)', async () => {
+    calls.length = 0;
+    traced.length = 0;
+    const nums = { gross_weight_g: null, net_weight_g: 80, edible_portion_pct: null, urt_qty: null, energy_kcal: 120, protein_g: 3, fat_g: null, carbohydrate_g: 25, fiber_g: null, beneficiaries: 350, ingredient_need_kg: 28, packaged_need_pax: null, unit_price: 14000, line_total: 392000 };
+    const rec = { source_record_id: 'SKN:MENU:abc:Menu:4', kitchen_id: 'SKN', period: '1', serving_date: '2026-02-23', day_name: 'Senin', menu_type: 'Makanan Pokok', portion_segment: 'Besar', menu_name: 'Nasi Putih', ingredient: 'Beras', urt_unit: null, ...nums };
+    await repo.replaceBatch('b-1', { ...empty, domain: 'MENU' }, { profileId: 'MAP-SKN-MENU-001', templateVersion: '1', loadedAt, domain: 'MENU', records: [rec] });
+    assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'pay:delete', 'menu:delete', 'issue:delete', 'menu:1']);
+    const [row] = traced;
+    assert.equal(row?.servingDate instanceof Date, true);
+    assert.equal(row?.plannedPortions, 350);
+    assert.equal(row?.fatG, null);
+    assert.equal(row?.mappingProfileId, 'MAP-SKN-MENU-001');
   });
 });

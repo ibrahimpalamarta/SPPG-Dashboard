@@ -17,8 +17,10 @@ export type RabIngredientLine = {
 export type RabDailyBudget = {
   budget_date: string;
   portion_segment: string;
-  /** Σ line_total of the day's ingredient lines; lines without a total add nothing. */
+  /** Σ line_total of the day's ingredient lines that have one. */
   planned_cost: number;
+  /** SCRUM-53: lines without a total. Above 0 the planned cost is incomplete, never "0 for those lines". */
+  missing_line_totals: number;
   /** Largest "Kebutuhan Makanan Kemasan (pax)" of the day's lines; null when none has one. */
   package_count: number | null;
   lines: RabIngredientLine[];
@@ -45,10 +47,11 @@ export function applySukunRab(sheets: StagedSheet[], rows: StagingRow[], profile
     const key = `${l.serving_date}|${l.portion_segment}`;
     let day = days.get(key);
     if (!day) {
-      day = { budget_date: l.serving_date, portion_segment: l.portion_segment, planned_cost: 0, package_count: null, lines: [] };
+      day = { budget_date: l.serving_date, portion_segment: l.portion_segment, planned_cost: 0, missing_line_totals: 0, package_count: null, lines: [] };
       days.set(key, day);
     }
-    day.planned_cost += l.line_total ?? 0;
+    if (l.line_total === null) day.missing_line_totals++;
+    else day.planned_cost += l.line_total;
     if (l.packaged_need_pax !== null) day.package_count = Math.max(day.package_count ?? 0, l.packaged_need_pax);
     day.lines.push({
       source_record_id: l.source_record_id,

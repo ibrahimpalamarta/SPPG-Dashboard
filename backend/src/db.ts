@@ -57,4 +57,11 @@ export type Db = Pick<
   | 'cmsDocument'
   | 'galleryImage'
   | 'referenceEntry'
+  | 'validationIssue'
+  | 'stagingRow'
+  | 'governmentSubmissionLog'
+  | 'financeBalance'
+  | 'rabDailyBudget'
+  | 'menuRecipeLine'
+  | 'beneficiaryDailyCount'
 >;

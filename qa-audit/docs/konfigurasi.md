@@ -53,6 +53,7 @@ Dibuat `scripts/seed-qa.ts`, email `qa.<key>@qa-audit.test`. Peta role PRD → r
 | `finance` | Finance | `FINANCE` | semua |
 | `kepala-kitchen-skn` | Kepala Kitchen Sukun | `KEPALA_KITCHEN` | SKN |
 | `data-steward` | Data Steward pusat | `DATA_STEWARD` | semua |
+| `pm` | Super Admin / PM MBG (QD-39) | `SUPER_ADMIN` | semua |
 
 Login dilakukan sekali per role oleh project `setup` (`tests/e2e/auth.setup.ts`), disimpan ke
 `.auth/<key>.json`; test memakai `test.use({ storageState: storageState('finance') })`.

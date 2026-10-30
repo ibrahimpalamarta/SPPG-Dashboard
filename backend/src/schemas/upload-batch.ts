@@ -57,15 +57,15 @@ export const uploadBatchCreateQuery = z.object({
 });
 
 /**
- * SCRUM-22: the review step. Only the states a reviewer may set by hand;
- * PROCESSING / NEEDS_MAPPING_UPDATE are set by the pipeline and PUBLISHED by
- * the publish flow. Whether the move is legal from the current state is
- * checked against `upload-status.ts` in the controller.
+ * SCRUM-22: the states Data Operasional may set by hand; PROCESSING /
+ * NEEDS_MAPPING_UPDATE are set by the pipeline and PUBLISHED by the publish
+ * flow. Whether the move is legal from the current state is checked against
+ * `upload-status.ts` in the controller.
  */
 export const uploadBatchUpdate = z
   .object({
     status: z
-      .enum([UploadStatus.NEEDS_REVIEW, UploadStatus.READY, UploadStatus.FAILED])
+      .enum([UploadStatus.NEEDS_REVIEW, UploadStatus.FAILED])
       .optional(),
     notes: z.string().max(2000).nullish(),
   })

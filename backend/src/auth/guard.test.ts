@@ -50,32 +50,29 @@ function run(handler: ReturnType<typeof requireRole>, req: Partial<Request>) {
 
 describe('requireRole', () => {
   test('lets an allowed role through', () => {
-    const { nexted, status } = run(requireRole('SUPER_ADMIN'), { user: userWith('SUPER_ADMIN') });
+    const { nexted, status } = run(requireRole('ADMIN'), { user: userWith('ADMIN') });
     assert.equal(nexted, true);
     assert.equal(status, undefined);
   });
 
   test('accepts any role on the allow-list', () => {
-    const guard = requireRole('SUPER_ADMIN', 'DATA_ADMIN');
+    const guard = requireRole('ADMIN', 'DATA_ADMIN');
     assert.equal(run(guard, { user: userWith('DATA_ADMIN') }).nexted, true);
   });
 
   test('denies a role that is not on the list with 403', () => {
-    const { status, body, nexted } = run(requireRole('SUPER_ADMIN'), { user: userWith('DATA_ADMIN') });
+    const { status, body, nexted } = run(requireRole('ADMIN'), { user: userWith('DATA_ADMIN') });
     assert.equal(status, 403);
     assert.equal(body?.error, 'forbidden');
     assert.equal(nexted, false);
   });
 
-  test('denies the view-only roles on a mutating route', () => {
-    const mutate = requireRole('SUPER_ADMIN', 'DATA_ADMIN');
-    for (const role of ['MANAGEMENT', 'FINANCE', 'KEPALA_KITCHEN'] as const) {
-      assert.equal(run(mutate, { user: userWith(role) }).status, 403, role);
-    }
+  test('denies a role that is not on the allow-list', () => {
+    assert.equal(run(requireRole('DATA_ADMIN'), { user: userWith('ADMIN') }).status, 403);
   });
 
   test('returns 401, not 403, when no user was attached', () => {
-    const { status, nexted } = run(requireRole('MANAGEMENT'), {});
+    const { status, nexted } = run(requireRole('ADMIN'), {});
     assert.equal(status, 401);
     assert.equal(nexted, false);
   });
@@ -94,7 +91,7 @@ describe('requirePermission', () => {
   });
 
   test('least privilege: a user-management permission is not implied by being an admin role', () => {
-    assert.equal(run(requirePermission('users:read'), { user: userWith('DATA_STEWARD') }).status, 403);
+    assert.equal(run(requirePermission('users:read'), { user: userWith('DATA_ADMIN') }).status, 403);
   });
 
   test('returns 401 when no user was attached', () => {
@@ -103,8 +100,8 @@ describe('requirePermission', () => {
 });
 
 describe('resolveKitchenIds', () => {
-  test('SUPER_ADMIN is unscoped even with rows', () => {
-    assert.equal(resolveKitchenIds(userWith('SUPER_ADMIN', [7n])), null);
+  test('ADMIN is unscoped even with rows', () => {
+    assert.equal(resolveKitchenIds(userWith('ADMIN', [7n])), null);
   });
 
   test('DATA_ADMIN is pinned to its own kitchens', () => {
@@ -122,7 +119,7 @@ describe('requireAuth', () => {
 
   /** A db whose only live session is for TOKEN; `patch` bends it into each failure mode. */
   const dbWith = (patch: { revokedAt?: Date; expiresAt?: Date; lastSeenAt?: Date; status?: 'ACTIVE' | 'INACTIVE' } = {}) => {
-    const user = { ...userWith('MANAGEMENT'), status: patch.status ?? 'ACTIVE' };
+    const user = { ...userWith('DATA_ADMIN'), status: patch.status ?? 'ACTIVE' };
     const touched: unknown[] = [];
     const db = {
       session: {
@@ -167,7 +164,7 @@ describe('requireAuth', () => {
   test('a live session attaches the Postgres user and its current permissions', async () => {
     const r = await call(dbWith().db, `Bearer ${TOKEN}`);
     assert.equal(r.nexted, true);
-    assert.equal(r.req.user?.role, 'MANAGEMENT');
+    assert.equal(r.req.user?.role, 'DATA_ADMIN');
     assert.equal(r.req.sessionId, 9n);
     // Retired permission names in the table are dropped, not trusted.
     assert.deepEqual(r.req.user?.permissions, ['upload:view']);
@@ -211,10 +208,10 @@ describe('requireAuth', () => {
   });
 });
 
-describe('SUPER_ADMIN permissions (four-eyes)', () => {
-  test('reviewer holds publish and review but not the maker permissions', async () => {
-    const granted = await permissionsFor('SUPER_ADMIN', {} as Db);
-    assert.ok(granted.includes('batch:publish') && granted.includes('users:manage'));
-    assert.ok(!granted.includes('upload:create') && !granted.includes('mapping:propose'));
+describe('ADMIN permissions', () => {
+  test('admin manages but neither uploads nor publishes', async () => {
+    const granted = await permissionsFor('ADMIN', {} as Db);
+    assert.ok(granted.includes('users:manage') && granted.includes('upload:view'));
+    for (const p of ['upload:create', 'mapping:propose', 'batch:publish'] as const) assert.ok(!granted.includes(p), p);
   });
 });

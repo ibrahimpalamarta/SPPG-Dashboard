@@ -39,6 +39,10 @@ export type MenuRecipeLine = {
   urt_unit: string | null;
 } & Record<Numeric, number | null>;
 
+/** Excel serials of 2000-01-01 and 2099-12-31. */
+const EXCEL_SERIAL_2000 = 36526;
+const EXCEL_SERIAL_2099 = 73050;
+
 const DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
 /**
@@ -90,6 +94,10 @@ export function applySukunMenu(sheets: StagedSheet[], rows: StagingRow[], profil
     const implausible = [...NUTRIENTS, 'edible_portion_pct' as const].filter((k) => (line[k] ?? 0) < 0 || (k === 'edible_portion_pct' && (line[k] ?? 0) > 100));
     if (implausible.length) {
       issues.push({ code: 'IMPLAUSIBLE_VALUE', rule: 'DQ-028', sourceRecordId: id, message: `${at}: ${implausible.join(', ')} negatif atau di luar 0-100.` });
+    }
+    // Excel turns a typed fraction ("1/2") into a date serial; seen in the Sukun baseline as 46024. Flagged, kept as read.
+    if (line.urt_qty !== null && Number.isInteger(line.urt_qty) && line.urt_qty >= EXCEL_SERIAL_2000 && line.urt_qty <= EXCEL_SERIAL_2099) {
+      issues.push({ code: 'URT_LOOKS_LIKE_DATE', sourceRecordId: id, message: `${at}: Jumlah URT ${line.urt_qty} kemungkinan pecahan yang diubah Excel menjadi tanggal.` });
     }
     // DQ-011: kept raw, mapping to ingredient master is a separate step.
     if (line.ingredient?.includes(',')) {

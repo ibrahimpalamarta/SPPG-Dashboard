@@ -42,20 +42,12 @@ Catatan desain:
 
 ### Role
 
-Tujuh role di enum `Role` (PRD Oktober 2026 §3):
+Dua role di enum `Role` (SCRUM-152):
 
 | Enum | Akses |
 |---|---|
-| `SUPER_ADMIN` | **Admin Sistem / PM MBG.** Penuh — kelola akun & role, master data, audit, seluruh data operasional. Selalu memegang semua permission |
-| `MANAGEMENT` | COO/Head of MBG: semua dapur, agregat, read-only, melihat kolom biaya |
-| `FINANCE` | Semua dapur, metrik finansial, read-only, melihat kolom biaya |
-| `DATA_STEWARD` | Analyst pusat, semua dapur: review/publish batch, mapping, referensi, audit; melihat kolom biaya |
-| `KEPALA_KITCHEN` | Dapur sendiri, read-only; melihat kolom biaya |
-| `DATA_ADMIN` | PIC/Data Admin Kitchen: upload untuk dapur sendiri; melihat kolom biaya |
-| `AHLI_GIZI` | Dapur sendiri: dukung mapping menu; **tidak** melihat biaya |
-
-Role per dapur (`KEPALA_KITCHEN`, `DATA_ADMIN`, `AHLI_GIZI`) wajib punya minimal satu
-baris di `user_kitchen_scopes`; tanpa itu mereka tidak melihat dapur mana pun.
+| `ADMIN` | Dulu PM MBG. Semua dapur: kelola akun & role, Data Reference, audit, lihat Upload History (hanya lihat + Export). **Tidak** mengunggah, mereview, atau mem-publish file |
+| `DATA_ADMIN` | Data Operasional: terikat **satu** dapur (`user_kitchen_scopes`), unggah, cek validasi, lalu Setujui & Publish sendiri. Tanpa scope = tidak melihat dapur mana pun |
 
 Route baru memeriksa **permission**, bukan role: `requirePermission('upload:create')`.
 Pemetaan role → permission ada di tabel `role_permissions` dan diubah lewat
@@ -72,15 +64,14 @@ dikenal ada di `PERMISSIONS` (`src/auth/roles.ts`).
 kitchenRouter.get('/', validate({ query: kitchenListQuery }), wrap(listKitchens()));
 kitchenRouter.post(
   '/',
-  requireRole('SUPER_ADMIN'),
+  requireRole('ADMIN'),
   validate({ body: kitchenCreate }),
   wrap(createKitchen()),
 );
 ```
 
-`MANAGEMENT`, `FINANCE`, dan `KEPALA_KITCHEN` jadi read-only atas data operasional bukan
-lewat flag khusus, tapi karena tidak pernah masuk allow-list route yang
-mengubahnya.
+`ADMIN` tidak bisa mengunggah atau mem-publish bukan lewat flag khusus, tapi karena `upload:create`
+dan `batch:publish` tidak pernah ia pegang (`MAKER_PERMISSIONS`).
 
 Untuk route yang discope per SPPG Dapur, jangan pakai `kitchenId` dari client
 begitu saja — lewatkan ke `kitchenScope(req.user, requested)` di
@@ -169,10 +160,10 @@ export SEED_SUPERADMIN_EMAIL=admin@example.com
 npm run seed:superadmin
 ```
 
-Membuat (atau mempromosikan) akun `SUPER_ADMIN` di Postgres dan menulis audit log.
+Membuat (atau mempromosikan) akun `ADMIN` di Postgres dan menulis audit log.
 
 - **Idempotent.** Dijalankan ulang tidak membuat duplikat; memastikan role
-  `SUPER_ADMIN`, status aktif, dan kunci akun terbuka.
+  `ADMIN`, status aktif, dan kunci akun terbuka.
 - **Tanpa password (disarankan).** Kalau `SEED_SUPERADMIN_PASSWORD` kosong, dicetak
   link set-password sekali pakai (`/admin/reset-password/<token>`). Tidak ada
   password yang lewat shell history atau log CI.
@@ -309,10 +300,10 @@ Merutekan pada `publicId` (UUID), tidak pernah pada id berurutan.
 
 | Endpoint | Role penulis | Scrum |
 |---|---|---|
-| `GET/POST /api/kitchens`, `GET/PATCH /:id` | SUPER_ADMIN | 15 |
-| `GET/POST /api/ingredients`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | — |
+| `GET/POST /api/kitchens`, `GET/PATCH /:id` | ADMIN | 15 |
+| `GET/POST /api/ingredients`, `GET/PATCH /:id` | ADMIN, DATA_ADMIN | — |
 | `GET /api/akg-targets`, `/:id` | read-only (hasil seed) | 8 |
-| `POST /api/upload-batches` (multipart), `GET`, `GET/PATCH /:id` | SUPER_ADMIN, DATA_ADMIN | 5, 6, 7 |
+| `POST /api/upload-batches` (multipart), `GET`, `GET/PATCH /:id` | ADMIN, DATA_ADMIN | 5, 6, 7 |
 | `GET /api/menu-plans`, `/:id` | read-only (dari import) | 2 |
 | `GET /api/menu-plans/:id/recipe-costings` | internal-only | 13 |
 | `GET /api/menu-nutritions` | read-only | 12 |
@@ -320,9 +311,9 @@ Merutekan pada `publicId` (UUID), tidak pernah pada id berurutan.
 | `GET /api/akg-compliances` | read-only | 8 |
 | `GET /api/menu-costs` | internal-only | 13 |
 | `GET /api/summaries`, `GET /api/dashboard/summary` | read-only | 9, 11 |
-| `/api/cms/announcements` (CRUD, JSON) | SUPER_ADMIN | 14 |
-| `/api/cms/documents`, `/gallery` (CRUD, multipart) | SUPER_ADMIN | 14 |
-| `/api/admin/users` (daftar, buat, ubah, reset password/MFA, cabut sesi), `/api/admin/roles`, `/api/admin/audit-logs` | `users:read/manage`, `settings:manage`, `audit:read` (default SUPER_ADMIN) | 1 |
+| `/api/cms/announcements` (CRUD, JSON) | ADMIN | 14 |
+| `/api/cms/documents`, `/gallery` (CRUD, multipart) | ADMIN | 14 |
+| `/api/admin/users` (daftar, buat, ubah, reset password/MFA, cabut sesi), `/api/admin/roles`, `/api/admin/audit-logs` | `users:read/manage`, `settings:manage`, `audit:read` (default ADMIN) | 1 |
 | `/api/auth/*` (logout, sesi, ganti password, MFA) | sesi sendiri | — |
 
 ### Unggah berkas (SCRUM-5, 6, 14)
@@ -407,7 +398,7 @@ Tiga lapis, semuanya perlu:
   membacanya tanpa perlu akses ke tabel dasarnya.
 - **Layer aplikasi** — `src/lib/visibility.ts`, untuk route **terautentikasi**.
   `menu_plans.hargaBahan`/`totalHarga` dan `daily_kitchens.jumlahPm` dibuang
-  untuk role di luar `COST_ROLES` (semua kecuali AHLI_GIZI); `recipe_costings` dan
+  untuk role di luar `COST_ROLES` (ADMIN dan DATA_ADMIN); `recipe_costings` dan
   `menu_costs` sensitif seluruhnya sehingga guard menutup resource-nya.
 
 Menyalakannya (sekali per environment, setelah `migrate:deploy`):

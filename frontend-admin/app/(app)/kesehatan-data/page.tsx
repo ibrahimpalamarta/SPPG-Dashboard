@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { KitchenDetail, SipgnStatus } from "@/components/kelengkapan/kitchen-detail";
+import { KitchenDetail } from "@/components/kelengkapan/kitchen-detail";
 import { StatusMatrix } from "@/components/kelengkapan/status-matrix";
 import { Card } from "@/components/ui/card";
 import { SampleDataNote } from "@/components/ui/sample-data-note";
@@ -32,7 +32,6 @@ export default async function KelengkapanPage() {
 
         <StatusMatrix />
         <KitchenDetail />
-        <SipgnStatus />
       </Card>
     </div>
   );

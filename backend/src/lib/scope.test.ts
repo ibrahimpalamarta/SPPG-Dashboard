@@ -9,14 +9,14 @@ function userWith(role: Role, ...kitchenIds: bigint[]): AppUser {
 }
 
 describe('kitchenScope', () => {
-  test('SUPER_ADMIN is unfiltered when no kitchen is requested', () => {
-    const scope = kitchenScope(userWith('SUPER_ADMIN'));
+  test('ADMIN is unfiltered when no kitchen is requested', () => {
+    const scope = kitchenScope(userWith('ADMIN'));
     assert.equal(scope.ok, true);
     assert.deepEqual(kitchenWhere(scope as { ok: true }), {});
   });
 
-  test('SUPER_ADMIN may narrow to any kitchen, scope rows notwithstanding', () => {
-    const scope = kitchenScope(userWith('SUPER_ADMIN', 1n), 7n);
+  test('ADMIN may narrow to any kitchen, scope rows notwithstanding', () => {
+    const scope = kitchenScope(userWith('ADMIN', 1n), 7n);
     assert.deepEqual(kitchenWhere(scope as { ok: true }), { kitchenId: { in: [7n] } });
   });
 
@@ -40,24 +40,11 @@ describe('kitchenScope', () => {
     assert.deepEqual(kitchenScope(userWith('DATA_ADMIN'), 1n), { ok: false });
   });
 
-  test('KEPALA_KITCHEN and AHLI_GIZI with no dapur see nothing — fail closed', () => {
-    for (const role of ['KEPALA_KITCHEN', 'AHLI_GIZI'] as const) {
-      assert.deepEqual(kitchenWhere(kitchenScope(userWith(role)) as { ok: true }), { kitchenId: { in: [] } }, role);
-    }
-  });
-
-  test('MANAGEMENT, FINANCE and DATA_STEWARD with no rows see all; with rows stay inside them', () => {
-    for (const role of ['MANAGEMENT', 'FINANCE', 'DATA_STEWARD'] as const) {
-      assert.deepEqual(kitchenWhere(kitchenScope(userWith(role)) as { ok: true }), {}, role);
-      assert.deepEqual(kitchenScope(userWith(role, 5n), 6n), { ok: false }, role);
-    }
-  });
-
   test('menuPlanWhere scopes through the relation for tables with no kitchenId', () => {
     const scope = kitchenScope(userWith('DATA_ADMIN', 3n));
     assert.deepEqual(menuPlanWhere(scope as { ok: true }), { menuPlan: { kitchenId: { in: [3n] } } });
 
-    const unrestricted = kitchenScope(userWith('SUPER_ADMIN'));
+    const unrestricted = kitchenScope(userWith('ADMIN'));
     assert.deepEqual(menuPlanWhere(unrestricted as { ok: true }), {});
   });
 });

@@ -7,7 +7,6 @@ type Status = { label: string; tone: Tone };
 type Stat = { icon: LucideIcon; label: string; value: string; valueClass?: string };
 type MatrixRow = { code: string; name: string; note: string; cells: Status[]; active?: boolean; phase?: string };
 type DetailRow = { icon: LucideIcon; type: string; status: Status; issue?: Status; approvedAt?: string; action?: "Ingatkan" | "Buka" };
-type Delivery = { title: string; code: string; note: string; status: Status };
 
 const s = (label: string, tone: Tone): Status => ({ label, tone });
 
@@ -50,12 +49,4 @@ export const detail: DetailRow[] = [
   { icon: BookOpen, type: "Master Menu", status: entered, approvedAt: "06 Nov 2026 15:02" },
   { icon: Package, type: "Penerimaan Barang", status: optional },
   { icon: Send, type: "Status Kirim SIPGN/BGN", status: missing, action: "Ingatkan" },
-];
-
-export const deliveries: Delivery[] = [
-  { title: "RAB P14", code: "SKN", note: "SIPGN – Aksis · Terkirim 09 Nov", status: s("Sudah terhubung", "green") },
-  { title: "Nota belanja (per transaksi)", code: "SKN", note: "Portal BGN (satu per satu) · Sebagian 61 dari 78", status: s("Sudah terhubung", "green") },
-  { title: "Laporan VA Harian", code: "SKN", note: "SIPGN · Terkirim tiap hari", status: s("Hanya untuk mencocokkan", "amber") },
-  { title: "Food waste", code: "SKN", note: "SIPGN · —", status: s("Phase 2a", "slate") },
-  { title: "Laporan keuangan BGN", code: "LWG", note: "SIPGN – Aksis · Terkirim 01 Okt", status: s("Perlu file ekspor", "amber") },
 ];

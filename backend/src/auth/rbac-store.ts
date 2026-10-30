@@ -4,7 +4,7 @@ import { MAKER_PERMISSIONS, PERMISSIONS, type Permission, type Role } from './ro
 const TTL_MS = 30_000;
 const cache = new Map<Role, { permissions: readonly Permission[]; at: number }>();
 
-const REVIEWER_PERMISSIONS = PERMISSIONS.filter((p) => !MAKER_PERMISSIONS.includes(p));
+const ADMIN_PERMISSIONS = PERMISSIONS.filter((p) => !MAKER_PERMISSIONS.includes(p));
 
 const known =(p: string): p is Permission => (PERMISSIONS as readonly string[]).includes(p);
 
@@ -17,7 +17,7 @@ const known =(p: string): p is Permission => (PERMISSIONS as readonly string[]).
  */
 export async function permissionsFor(role: Role, db: Db, now = Date.now()): Promise<readonly Permission[]> {
   // Never read from the table: the one role that must not be lockable-out.
-  if (role === 'SUPER_ADMIN') return REVIEWER_PERMISSIONS;
+  if (role === 'ADMIN') return ADMIN_PERMISSIONS;
 
   const hit = cache.get(role);
   if (hit && now - hit.at < TTL_MS) return hit.permissions;

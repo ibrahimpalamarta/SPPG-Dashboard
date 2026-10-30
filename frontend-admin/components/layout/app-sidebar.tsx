@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BookOpen, Inbox, LayoutDashboard, LogOut, Map, Plug, ShieldCheck, Upload, Users, Wallet } from "lucide-react";
+import { Activity, BookOpen, History, Inbox, LayoutDashboard, LogOut, Map, Plug, ShieldCheck, Upload, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { Fragment } from "react";
 import { usePathname } from "next/navigation";
@@ -8,7 +8,7 @@ import { logout } from "@/app/login/actions";
 import type { NAV } from "@/lib/nav";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 
-const ICONS = { Activity, BookOpen, Inbox, LayoutDashboard, Map, Plug, ShieldCheck, Upload, Users, Wallet };
+const ICONS = { Activity, BookOpen, History, Inbox, LayoutDashboard, Map, Plug, ShieldCheck, Upload, Users, Wallet };
 
 export type NavItem = Omit<(typeof NAV)[number], "label"> & { label: string };
 

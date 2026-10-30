@@ -32,18 +32,18 @@ const TABS: { key: Status | "ALL"; label: string }[] = [
 const ROLE_CARDS: { role: Role; description: string; chips: string[] }[] = [
   {
     role: "DATA_ADMIN",
-    description: "Mengerjakan data: unggah file, mapping & validasi, resolve issue, dan mengajukan review ke Project Manager.",
-    chips: ["Unggah & validasi", "Resolve issue", "Ajukan review"],
+    description: "Mengerjakan data satu dapur: unggah file, cek validasi, lalu Setujui & Publish sendiri.",
+    chips: ["Unggah & validasi", "Resolve issue", "Setujui & Publish"],
   },
   {
-    role: "SUPER_ADMIN",
-    description: "Mereview data yang diinput Data Operasional, lalu menyetujui (publish) atau mengembalikannya, serta mengelola anggota.",
-    chips: ["Review batch", "Setujui & publish", "Kembalikan + catatan", "Kelola anggota"],
+    role: "ADMIN",
+    description: "Melihat semua dapur, mengelola anggota, Data Reference, dan Upload History (hanya lihat + Export).",
+    chips: ["Semua dapur", "Kelola anggota", "Data Reference", "Upload History"],
   },
 ];
 
 const ALUR = [
-  ["1 · Undang", "Project Manager MBG", "Isi nama, email, role, dan dapur"],
+  ["1 · Undang", "Admin", "Isi nama, email, role, dan dapur"],
   ["2 · Validasi", "Sistem", "Email belum terdaftar"],
   ["3 · Tautan aktivasi", "Status: Menunggu aktivasi", "Bisa dikirim ulang atau dibatalkan"],
   ["4 · Aktivasi", "Penerima", "Membuat kata sandi; role sudah ditetapkan"],
@@ -53,8 +53,7 @@ const ALUR = [
 const PERMISSION_LABELS: Record<Permission, string> = {
   "upload:create": "Unggah file",
   "upload:view": "Lihat riwayat unggah",
-  "batch:review": "Review & kembalikan batch",
-  "batch:publish": "Setujui & publish batch",
+  "batch:publish": "Setujui & Publish file",
   "mapping:view": "Lihat mapping",
   "mapping:propose": "Ajukan mapping",
   "reference:view": "Lihat Data Reference",
@@ -241,14 +240,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
                 <tr>
                   <th className="px-4 py-3 font-medium">Aksi</th>
                   <th className="px-4 py-3 text-center font-medium">{ROLE_LABELS.DATA_ADMIN}</th>
-                  <th className="px-4 py-3 text-center font-medium">{ROLE_LABELS.SUPER_ADMIN}</th>
+                  <th className="px-4 py-3 text-center font-medium">{ROLE_LABELS.ADMIN}</th>
                 </tr>
               </thead>
               <tbody>
                 {PERMISSIONS.map((p) => (
                   <tr key={p} className="border-t border-slate-100">
                     <td className="px-4 py-2.5 font-medium text-slate-800">{PERMISSION_LABELS[p]}</td>
-                    {(["DATA_ADMIN", "SUPER_ADMIN"] as const).map((r) => (
+                    {(["DATA_ADMIN", "ADMIN"] as const).map((r) => (
                       <td key={r} className="px-4 py-2.5 text-center">
                         {granted(r).includes(p) ? (
                           <Check className="mx-auto size-4 text-emerald-600" aria-label="Diizinkan" />

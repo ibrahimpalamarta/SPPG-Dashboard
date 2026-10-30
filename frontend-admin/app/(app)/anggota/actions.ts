@@ -16,9 +16,9 @@ export type UserActionState = {
 const text = (form: FormData, key: string) => (typeof form.get(key) === "string" ? (form.get(key) as string) : "");
 const ids = (form: FormData) => form.getAll("kitchenIds").filter((v): v is string => typeof v === "string" && v !== "");
 
-/** PRD Oktober §3: these roles see only their own kitchens, and the backend rejects an empty set. */
-const KITCHEN_SCOPED = ["KEPALA_KITCHEN", "DATA_ADMIN", "AHLI_GIZI"];
-const NO_KITCHENS: UserActionState = { message: "Pilih minimal satu dapur untuk role ini." };
+/** SCRUM-144: Data Operasional is tied to exactly one dapur; the backend rejects any other count. */
+const KITCHEN_SCOPED = ["DATA_ADMIN"];
+const ONE_KITCHEN: UserActionState = { message: "Pilih satu dapur untuk role ini." };
 
 const untilDate = (iso: unknown) => new Date(String(iso)).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
@@ -38,7 +38,7 @@ export async function createUser(_prev: UserActionState, form: FormData): Promis
   const role = text(form, "role");
   const scoped = KITCHEN_SCOPED.includes(role);
   const kitchenIds = scoped ? ids(form) : [];
-  if (scoped && kitchenIds.length === 0) return NO_KITCHENS;
+  if (scoped && kitchenIds.length !== 1) return ONE_KITCHEN;
   const res = await apiSend("/admin/users", "POST", {
     email,
     fullName: text(form, "fullName"),
@@ -55,9 +55,9 @@ export async function createUser(_prev: UserActionState, form: FormData): Promis
 export async function saveUser(id: string, _prev: UserActionState, form: FormData): Promise<UserActionState> {
   const role = text(form, "role");
   const scoped = KITCHEN_SCOPED.includes(role);
-  // A role change replaces the whole scope: the picked kitchens, or none (all kitchens) for a cross-kitchen role.
+  // A role change replaces the whole scope: the picked dapur, or none (all dapur) for Admin.
   const kitchenIds = role ? (scoped ? ids(form) : []) : undefined;
-  if (scoped && kitchenIds?.length === 0) return NO_KITCHENS;
+  if (scoped && kitchenIds?.length !== 1) return ONE_KITCHEN;
   const res = await apiSend(`/admin/users/${id}`, "PATCH", {
     // A disabled control (your own row) is not submitted: leave the field out, don't send "".
     fullName: text(form, "fullName") || undefined,

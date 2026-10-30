@@ -72,32 +72,20 @@ describe('listMenuPlans (SCRUM-2)', () => {
     assert.equal(status, 403);
   });
 
-  test('SCRUM-13: cost columns reach MANAGEMENT', async () => {
+  test('SCRUM-13: cost columns reach DATA_ADMIN', async () => {
     const { db } = fakeDb();
     const { body } = await run(listMenuPlans(db), {
-      user: userWith('MANAGEMENT'),
+      user: userWith('DATA_ADMIN', 3n),
       valid: { query: { page: 1, pageSize: 25 } },
     });
     assert.equal(firstRow(body).hargaBahan, 12000);
     assert.equal(firstRow(body).totalHarga, 480000);
   });
 
-  test('SCRUM-13: cost columns are stripped for AHLI_GIZI', async () => {
-    const { db } = fakeDb();
-    const { body } = await run(listMenuPlans(db), {
-      user: userWith('AHLI_GIZI'),
-      valid: { query: { page: 1, pageSize: 25 } },
-    });
-    const row = firstRow(body);
-    assert.equal('hargaBahan' in row, false);
-    assert.equal('totalHarga' in row, false);
-    assert.equal(row.menuName, 'Ayam Goreng');
-  });
-
   test('search covers both the dish and the ingredient column', async () => {
     const { db, calls } = fakeDb();
     await run(listMenuPlans(db), {
-      user: userWith('SUPER_ADMIN'),
+      user: userWith('ADMIN'),
       valid: { query: { page: 1, pageSize: 25, search: 'ayam' } },
     });
     const or = calls.where?.OR as Record<string, unknown>[];
@@ -108,7 +96,7 @@ describe('listMenuPlans (SCRUM-2)', () => {
   test('the page envelope carries the total so the client can page', async () => {
     const { db } = fakeDb();
     const { body } = await run(listMenuPlans(db), {
-      user: userWith('SUPER_ADMIN'),
+      user: userWith('ADMIN'),
       valid: { query: { page: 1, pageSize: 25 } },
     });
     assert.deepEqual(body?.meta, { page: 1, pageSize: 25, total: 1, totalPages: 1 });

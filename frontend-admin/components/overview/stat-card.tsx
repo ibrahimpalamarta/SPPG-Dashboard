@@ -1,5 +1,7 @@
+import type { LucideIcon } from "lucide-react";
 import { DetailLink } from "@/components/ui/detail-link";
-import type { Stat } from "@/lib/mock/overview";
+
+export type Stat = { icon: LucideIcon; label: string; value: string; status?: string };
 
 export function StatCard({ icon: Icon, label, value, status }: Stat) {
   return (
@@ -12,7 +14,7 @@ export function StatCard({ icon: Icon, label, value, status }: Stat) {
       </div>
       <p className="mt-4 text-sm text-slate-600">{label}</p>
       <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
-      <span className="mt-3 inline-flex rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{status}</span>
+      {status && <span className="mt-3 inline-flex rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{status}</span>}
     </div>
   );
 }
