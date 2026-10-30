@@ -30,7 +30,6 @@ const MENU: Jenis = { domain: /^Master Menu/, profil: /MAP-SKN-MENU-001/ };
 // koreksi batch Published (SCRUM-96) field disisipkan ke form; server action dan backend tetap asli.
 async function unggah(page: Page, name: string, buffer: Buffer, jenis = CASHFLOW, replaces?: string) {
   await page.goto('unggah-data');
-  await page.getByRole('combobox').selectOption(await page.getByRole('option', { name: /SKN/ }).getAttribute('value') ?? '');
   if (jenis.domain) await page.getByRole('button', { name: jenis.domain }).click();
   await page.getByRole('button', { name: 'Lanjut pilih file' }).click();
   await page.locator('input[type=file]').setInputFiles({ name, mimeType: 'text/csv', buffer });

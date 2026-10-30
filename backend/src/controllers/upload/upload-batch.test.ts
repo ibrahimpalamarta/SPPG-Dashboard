@@ -371,7 +371,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
   });
 
   test('replaces must name an open batch of the same kitchen and domain', async () => {
-    for (const old of [null, { id: 7n, kitchenId: 4n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'MENU', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'CASHFLOW', status: 'READY' }]) {
+    for (const old of [null, { id: 7n, kitchenId: 4n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'MENU', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'CASHFLOW', status: 'FAILED' }]) {
       const { db, calls } = fakeDb({ findUnique: async () => old }, skn);
       const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: '11111111-1111-4111-8111-111111111111' }));
       assert.equal(out.status, 400, JSON.stringify(old, (_k, v) => (typeof v === 'bigint' ? String(v) : v)));

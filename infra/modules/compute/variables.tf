@@ -187,7 +187,7 @@ variable "frontend_api_base_url" {
 }
 
 variable "mfa_required_roles" {
-  description = "Comma-separated roles that cannot use the app without MFA, e.g. SUPER_ADMIN. Empty = MFA optional for everyone."
+  description = "Comma-separated roles that cannot use the app without MFA, e.g. ADMIN. Empty = MFA optional for everyone."
   type        = string
   default     = ""
 }
