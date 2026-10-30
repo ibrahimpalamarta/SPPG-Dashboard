@@ -20,17 +20,19 @@ export const getInbox = (db: Db = prisma): RequestHandler => async (req, res) =>
   if (!scope.ok) return; // kitchenScope(user) with no `requested` id is always ok
 
   const [reviewTasks, quarantinedFiles, expiredInvites] = await Promise.all([
-    perms.includes('batch:review')
+    // SCRUM-117: "Menunggu Review PM" — batches Data Operasional has submitted.
+    perms.includes('batch:publish')
       ? db.uploadBatch.findMany({
-          where: { status: 'NEEDS_REVIEW', ...kitchenWhere(scope) },
+          where: { status: 'READY', ...kitchenWhere(scope) },
           select: { id: true, publicId: true, domain: true, fileName: true, uploadDate: true, ...withKitchen },
           orderBy: { uploadDate: 'asc' },
         })
       : [],
+    // Files to fix: unrecognised layouts, and batches the PM sent back with a note (errorSummary).
     perms.includes('upload:create')
       ? db.uploadBatch.findMany({
-          where: { status: 'NEEDS_MAPPING_UPDATE', ...kitchenWhere(scope) },
-          select: { id: true, publicId: true, domain: true, fileName: true, uploadDate: true, errorSummary: true, notes: true, ...withKitchen },
+          where: { OR: [{ status: 'NEEDS_MAPPING_UPDATE' }, { status: 'NEEDS_REVIEW', errorCode: 'RETURNED' }], ...kitchenWhere(scope) },
+          select: { id: true, publicId: true, domain: true, fileName: true, uploadDate: true, status: true, errorSummary: true, notes: true, ...withKitchen },
           orderBy: { uploadDate: 'asc' },
         })
       : [],

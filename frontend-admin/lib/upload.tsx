@@ -14,7 +14,7 @@ export const STATUS = {
   PROCESSING: { label: "Processing", tone: "bg-slate-100 text-slate-700" },
   NEEDS_REVIEW: { label: "Needs Review", tone: "bg-amber-100 text-amber-800" },
   NEEDS_MAPPING_UPDATE: { label: "Needs Mapping Update", tone: "bg-amber-100 text-amber-800" },
-  READY: { label: "Ready", tone: "bg-emerald-100 text-emerald-800" },
+  READY: { label: "Menunggu Review PM", tone: "bg-emerald-100 text-emerald-800" },
   PUBLISHED: { label: "Published", tone: "bg-emerald-700 text-white" },
   FAILED: { label: "Failed", tone: "bg-red-100 text-red-800" },
   SUPERSEDED: { label: "Diganti", tone: "bg-slate-100 text-slate-700" },
@@ -26,6 +26,8 @@ export const STATUS = {
  */
 const BY_ERROR_CODE: Record<string, { label: string; tone: string }> = {
   EMPTY_FILE: { label: "Ditahan · file kosong", tone: "bg-amber-100 text-amber-800" },
+  // SCRUM-117: the PM sent it back; errorSummary holds the note.
+  RETURNED: { label: "Dikembalikan", tone: "bg-amber-100 text-amber-800" },
 };
 
 export function StatusBadge({ status, errorCode }: { status: string; errorCode?: string | null }) {

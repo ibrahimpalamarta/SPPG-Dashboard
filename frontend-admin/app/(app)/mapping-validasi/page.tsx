@@ -1,4 +1,4 @@
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { BatchList } from "@/components/mapping/batch-list";
@@ -6,6 +6,7 @@ import { ColumnTable } from "@/components/mapping/column-table";
 import { FindingsPanel } from "@/components/mapping/findings-panel";
 import { HistoryList, type HistoryEntry } from "@/components/mapping/history-list";
 import { RecordsTable, type Txn } from "@/components/mapping/records-table";
+import { ReviewActions } from "@/components/mapping/review-actions";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { apiGet } from "@/lib/api";
@@ -78,14 +79,18 @@ export default async function Page({
             </span>
             <StatusBadge status={batch.status} errorCode={batch.errorCode} />
           </div>
-          <button
-            disabled={batch.status !== "READY"}
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-          >
-            <Send className="size-4" aria-hidden="true" />
-            Kirim ke PM
-          </button>
+          <ReviewActions
+            batchId={batch.id}
+            status={batch.status}
+            canSubmit={me.permissions.includes("upload:create")}
+            canPublish={me.permissions.includes("batch:publish")}
+          />
         </div>
+        {batch.errorCode === "RETURNED" && batch.errorSummary && (
+          <p className="mx-6 mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <span className="font-semibold">Dikembalikan PM:</span> {batch.errorSummary}
+          </p>
+        )}
         <FindingsPanel
           key={batch.publicId}
           findings={findings}

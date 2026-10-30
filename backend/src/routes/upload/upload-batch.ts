@@ -4,7 +4,8 @@ import { validate } from '../../middleware/validate.js';
 import { singleFile } from '../../middleware/upload.js';
 import { wrap } from '../../lib/wrap.js';
 import { idParam } from '../../schemas/common.js';
-import { templateParam } from '../../schemas/upload-batch.js';
+import { batchReturn, templateParam } from '../../schemas/upload-batch.js';
+import { publishUploadBatch, returnUploadBatch, submitUploadBatch } from '../../controllers/upload/review.js';
 import {
   uploadBatchCreate,
   uploadBatchCreateQuery,
@@ -48,6 +49,10 @@ uploadBatchRouter.post(
   validate({ body: uploadBatchCreate, query: uploadBatchCreateQuery }),
   wrap(createUploadBatch()),
 );
+// SCRUM-117/95: Data Operasional (the maker) submits; PM MBG returns or publishes.
+uploadBatchRouter.post('/:id/submit', requirePermission('upload:create'), validate({ params: idParam }), wrap(submitUploadBatch()));
+uploadBatchRouter.post('/:id/return', requirePermission('batch:publish'), validate({ params: idParam, body: batchReturn }), wrap(returnUploadBatch()));
+uploadBatchRouter.post('/:id/publish', requirePermission('batch:publish'), validate({ params: idParam }), wrap(publishUploadBatch()));
 uploadBatchRouter.patch(
   '/:id',
   requirePermission('batch:review'),

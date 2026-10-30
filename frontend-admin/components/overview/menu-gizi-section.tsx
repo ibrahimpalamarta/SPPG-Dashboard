@@ -1,23 +1,16 @@
 import { NutritionInfo } from "@/components/overview/nutrition-info";
 import { Section } from "@/components/overview/section";
 import { TopMenu } from "@/components/overview/top-menu";
-import { SelectButton } from "@/components/ui/select-button";
-import { filters } from "@/lib/mock/menu-gizi";
+import { dateLabel, type MenuKpi } from "@/lib/kpi";
 
-export function MenuGiziSection() {
+export function MenuGiziSection({ menu }: { menu: MenuKpi }) {
   return (
     <Section
       title="Menu, Gizi & Porsi"
-      action={
-        <div className="flex flex-wrap gap-2">
-          {filters.map((label) => (
-            <SelectButton key={label} label={label} />
-          ))}
-        </div>
-      }
+      action={menu.window && <span className="text-sm text-slate-500">Periode: {dateLabel(menu.window.from)} – {dateLabel(menu.window.to)}</span>}
     >
-      <TopMenu />
-      <NutritionInfo />
+      <TopMenu menus={menu.topMenus} />
+      <NutritionInfo menu={menu} />
     </Section>
   );
 }

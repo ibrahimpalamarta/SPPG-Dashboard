@@ -27,6 +27,8 @@ export type CashflowTxn = {
   is_external_spend: boolean;
   /** SCRUM-43: moving money between the kitchen's own accounts (topping up petty cash). */
   is_internal_transfer: boolean;
+  /** SCRUM-66: incentive transfer to Yayasan Edufarmers (EFI); set once all lines are read. */
+  is_efi_transfer: boolean;
   review_status: string | null;
   review_note: string | null;
   confidence: string | null;
@@ -43,6 +45,13 @@ const upper = (s: string) => s.toUpperCase();
  * later as BELANJA lines, so counting the top-up too would double it.
  */
 const INTERNAL_TRANSFER_TYPES = new Set(['ISI KAS KECIL', 'TRANSFER INTERNAL', 'PINDAH BUKU']);
+
+/**
+ * SCRUM-66 (ASUMSI, decisions D-20): an EFI transfer is an INSENTIF paid to
+ * Yayasan Edufarmers ("Pembayaran Insentif Yayasan Minggu 1 · Yayasan
+ * Edufarmers"). It is shown as its own KPI, never as supplier spend.
+ */
+const EFI = /edufarmers|insentif yayasan/i;
 const rupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
 
 /**
@@ -123,6 +132,7 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
         txn_total: total,
         is_external_spend: direction === 'KELUAR' && !internal,
         is_internal_transfer: internal,
+        is_efi_transfer: false,
         review_status: fold('review_status', upper),
         review_note: text(f.review_note),
         confidence: fold('confidence', (s) => s.toLowerCase()),
@@ -137,6 +147,10 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
 
   const totals: Record<string, number> = {};
   for (const txn of txns.values()) {
+    if (txn.txn_type === 'INSENTIF' && [txn.description, ...txn.lines.map((l) => l.counterparty)].some((s) => s && EFI.test(s))) {
+      txn.is_efi_transfer = true;
+      txn.is_external_spend = false;
+    }
     if (totalsSeen.get(txn.txn_id)!.size > 1) {
       issues.push({ code: 'TOTAL_INCONSISTENT', rule: 'DQ-004', message: `${txn.txn_id}: nilai total berbeda antar baris.` });
     }

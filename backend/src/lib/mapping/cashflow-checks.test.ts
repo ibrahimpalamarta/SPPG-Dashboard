@@ -17,6 +17,7 @@ const txn = (txn_id: string, over: Partial<CashflowTxn> = {}): CashflowTxn => ({
   txn_total: 1000,
   is_external_spend: true,
   is_internal_transfer: false,
+  is_efi_transfer: false,
   review_status: 'TERKONFIRMASI',
   review_note: null,
   confidence: null,

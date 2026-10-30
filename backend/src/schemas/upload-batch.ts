@@ -62,6 +62,9 @@ export const uploadBatchCreateQuery = z.object({
  * the publish flow. Whether the move is legal from the current state is
  * checked against `upload-status.ts` in the controller.
  */
+/** SCRUM-117: "Dikembalikan" always says why. */
+export const batchReturn = z.object({ note: z.string().trim().min(1).max(2000) });
+
 export const uploadBatchUpdate = z
   .object({
     status: z

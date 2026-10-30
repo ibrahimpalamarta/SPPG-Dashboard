@@ -60,7 +60,7 @@ export default async function Page() {
       </div>
 
       {inbox.reviewTasks.length > 0 && (
-        <Section icon={ClipboardCheck} title="Menunggu review">
+        <Section icon={ClipboardCheck} title="Menunggu Review PM">
           {inbox.reviewTasks.map((b) => (
             <Row key={b.publicId} href={`/mapping-validasi?batch=${b.publicId}`} title={b.fileName} subtitle={kitchenLabel(b)} time={b.uploadDate} />
           ))}
@@ -68,7 +68,7 @@ export default async function Page() {
       )}
 
       {inbox.quarantinedFiles.length > 0 && (
-        <Section icon={FileWarning} title="File ditahan">
+        <Section icon={FileWarning} title="File ditahan atau dikembalikan">
           {inbox.quarantinedFiles.map((b) => (
             <Row
               key={b.publicId}

@@ -56,16 +56,16 @@ Setiap tiket dianggap selesai bila semua poin di kolom *Selesai bila* lulus, dan
 | **Tahap 4 — Kanonik Finance** ||||
 | T16 | finance_transaction header/line + anti-double-count | 77, 40, 98, 41 | IN REVIEW |
 | T17 | Rantai RAB → PO → GR → Payment (Sukun) | 44, 28, 45, 29, 46, 47, 30 | BLOCKED (B-SRC-SKN) (B-RAW) |
-| T18 | Dataset finance_balance + beneficiary_daily_count + PII | 49, 50, 72 | BLOCKED (B-SRC-SKN) |
+| T18 | Dataset finance_balance + beneficiary_daily_count + PII | 49, 50, 72 | IN_PROGRESS (tabel ada; writer B-SRC-SKN) |
 | **Tahap 5 — Validasi & Publish** ||||
 | T19 | Normalisasi bersama (tanggal/mata uang/unit) + missing ≠ 0 | 52, 53 | IN_PROGRESS (siap review) |
 | T20 | Validation framework + severity & quarantine | 33, 51 | IN_PROGRESS (siap review) |
 | T21 | Finance DQ: kategori, transfer internal, SLA D0/D+1, rekonsiliasi Ringkasan_Transaksi | 34, 42, 43, 48, 84, 119 (127 duplikat) | IN_PROGRESS (siap review) |
 | T22 | Menu DQ lintas template dapur | 85, 120 (128 duplikat) | IN_PROGRESS (Sukun siap review) |
-| T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | BLOCKED (B-SRC-SKN) |
+| T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | IN_PROGRESS (siap review; B-ROLE) |
 | **Tahap 6 — KPI & Dashboard** ||||
-| T24 | Widget Finance: Top 5 Supplier, Expense Mix, Planned Cost/Portion, Saldo, EFI Transfer | 62, 97, 63, 99, 64, 100, 65, 101, 66, 102 | BLOCKED (B-SRC-SKN) |
-| T25 | Widget Menu/Gizi/Beneficiary + validasi total tersalurkan | 74, 115, 76, 116, 103, 129 | TODO |
+| T24 | Widget Finance: Top 5 Supplier, Expense Mix, Planned Cost/Portion, Saldo, EFI Transfer | 62, 97, 63, 99, 64, 100, 65, 101, 66, 102 | IN_PROGRESS (siap review; Saldo B-SRC-SKN/OD-02, Planned B-PLAN) |
+| T25 | Widget Menu/Gizi/Beneficiary + validasi total tersalurkan | 74, 115, 76, 116, 103, 129 | IN_PROGRESS (siap review; tersalurkan B-SRC-SKN) |
 | T26 | Data Health & traceability | 104, 60, 105, 61, 106, 59, 107, 67, 68 | TODO |
 | **Tahap 7 — Fallback & Foto** ||||
 | T27 | Manual exception input (WEB_MANUAL + quick entry) | 75, 108 | TODO |
@@ -215,8 +215,8 @@ logika yang di-hardcode berdasarkan nama dapur.
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
 | T18.1 | SCRUM-49 | [DATA-016] finance_balance + source-of-truth guard | IN_PROGRESS (tabel ada; B-SRC-SKN, OD-02) | U | Satu saldo per kitchen × tanggal × rekening; source_system ada; KPI tetap draft sampai source resmi dikonfigurasi |
-| T18.2 | SCRUM-50 | [DATA-017] beneficiary_daily_count | TODO | U | Key kitchen/tanggal/lokasi/segmen; planned dan actual terpisah; missing = NULL; tanpa PII individu |
-| T18.3 | SCRUM-72 | [DATA-039] Restriksi PII beneficiary | TODO | U, UI | Dataset manajemen tanpa PII; tabel restricted terisolasi; akses tercatat; export/dashboard tidak bisa mengeluarkan NIK/nama/telepon/alamat |
+| T18.2 | SCRUM-50 | [DATA-017] beneficiary_daily_count | IN_PROGRESS (sebagian BLOCKED: B-SRC-SKN) | U | Key kitchen/tanggal/lokasi/segmen; planned dan actual terpisah; missing = NULL; tanpa PII individu |
+| T18.3 | SCRUM-72 | [DATA-039] Restriksi PII beneficiary | IN_PROGRESS (siap review; registry restricted belum ada) | U, UI | Dataset manajemen tanpa PII; tabel restricted terisolasi; akses tercatat; export/dashboard tidak bisa mengeluarkan NIK/nama/telepon/alamat |
 
 ### Tahap 5 — Validasi & Publish
 
@@ -256,11 +256,11 @@ tidak menggandakan fakta; batch koreksi menggantikan yang lama dan histori tetap
 #### T23 — Review & publish · Butuh: T20 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T23.1 | SCRUM-117 | Review & approval workflow PM | TODO | U, UI | Status Menunggu Review PM & Dikembalikan; catatan wajib; tugas muncul di Inbox; tercatat di audit |
-| T23.2 | SCRUM-54 | [DATA-021] Production eligibility by review_status | TODO | U | Rule bisa dikonfigurasi (baseline: TERKONFIRMASI saja); status karantina dikecualikan tapi tetap terlihat; keputusan terdokumentasi |
-| T23.3 | SCRUM-78 | [DATA-045] Publish idempoten + supersede lineage | TODO | U | Publish pakai business key deterministik; batch koreksi menandai record lama superseded; lineage lama tetap bisa di-query |
-| T23.4 | SCRUM-95 | Publish canonical batch | TODO | U, UI | Hanya PM MBG, setelah review, tanpa blocker; idempoten; lineage terjaga |
-| T23.5 | SCRUM-96 | Correction/supersede flow | TODO | U, UI | Batch koreksi menggantikan yang lama tanpa kehilangan histori |
+| T23.1 | SCRUM-117 | Review & approval workflow PM | IN_PROGRESS (siap review) | U, UI | Status Menunggu Review PM & Dikembalikan; catatan wajib; tugas muncul di Inbox; tercatat di audit |
+| T23.2 | SCRUM-54 | [DATA-021] Production eligibility by review_status | IN_PROGRESS (siap review) | U | Rule bisa dikonfigurasi (baseline: TERKONFIRMASI saja); status karantina dikecualikan tapi tetap terlihat; keputusan terdokumentasi |
+| T23.3 | SCRUM-78 | [DATA-045] Publish idempoten + supersede lineage | IN_PROGRESS (siap review) | U | Publish pakai business key deterministik; batch koreksi menandai record lama superseded; lineage lama tetap bisa di-query |
+| T23.4 | SCRUM-95 | Publish canonical batch | IN_PROGRESS (siap review) | U, UI | Hanya PM MBG, setelah review, tanpa blocker; idempoten; lineage terjaga |
+| T23.5 | SCRUM-96 | Correction/supersede flow | IN_PROGRESS (siap review) | U, UI | Batch koreksi menggantikan yang lama tanpa kehilangan histori |
 
 ### Tahap 6 — KPI & Dashboard
 
@@ -272,26 +272,26 @@ Urutan di tiap task: **semantic query dulu (backend), lalu widget (UI).**
 #### T24 — Widget Finance · Butuh: T21, T23 (T17 untuk Planned Cost, T18 untuk Saldo) · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T24.1 | SCRUM-62 | [DATA-029] Top 5 Supplier semantic query | TODO | U, D | Σ line_amount per supplier_id ternormalisasi; tanpa transfer internal/non-spend; tanpa double-count total |
-| T24.2 | SCRUM-97 | Top 5 Supplier widget | TODO | UI | Widget menampilkan hasil T24.1 dan bisa ditelusuri |
-| T24.3 | SCRUM-63 | [DATA-030] Expense Mix semantic query | TODO | U, D | Pakai kategori ternormalisasi; kategori tak termapping dikecualikan/di-flag; total cocok dengan spend |
-| T24.4 | SCRUM-99 | Expense Mix widget | TODO | UI | Kategori master tampil; kategori mentah ada di trace |
-| T24.5 | SCRUM-64 | [DATA-031] Planned Cost per Portion (feature flag) | TODO | U, D | Berlabel Planned/RAB; pakai RAB disetujui + porsi rencana; versi formula dicatat; tidak diam-diam jatuh ke actual spend |
-| T24.6 | SCRUM-100 | Planned Cost per Portion widget | TODO | UI | Label Rencana; aturan alokasi bisa dikonfigurasi. Cek konflik dengan SCRUM-123 (B-PLAN) |
-| T24.7 | SCRUM-65 | [DATA-032] Account Balance KPI | TODO | U | Baca source finance_balance yang dikonfigurasi; Draft/Unavailable sampai OD-02 ditutup; selisih rekonsiliasi didukung |
-| T24.8 | SCRUM-101 | Account Balance widget | TODO | UI | Tampil Draft sampai source resmi disetujui |
-| T24.9 | SCRUM-66 | [DATA-033] EFI Transfer + Last Transfer KPI | TODO | U | Tipe transaksi EFI Transfer terkontrol; event terakhir = tanggal + nominal + referensi; tidak dihitung sebagai external spend |
-| T24.10 | SCRUM-102 | EFI Transfer widget | TODO | UI | Tampil tanggal/nominal/referensi transfer terakhir |
+| T24.1 | SCRUM-62 | [DATA-029] Top 5 Supplier semantic query | IN_PROGRESS (siap review) | U, D | Σ line_amount per supplier_id ternormalisasi; tanpa transfer internal/non-spend; tanpa double-count total |
+| T24.2 | SCRUM-97 | Top 5 Supplier widget | IN_PROGRESS (siap review) | UI | Widget menampilkan hasil T24.1 dan bisa ditelusuri |
+| T24.3 | SCRUM-63 | [DATA-030] Expense Mix semantic query | IN_PROGRESS (siap review) | U, D | Pakai kategori ternormalisasi; kategori tak termapping dikecualikan/di-flag; total cocok dengan spend |
+| T24.4 | SCRUM-99 | Expense Mix widget | IN_PROGRESS (siap review) | UI | Kategori master tampil; kategori mentah ada di trace |
+| T24.5 | SCRUM-64 | [DATA-031] Planned Cost per Portion (feature flag) | IN_PROGRESS (siap review; B-PLAN) | U, D | Berlabel Planned/RAB; pakai RAB disetujui + porsi rencana; versi formula dicatat; tidak diam-diam jatuh ke actual spend |
+| T24.6 | SCRUM-100 | Planned Cost per Portion widget | IN_PROGRESS (siap review; B-PLAN) | UI | Label Rencana; aturan alokasi bisa dikonfigurasi. Cek konflik dengan SCRUM-123 (B-PLAN) |
+| T24.7 | SCRUM-65 | [DATA-032] Account Balance KPI | IN_PROGRESS (sebagian BLOCKED: B-SRC-SKN, OD-02) | U | Baca source finance_balance yang dikonfigurasi; Draft/Unavailable sampai OD-02 ditutup; selisih rekonsiliasi didukung |
+| T24.8 | SCRUM-101 | Account Balance widget | IN_PROGRESS (sebagian BLOCKED: B-SRC-SKN, OD-02) | UI | Tampil Draft sampai source resmi disetujui |
+| T24.9 | SCRUM-66 | [DATA-033] EFI Transfer + Last Transfer KPI | IN_PROGRESS (siap review; definisi ASUMSI D-20) | U | Tipe transaksi EFI Transfer terkontrol; event terakhir = tanggal + nominal + referensi; tidak dihitung sebagai external spend |
+| T24.10 | SCRUM-102 | EFI Transfer widget | IN_PROGRESS (siap review) | UI | Tampil tanggal/nominal/referensi transfer terakhir |
 
 #### T25 — Widget Menu, Gizi, Beneficiary · Butuh: T15, T18, T22, T23 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T25.1 | SCRUM-74 | [DATA-042] Top 5 Menu semantic query | TODO | U, D | Pakai menu_recipe_line; window tanggal layanan (bukan nomor periode lokal); tanpa garnish/bumbu/makanan pokok; dasar ranking di feature flag sampai OD-13 |
-| T25.2 | SCRUM-115 | Top 5 Menu widget | TODO | UI | Ranking per window 2 minggu & daerah; tertelusur ke menu_recipe_line |
-| T25.3 | SCRUM-76 | [DATA-043] Nutrition & delivered-count query | TODO | U, D | Gizi dari menu_recipe_line; jumlah tersalurkan join beneficiary_daily_count; Missing tetap Missing; filter region/tanggal selaras |
-| T25.4 | SCRUM-129 | [DATA-049] Validasi total segmen tersalurkan | TODO | U | Per dapur/periode, Σ segmen = total aktual; selisih → kartu di-flag/ditahan |
-| T25.5 | SCRUM-116 | Informasi Gizi & Jumlah Tersalurkan widget | TODO | UI | Gizi per porsi Besar/Kecil; planned vs tersalurkan; Missing ≠ 0 |
-| T25.6 | SCRUM-103 | Beneficiary aggregate widget | TODO | UI | Planned dan actual terpisah; tanpa PII |
+| T25.1 | SCRUM-74 | [DATA-042] Top 5 Menu semantic query | IN_PROGRESS (siap review; OD-13 ASUMSI D-21) | U, D | Pakai menu_recipe_line; window tanggal layanan (bukan nomor periode lokal); tanpa garnish/bumbu/makanan pokok; dasar ranking di feature flag sampai OD-13 |
+| T25.2 | SCRUM-115 | Top 5 Menu widget | IN_PROGRESS (siap review) | UI | Ranking per window 2 minggu & daerah; tertelusur ke menu_recipe_line |
+| T25.3 | SCRUM-76 | [DATA-043] Nutrition & delivered-count query | IN_PROGRESS (sebagian BLOCKED: B-SRC-SKN) | U, D | Gizi dari menu_recipe_line; jumlah tersalurkan join beneficiary_daily_count; Missing tetap Missing; filter region/tanggal selaras |
+| T25.4 | SCRUM-129 | [DATA-049] Validasi total segmen tersalurkan | IN_PROGRESS (siap review) | U | Per dapur/periode, Σ segmen = total aktual; selisih → kartu di-flag/ditahan |
+| T25.5 | SCRUM-116 | Informasi Gizi & Jumlah Tersalurkan widget | IN_PROGRESS (siap review; data tersalurkan B-SRC-SKN) | UI | Gizi per porsi Besar/Kecil; planned vs tersalurkan; Missing ≠ 0 |
+| T25.6 | SCRUM-103 | Beneficiary aggregate widget | IN_PROGRESS (sebagian BLOCKED: B-SRC-SKN) | UI | Planned dan actual terpisah; tanpa PII |
 
 #### T26 — Data Health & traceability · Butuh: T20, T23 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
@@ -300,8 +300,8 @@ Urutan di tiap task: **semantic query dulu (backend), lalu widget (UI).**
 | T26.2 | SCRUM-105 | Source trace drilldown | TODO | UI | KPI → canonical → mapping profile → file/record source |
 | T26.3 | SCRUM-61 | [DATA-028] Mapping/template change log | TODO | U | Log mencatat profil, versi lama/baru, effective_from, deskripsi, owner; upload versi tidak kompatibel diblokir |
 | T26.4 | SCRUM-106 | Audit & change log | TODO | U, UI | Upload, mapping, publish, koreksi manual, perubahan versi tercatat |
-| T26.5 | SCRUM-59 | [DATA-026] government_submission_log + dedup | TODO | U | Submission merujuk source_record_id; sistem/modul/status tersimpan; KPI mengecualikan salinan submission |
-| T26.6 | SCRUM-107 | Government submission lineage | TODO | U | Submission SIPGN/POP/Aksis tertaut ke source_record_id, tanpa fakta ganda |
+| T26.5 | SCRUM-59 | [DATA-026] government_submission_log + dedup | IN_PROGRESS (siap review) | U | Submission merujuk source_record_id; sistem/modul/status tersimpan; KPI mengecualikan salinan submission |
+| T26.6 | SCRUM-107 | Government submission lineage | IN_PROGRESS (siap review; UI di T26) | U | Submission SIPGN/POP/Aksis tertaut ke source_record_id, tanpa fakta ganda |
 | T26.7 | SCRUM-67 | [DATA-034] Expected source checklist + completeness | TODO | U | Checklist per dapur/fase; status submitted/missing/error/accepted; source di luar scope dikecualikan; missing ≠ 0 |
 | T26.8 | SCRUM-68 | [DATA-035] Validation queue | IN_PROGRESS (siap review) | U, UI | Filter dapur/batch/rule/severity; link ke source record; auto-fix terlihat; item bisa diproses ulang |
 | T26.9 | SCRUM-104 | Data Health overview | TODO | UI | Kelengkapan, data hilang, error, jumlah issue, publish terakhir per dapur/domain |
