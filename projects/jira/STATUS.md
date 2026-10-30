@@ -1,8 +1,8 @@
-# STATUS — Tahap 1–3
+# STATUS — Tahap 1–7
 
 Tiket Tahap 1–2 dikelompokkan per fitur (folder `tickets/<tahap>/<subfitur>/`: `access/` = Tahap 1, `upload/` = Tahap 2); tiket Tahap 3 masih di `tickets/` langsung.
 
-Diperbarui: 2026-10-27. Kolom `Status` diisi dari audit kode, bukan dari Jira.
+Diperbarui: 2026-10-30. Kolom `Status` diisi dari audit kode, bukan dari Jira.
 Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 
 | Tiket | Judul | Fitur | Tahap | Status | Status Jira (per 22 Okt) | Branch/PR | Update terakhir | Catatan singkat |
@@ -35,10 +35,10 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | SCRUM-27 | Sukun Cashflow adapter | mapping | 3 | IN REVIEW | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-27 | Grouping per txn_id, Rp/qty/tanggal; hasil disimpan saat upload ke `finance_transactions` + `_lines` |
 | SCRUM-44 | [DATA-011] Sukun RAB profile | mapping | 3 | IN REVIEW (sebagian BLOCKED: B-DD) | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-27 | MAP-SKN-RAB-001 DRAFT; sheet "12" Σ planned_cost = Σ Total Harga sumber |
 | SCRUM-28 | Sukun RAB adapter | mapping | 3 | IN REVIEW | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-27 | `rab_daily_budgets` (tanggal+segmen) + `rab_ingredient_budgets` dengan lineage baris sumber |
-| SCRUM-45 | [DATA-012] Sukun PO profile | mapping | 3 | BLOCKED (B-SRC-SKN) | To Do | — | 2026-10-28 | Tidak ada berkas List PO/Nota Pesanan Sukun; tidak dikarang |
-| SCRUM-29 | Sukun PO adapter + stable IDs | mapping | 3 | BLOCKED (B-SRC-SKN) | To Do | — | 2026-10-28 | Sama dengan SCRUM-45 |
-| SCRUM-31 | Menu common adapter | menu-mapping | 3 | IN_PROGRESS (sebagian BLOCKED: B-MAPOUT, B-DD) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | MAP-SKN-MENU-001 multi-sheet; hasil belum disimpan |
-| SCRUM-73 | [DATA-041] menu_recipe_line canonical transform | menu-mapping | 3 | IN_PROGRESS (sebagian BLOCKED: B-MAPOUT, B-DD) | To Do | `feature/tahap3-mapping-sukun` | 2026-10-26 | Segmen/menu type dirapikan, dedup `tanggal |
+| SCRUM-45 | [DATA-012] Sukun PO profile | mapping | 3 | IN_PROGRESS (sebagian BLOCKED: B-SRC-SKN) | In Progress | `feature/tahap3-menu-recipe-line` | 2026-10-30 | Tabel `purchase_order_lines` ada, adapter menunggu sumber PO |
+| SCRUM-29 | Sukun PO adapter + stable IDs | mapping | 3 | IN_PROGRESS (sebagian BLOCKED: B-SRC-SKN) | In Progress | `feature/tahap3-menu-recipe-line` | 2026-10-30 | Sama dengan SCRUM-45 |
+| SCRUM-31 | Menu common adapter | menu-mapping | 3 | IN_PROGRESS (siap review; sebagian BLOCKED: B-DD) | In Progress | `feature/tahap3-menu-recipe-line` | 2026-10-30 | Hasil MAP-SKN-MENU-001 kini disimpan ke `menu_recipe_lines` saat upload |
+| SCRUM-73 | [DATA-041] menu_recipe_line canonical transform | menu-mapping | 3 | IN_PROGRESS (siap review; sebagian BLOCKED: B-DD) | In Progress | `feature/tahap3-menu-recipe-line` | 2026-10-30 | Tabel `menu_recipe_lines` + traceability; Jumlah PM = `planned_portions` |
 | SCRUM-58 | [DATA-025] Profil Menu 5 kitchen | menu-mapping | 3 | TODO | To Do | — | 2026-10-23 |  |
 | SCRUM-30 | Sukun Payment adapter | mapping | 3 | IN REVIEW | To Do | `feature/tahap4-finance-payment-canonical` | 2026-10-28 | MAP-SKN-PAY-001 → `vendor_payment_workflows`; TAGIHAN/TANGGAL tidak jadi paid/maker time |
 | SCRUM-47 | [DATA-014] Vendor payment workflow chain | mapping | 4 | IN REVIEW (sebagian BLOCKED: B-SRC-SKN) | To Do | `feature/tahap4-finance-payment-canonical` | 2026-10-28 | `payment_request_id` stabil; CHECK paid_at ⇒ payment_reference; link PO/receipt menunggu sumber |

@@ -2,6 +2,7 @@ import type { Prisma, UploadDomain } from '@prisma/client';
 import type { CashflowTxn } from './sukun-cashflow.js';
 import type { RabDailyBudget } from './sukun-rab.js';
 import type { InputMakerLine } from './input-maker.js';
+import type { MenuRecipeLine } from './sukun-menu.js';
 
 /** What an adapter produced for a batch, ready to store (B-MAPOUT: stored at upload). */
 export type MappedRecords = {
@@ -23,7 +24,7 @@ async function insertChunked<T>(rows: T[], insert: (chunk: T[]) => Promise<unkno
 /**
  * Replaces the canonical rows of one batch: Cashflow → finance_transaction(+_line),
  * RAB → rab_daily_budget + rab_ingredient_budget, Input Maker →
- * vendor_payment_workflow. Runs inside the staging
+ * vendor_payment_workflow, Menu → menu_recipe_line. Runs inside the staging
  * transaction, so staging and canonical rows are never half-written. Other
  * domains have no canonical table yet.
  */
@@ -32,6 +33,7 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
   await tx.financeTransaction.deleteMany({ where: { uploadBatchId } });
   await tx.rabDailyBudget.deleteMany({ where: { uploadBatchId } });
   await tx.vendorPaymentWorkflow.deleteMany({ where: { uploadBatchId } });
+  await tx.menuRecipeLine.deleteMany({ where: { uploadBatchId } });
 
   // PRD §7.2 traceability: kitchen_id, source_system and source_file_name are the batch's.
   const batch = await tx.uploadBatch.findUniqueOrThrow({
@@ -103,6 +105,36 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
           checklist: l.checklist,
           supplierInvoiceLink: l.supplier_invoice_link,
           paymentInvoiceLink: l.payment_invoice_link,
+        })),
+      }),
+    );
+  } else if (mapped.domain === 'MENU') {
+    await insertChunked(mapped.records as MenuRecipeLine[], (chunk) =>
+      tx.menuRecipeLine.createMany({
+        data: chunk.map((l) => ({
+          ...trace,
+          sourceRecordId: l.source_record_id,
+          period: l.period,
+          servingDate: l.serving_date ? new Date(l.serving_date) : null,
+          menuType: l.menu_type,
+          portionSegment: l.portion_segment,
+          menuName: l.menu_name,
+          ingredient: l.ingredient,
+          urtUnit: l.urt_unit,
+          urtQty: l.urt_qty,
+          grossWeightG: l.gross_weight_g,
+          netWeightG: l.net_weight_g,
+          ediblePortionPct: l.edible_portion_pct,
+          energyKcal: l.energy_kcal,
+          proteinG: l.protein_g,
+          fatG: l.fat_g,
+          carbohydrateG: l.carbohydrate_g,
+          fiberG: l.fiber_g,
+          plannedPortions: l.beneficiaries,
+          ingredientNeedKg: l.ingredient_need_kg,
+          packagedNeedPax: l.packaged_need_pax,
+          unitPrice: l.unit_price,
+          lineTotal: l.line_total,
         })),
       }),
     );
