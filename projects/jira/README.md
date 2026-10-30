@@ -6,10 +6,10 @@ bersama kode tiketnya.
 
 | Berkas | Isi |
 |---|---|
-| `STATUS.md` | Ringkasan semua tiket Tahap 1–3, dengan kolom Fitur |
+| `STATUS.md` | Ringkasan semua tiket Tahap 1–7, dengan kolom Fitur |
 | `blockers.md` | Blocker aktif + riwayat yang sudah selesai |
 | `decisions.md` | Keputusan, asumsi, temuan konflik dokumen |
-| `tickets/<fitur>/<subfitur>/SCRUM-xx.md` | Satu berkas per tiket. `access/` (Tahap 1: `rbac`, `app-shell`, `members`, `kitchen-reference`) dan `upload/` (Tahap 2: `batch`, `pipeline`, `ui`, `template`). Tiket Tahap 3 masih langsung di `tickets/` |
+| `tickets/<fitur>/<subfitur>/SCRUM-xx.md` | Satu berkas per tiket. `access/` (Tahap 1: `rbac`, `app-shell`, `members`, `kitchen-reference`) dan `upload/` (Tahap 2: `batch`, `pipeline`, `ui`, `template`). Tiket Tahap 3 lama masih langsung di `tickets/`; tiket baru Tahap 3–7 di `mapping/`, `validation/`, `finance/`, `publish/`, `kpi/` |
 | `tickets/.../SCRUM-xx-schema.md` | Usulan skema yang belum tertulis di PRD/Data Dictionary, di folder yang sama dengan tiketnya |
 
 ## Legenda status

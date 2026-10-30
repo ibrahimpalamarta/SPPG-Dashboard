@@ -54,6 +54,12 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 
 **D-19 · 2026-10-30 · Eligibility KPI (SCRUM-54).** `ELIGIBLE_REVIEW_STATUSES = ['TERKONFIRMASI']` di `backend/src/lib/publish.ts`: konstanta kode, berubah lewat deploy. KPI hanya membaca batch PUBLISHED, baris yang tidak superseded, dan (untuk finance) review status eligible.
 
+**D-20 · 2026-10-30 · ASUMSI definisi Transfer EFI (SCRUM-66).** Transaksi bertipe INSENTIF yang uraian atau penerimanya cocok `edufarmers|insentif yayasan` (mengikuti mockup: "Pembayaran Insentif Yayasan … · Yayasan Edufarmers"). Ditandai `is_efi_transfer` dan dikeluarkan dari spend; label "Belum resmi" tidak ditampilkan (deskripsi Jira SCRUM-102). Arti "transfer EFI" perlu dikonfirmasi Finance.
+
+**D-21 · 2026-10-30 · ASUMSI Top 5 Menu (SCRUM-74, OD-13).** Window = 14 hari tanggal layanan, berakhir di `dateTo` atau tanggal published terakhir. Dasar ranking = jumlah hari layanan berbeda (`basis: serving_days` di response). Dikecualikan: menu bertipe Makanan Pokok/Bumbu/Garnish dan nama yang diawali "Nasi" atau memuat "bumbu"/"garnish". Daerah = `kitchens.city_regency`.
+
+**D-22 · 2026-10-30 · KPI dua endpoint gabungan.** `GET /api/kpi/finance` (khusus COST_ROLES) dan `GET /api/kpi/menu`, mengikuti preseden `dashboard/summary` (satu request per halaman). Porsi/penerima manfaat hanya keluar untuk role biaya (SCRUM-13). Planned Cost/Portion di balik env `KPI_PLANNED_COST=true`, default mati selama B-PLAN terbuka.
+
 ## Konflik dokumen
 
 **K-01 · OD-01 Lawang (B-LWG).** PRD §0/§14: Lawang = "Phase 1 comparison", masuk setelah alur Sukun stabil. BRD §1 "Kitchen mana yang didahulukan": Lawang = "Phase 2 – rollout", didahulukan dari DNM/PCK. **Dipakai PRD**, sebagai nilai config `rollout_status`, bukan hardcode.

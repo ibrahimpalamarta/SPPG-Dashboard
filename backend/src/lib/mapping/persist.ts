@@ -73,7 +73,7 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
     const txns = mapped.records as CashflowTxn[];
     await insertChunked(txns, (chunk) =>
       tx.financeTransaction.createMany({
-        data: chunk.map(({ lines, txn_date, txn_type, direction, category, category_normalized, description, txn_total, is_external_spend, is_internal_transfer, review_status, review_note, confidence, txn_id }) => ({
+        data: chunk.map(({ lines, txn_date, txn_type, direction, category, category_normalized, description, txn_total, is_external_spend, is_internal_transfer, is_efi_transfer, review_status, review_note, confidence, txn_id }) => ({
           ...trace,
           // The transaction is traced to its first source row.
           sourceRecordId: lines[0]!.source_record_id,
@@ -87,6 +87,7 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
           txnTotal: txn_total,
           isExternalSpend: is_external_spend,
           isInternalTransfer: is_internal_transfer,
+          isEfiTransfer: is_efi_transfer,
           reviewStatus: review_status,
           reviewNote: review_note,
           confidence,
