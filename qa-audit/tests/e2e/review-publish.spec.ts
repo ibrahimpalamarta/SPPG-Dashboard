@@ -166,13 +166,16 @@ test.describe.serial('Review dan publish', () => {
     });
   });
 
-  test('[SCRUM-103][SCRUM-65] Overview menampilkan "Belum ada data", bukan 0, untuk Penerima Manfaat, Saldo, dan Pengeluaran @smoke @kpi', async ({ browser }) => {
+  test('[SCRUM-103][SCRUM-65] Overview menampilkan "-" dan insight, bukan 0, untuk Penerima Manfaat, Saldo, dan Pengeluaran @smoke @kpi', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
       await page.goto('overview');
       const main = page.getByRole('main');
       await expect(main.getByText('Penerima Manfaat / hari')).toBeVisible();
-      // Penerima Manfaat, Saldo, dan Pengeluaran · Bulan ini (fixture Feb 2026, bukan bulan berjalan).
-      await expect(main.getByText('Belum ada data', { exact: true })).toHaveCount(3);
+      // Tanpa badge: nilai "-" dan insight yang menyebut data apa yang kurang (fixture Feb 2026, bukan bulan berjalan).
+      await expect(main.getByText(/^Belum ada data penerima manfaat/)).toBeVisible();
+      await expect(main.getByText(/^Belum ada data saldo rekening/)).toBeVisible();
+      await expect(main.getByText(/^Belum ada data pengeluaran bulan ini/)).toBeVisible();
+      await expect(main.getByText('Rp0')).toHaveCount(0);
       await shot(page, 'SCRUM-103', 1, 'overview-belum-ada-data');
     });
   });

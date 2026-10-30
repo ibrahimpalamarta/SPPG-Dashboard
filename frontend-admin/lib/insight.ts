@@ -45,7 +45,7 @@ export function efiInsight(finance: FinanceKpi): string {
   if (latest.amount === null) return `Transfer EFI terakhir (${dateLabel(latest.date)}) belum punya nominal. Lengkapi nominal transfer agar penerimaan dana bisa dipantau.`;
   const { perDay } = finance.spend;
   if (!perDay) return `Transfer EFI terakhir ${rp(latest.amount)} pada ${dateLabel(latest.date)}. Lengkapi data belanja untuk membandingkannya dengan kebutuhan harian.`;
-  return `Transfer EFI terakhir ${rp(latest.amount)} pada ${dateLabel(latest.date)}, setara ${Math.floor(latest.amount / perDay)} hari belanja (rata-rata ${rp(perDay)}/hari). Pantau jadwal transfer berikutnya agar dana tetap tersedia.`;
+  return `Transfer EFI terakhir ${rp(latest.amount)} pada ${dateLabel(latest.date)}, setara ${latest.amount < perDay ? "kurang dari 1" : Math.floor(latest.amount / perDay)} hari belanja (rata-rata ${rp(perDay)}/hari). Pantau jadwal transfer berikutnya agar dana tetap tersedia.`;
 }
 
 export function monthSpendInsight(finance: FinanceKpi): string {
