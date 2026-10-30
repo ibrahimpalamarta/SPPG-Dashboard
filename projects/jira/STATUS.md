@@ -70,7 +70,7 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | SCRUM-127 | (duplikat SCRUM-119) | finance | 5 | DUPLICATE | To Do | — | 2026-10-30 | Tidak dikerjakan |
 | SCRUM-117 | Review & approval workflow PM | publish | 6 | IN_PROGRESS (siap review; B-ROLE) | In Progress | `feature/tahap6-publish-lineage` | 2026-10-30 | submit/return(catatan wajib)/publish + Inbox + tombol Validasi Data |
 | SCRUM-54 | [DATA-021] Production eligibility | publish | 6 | IN_PROGRESS (siap review) | In Progress | `feature/tahap6-publish-lineage` | 2026-10-30 | `ELIGIBLE_REVIEW_STATUSES` (TERKONFIRMASI) |
-| SCRUM-95 | Publish canonical batch | publish | 6 | IN_PROGRESS (siap review; B-ROLE) | In Progress | `feature/tahap6-publish-lineage` | 2026-10-30 | READY + tanpa blocker + four-eyes; idempoten |
+| SCRUM-95 | Publish canonical batch | publish | 6 | IN_PROGRESS (siap review; B-ROLE, konflik K-06) | In Progress | `feature/tahap6-publish-lineage` | 2026-10-30 | READY + tanpa blocker + four-eyes; idempoten |
 | SCRUM-78 | [DATA-045] Idempotent publish + supersede lineage | publish | 6 | IN_PROGRESS (siap review) | In Progress | `feature/tahap6-publish-lineage` | 2026-10-30 | `superseded_by_batch_id` per kunci bisnis (D-18); SQL diverifikasi di Postgres |
 | SCRUM-96 | Correction/supersede flow | publish | 6 | IN_PROGRESS (siap review) | In Progress | `feature/tahap6-publish-lineage` | 2026-10-30 | `replaces` batch PUBLISHED; lama → SUPERSEDED saat koreksi dipublish |
 | SCRUM-59 | [DATA-026] government_submission_log + dedup | publish | 6 | IN_PROGRESS (siap review) | In Progress | `feature/tahap6-publish-lineage` | 2026-10-30 | Tabel + API, dedup per sistem/modul/record |
