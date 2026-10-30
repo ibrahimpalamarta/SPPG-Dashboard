@@ -1,29 +1,27 @@
 "use client";
 
-import { BookOpen, Coins, FileText, Package, Utensils, Wallet, type LucideIcon } from "lucide-react";
+import { Building2, Check, FileText, Sparkles, Upload } from "lucide-react";
 import Link from "next/link";
 import { startTransition, useActionState, useRef, useState, useTransition } from "react";
-import { checkFile, uploadFile, type CheckResult, type UploadResult } from "./actions";
+import { checkFile, uploadFile, type CheckResult, type FileColumn, type UploadResult } from "./actions";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { Kitchen } from "@/lib/me";
 
 const field = "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20";
 const primaryButton = "inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60";
 const secondaryButton = "inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-700 px-4 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60";
-const choice = (selected: boolean) =>
-  `rounded-xl border p-4 text-left disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-40 ${selected ? "border-emerald-600 ring-1 ring-emerald-600" : "border-slate-200 enabled:hover:border-emerald-300"}`;
-
 // Domains with an official empty template (SCRUM-125); the rest upload an ordinary file.
 const TEMPLATES: Record<string, string> = { CASHFLOW: "cashflow", MENU: "menu" };
 
-const DOMAIN_CARDS: { value: string; label: string; note: string; icon: LucideIcon }[] = [
-  { value: "CASHFLOW", label: "Cashflow", note: "Catatan uang masuk & keluar", icon: Wallet },
-  { value: "RAB", label: "RAB", note: "Rencana anggaran per periode", icon: Utensils },
-  { value: "PO", label: "Purchase Order", note: "Daftar pesanan ke supplier", icon: FileText },
-  { value: "INPUT_MAKER", label: "Input Maker", note: "Permintaan bayar ke supplier (tanpa data rekening)", icon: Coins },
-  { value: "VENDOR_PAYMENT", label: "Pembayaran Supplier", note: "Bukti bayar ke supplier (Input Maker / EFI)", icon: Coins },
-  { value: "MENU", label: "Master Menu", note: "Menu & gizi yang direncanakan", icon: BookOpen },
-  { value: "GOODS_RECEIPT", label: "Penerimaan Barang", note: "Barang yang diterima dapur", icon: Package },
+const DOMAIN_OPTIONS = [
+  { value: "CASHFLOW", label: "Cashflow" },
+  { value: "RAB", label: "RAB" },
+  { value: "PO", label: "Purchase Order" },
+  { value: "INPUT_MAKER", label: "Input Maker" },
+  { value: "VENDOR_PAYMENT", label: "Pembayaran Supplier" },
+  { value: "MENU", label: "Master Menu" },
+  { value: "GOODS_RECEIPT", label: "Penerimaan Barang" },
 ];
 
 const LABEL_TONE: Record<string, string> = {
@@ -41,15 +39,32 @@ function headline(r: Extract<UploadResult, { ok: true }>) {
   return "File belum dipublish";
 }
 
-/** FR-AI-01: one card for the picked file, before anything is stored. */
-function CheckCard({ check }: { check: Extract<CheckResult, { ok: true }> }) {
+/** FR-AI-01: the verdict on the picked file, before anything is stored. */
+function CheckChips({ ready }: { ready: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+      <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-blue-50 px-3 text-blue-700">
+        <Sparkles className="size-3.5" aria-hidden="true" />
+        Cek otomatis
+      </span>
+      <span className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 ${ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+        {ready && <Check className="size-3.5" aria-hidden="true" />}
+        {ready ? "Siap diunggah" : "Perlu dicek"}
+      </span>
+    </div>
+  );
+}
+
+/** What the check found: the issues, the columns that differ and the AI's advice. */
+function CheckDetails({ check }: { check: Extract<CheckResult, { ok: true }> }) {
   const problems = check.columnDiff.flatMap((d) => [
     ...d.missing.map((c) => ({ key: `${d.sheet}-m-${c}`, column: c, note: "Tidak ada, padahal wajib" })),
     ...d.unexpected.map((c) => ({ key: `${d.sheet}-u-${c}`, column: c, note: "Tidak dikenal" })),
   ]);
+  const advice = check.ai && (check.ai.columns.length > 0 || check.ai.issues.length > 0);
+  if (!check.issues.length && !problems.length && !advice) return null;
   return (
-    <section aria-live="polite" className={`space-y-3 rounded-xl border p-4 text-sm ${check.ready ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
-      <p className={`text-base font-semibold ${check.ready ? "text-emerald-800" : "text-amber-800"}`}>{check.ready ? "Siap diunggah" : "Perlu dicek"}</p>
+    <section aria-live="polite" className="space-y-3 text-sm">
       {check.issues.length > 0 && (
         <ul className="space-y-1.5">
           {check.issues.map((i) => (
@@ -99,6 +114,81 @@ function CheckCard({ check }: { check: Extract<CheckResult, { ok: true }> }) {
   );
 }
 
+type ColumnMap = Record<string, string>;
+const size = (bytes: number) => (bytes < 1_048_576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1_048_576).toFixed(1)} MB`);
+const mapKey = (c: FileColumn) => `${c.sheet}|${c.column}`;
+
+/** "Ubah Mapping": each header of the file next to the SOP field it is read as; every pick is re-checked by the backend. */
+function MappingEditor({
+  check,
+  map,
+  busy,
+  onPick,
+  onDone,
+}: {
+  check: Extract<CheckResult, { ok: true }>;
+  map: ColumnMap;
+  busy: boolean;
+  onPick: (column: FileColumn, field: string) => void;
+  onDone: () => void;
+}) {
+  const sheets = new Set(check.columns.map((c) => c.sheet)).size;
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <CheckChips ready={check.ready} />
+        <div className="flex gap-3">
+          <button type="button" onClick={onDone} className={secondaryButton}>
+            Selesai
+          </button>
+          <button type="submit" disabled={busy} className={primaryButton}>
+            <Upload className="size-4" aria-hidden="true" />
+            Unggah
+          </button>
+        </div>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-slate-200">
+        <table className="w-full min-w-[32rem] text-left text-sm">
+          <thead className="text-slate-500">
+            <tr>
+              <th className="px-4 py-3 font-medium">Kolom di file</th>
+              <th className="px-4 py-3 font-medium">Dibaca sebagai (kolom SOP)</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {check.columns.map((c) => {
+              const key = mapKey(c);
+              const changed = key in map;
+              return (
+                <tr key={key}>
+                  <td className="px-4 py-3">
+                    <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800">{c.header}</code>
+                    {sheets > 1 && <span className="ml-2 text-xs text-slate-500">{c.sheet}</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <select aria-label={`Dibaca sebagai untuk kolom ${c.header}`} value={map[key] ?? c.field ?? ""} onChange={(e) => onPick(c, e.target.value)} className={`${field} max-w-xs`}>
+                      <option value="">Tidak dipakai</option>
+                      {check.fields.map((f) => (
+                        <option key={f.field} value={f.field}>
+                          {f.header}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {changed ? <Badge tone="amber">Diubah</Badge> : c.field ? <Badge tone="green">Yakin</Badge> : <Badge tone="slate">Tidak dipakai</Badge>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitchenId?: string }) {
   const [result, action, pending] = useActionState<UploadResult | null, FormData>(uploadFile, null);
   const [kitchen, setKitchen] = useState(kitchenId ?? kitchens[0].id);
@@ -107,9 +197,14 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   const [checking, startChecking] = useTransition();
   // "Unggah ulang" goes back to the file pick without dropping kitchen/domain.
   const [retry, setRetry] = useState(false);
+  // "Ubah Mapping": the uploader's overrides of how the file's columns are read, per file.
+  const [columnMap, setColumnMap] = useState<ColumnMap>({});
+  const [editing, setEditing] = useState(false);
+  const [file, setFile] = useState<{ name: string; size: number } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const showResult = result?.ok && !retry;
+  const mapping = check?.ok && editing ? check : null;
 
   /** Reads the picked file again with the form as it will be sent; `over` carries a value the state has not flushed yet. */
   const runCheck = (over: Record<string, string> = {}) => {
@@ -120,7 +215,21 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   };
   const clearFile = () => {
     if (fileRef.current) fileRef.current.value = "";
+    setFile(null);
     setCheck(null);
+    resetMapping();
+  };
+  // A new file, kitchen or domain has other columns and another SOP: overrides do not carry over.
+  const resetMapping = () => {
+    setColumnMap({});
+    setEditing(false);
+  };
+  const pick = (check: Extract<CheckResult, { ok: true }>, column: FileColumn, field: string) => {
+    const next = { ...columnMap, [mapKey(column)]: field };
+    // One SOP field is read from one column: whichever column held it lets go.
+    if (field) for (const o of check.columns) if (o !== column && (columnMap[mapKey(o)] ?? o.field) === field) next[mapKey(o)] = "";
+    setColumnMap(next);
+    runCheck({ columnMap: JSON.stringify(next) });
   };
 
   return (
@@ -131,6 +240,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
       onSubmit={(e) => {
         e.preventDefault();
         setRetry(false);
+        setEditing(false);
         const data = new FormData(e.currentTarget);
         startTransition(() => action(data));
       }}
@@ -138,95 +248,150 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
     >
       <input type="hidden" name="kitchenId" value={kitchen} />
       <input type="hidden" name="domain" value={domain} />
+      <input type="hidden" name="columnMap" value={Object.keys(columnMap).length ? JSON.stringify(columnMap) : ""} />
       {/* SCRUM-124: re-uploading a quarantined file closes it as "Diganti". */}
       {retry && result?.ok && result.status === "NEEDS_MAPPING_UPDATE" && <input type="hidden" name="replaces" value={result.batchId} />}
 
-      <Card className="space-y-6 p-6">
-        {kitchens.length > 1 ? (
+      <Card className="space-y-5 p-6">
+        <div className="grid gap-4 sm:grid-cols-3">
+          {kitchens.length > 1 ? (
+            <label className="block space-y-2 text-sm">
+              <span className="font-semibold text-slate-800">Dapur</span>
+              <select
+                value={kitchen}
+                onChange={(e) => {
+                  setKitchen(e.target.value);
+                  resetMapping();
+                  runCheck({ kitchenId: e.target.value, columnMap: "" });
+                }}
+                className={field}
+              >
+                {kitchens.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.code ? `${k.code} · ${k.name}` : k.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            // SCRUM-144: Data Operasional is tied to one dapur, so there is nothing to pick.
+            <div className="space-y-2 text-sm">
+              <p className="font-semibold text-slate-800">Dapur</p>
+              <p className="flex h-10 items-center gap-2 font-semibold text-slate-800">
+                <Building2 className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                {kitchens[0]!.code ? `${kitchens[0]!.code} · ${kitchens[0]!.name}` : kitchens[0]!.name}
+              </p>
+            </div>
+          )}
+
           <label className="block space-y-2 text-sm">
-            <span className="font-semibold text-slate-800">Dapur</span>
+            <span className="font-semibold text-slate-800">Jenis data</span>
             <select
-              value={kitchen}
+              value={domain}
               onChange={(e) => {
-                setKitchen(e.target.value);
-                runCheck({ kitchenId: e.target.value });
+                setDomain(e.target.value);
+                resetMapping();
+                runCheck({ domain: e.target.value, columnMap: "" });
               }}
-              className={`${field} max-w-md`}
+              className={field}
             >
-              {kitchens.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.code ? `${k.code} · ${k.name}` : k.name}
+              {DOMAIN_OPTIONS.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
                 </option>
               ))}
             </select>
           </label>
-        ) : (
-          // SCRUM-144: Data Operasional is tied to one dapur, so there is nothing to pick.
-          <p className="text-sm font-semibold text-slate-800">Dapur: {kitchens[0]!.code ? `${kitchens[0]!.code} · ${kitchens[0]!.name}` : kitchens[0]!.name}</p>
-        )}
 
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold text-slate-800">Jenis data</legend>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {DOMAIN_CARDS.map(({ value, label, note, icon: Icon }) => (
-              <button
-                key={label}
-                type="button"
-                aria-pressed={value === domain}
-                onClick={() => {
-                  setDomain(value);
-                  runCheck({ domain: value });
-                }}
-                className={choice(value === domain)}
-              >
-                <span className="flex items-center gap-2 font-semibold">
-                  <Icon className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                  {label}
-                </span>
-                <span className="mt-2 block text-sm text-slate-500">{note}</span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        <label className="block space-y-2 text-sm">
-          <span className="font-semibold text-slate-800">
-            Bulan <span className="font-normal text-slate-500">(opsional)</span>
-          </span>
-          <input type="month" name="period" className={`${field} max-w-xs`} />
-        </label>
-
-        <div className="space-y-2">
-          <label className="block space-y-1 text-sm">
-            <span className="font-semibold text-slate-800">File (.xlsx atau .csv, maks. 10 MB)</span>
-            <input
-              ref={fileRef}
-              type="file"
-              name="file"
-              accept=".xlsx,.csv"
-              required
-              onChange={() => {
-                // A new pick hides the previous upload's result.
-                setRetry(true);
-                runCheck();
-              }}
-              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium"
-            />
+          <label className="block space-y-2 text-sm">
+            <span className="font-semibold text-slate-800">
+              Bulan <span className="font-normal text-slate-500">(opsional)</span>
+            </span>
+            <input type="month" name="period" className={field} />
           </label>
-          {TEMPLATES[domain] && (
-            <a href={`unggah-data/template/${TEMPLATES[domain]}`} download className="inline-block text-sm font-medium text-emerald-700 underline">
-              Download template
-            </a>
-          )}
         </div>
 
-        {checking && <p className="text-sm text-slate-600">Membaca dan mengecek file…</p>}
-        {!showResult && !pending && !checking && check && !check.ok && (
-          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            {check.message}
-          </p>
+        <input
+          ref={fileRef}
+          type="file"
+          name="file"
+          accept=".xlsx,.csv"
+          required
+          aria-label="File (.xlsx atau .csv, maks. 10 MB)"
+          className="sr-only"
+          onChange={(e) => {
+            const picked = e.target.files?.[0];
+            setFile(picked ? { name: picked.name, size: picked.size } : null);
+            // A new pick hides the previous upload's result.
+            setRetry(true);
+            resetMapping();
+            runCheck({ columnMap: "" });
+          }}
+        />
+        {file ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <FileText className="size-5 shrink-0 text-slate-400" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-slate-800">{file.name}</p>
+                <p className="text-sm text-slate-500">
+                  {size(file.size)}
+                  {check?.ok && ` · ${check.rowCount.toLocaleString("id-ID")} baris`}
+                </p>
+              </div>
+            </div>
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={pending} className="shrink-0 text-sm font-medium text-slate-600 hover:text-slate-900 disabled:opacity-60">
+              Ganti file
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-6 text-sm font-medium text-slate-600 hover:border-emerald-400 hover:text-emerald-700"
+          >
+            <Upload className="size-4" aria-hidden="true" />
+            Pilih file (.xlsx atau .csv, maks. 10 MB)
+          </button>
         )}
-        {!showResult && !pending && !checking && check?.ok && <CheckCard check={check} />}
+        {TEMPLATES[domain] && (
+          <a href={`unggah-data/template/${TEMPLATES[domain]}`} download className="inline-block text-sm font-medium text-emerald-700 underline">
+            Download template
+          </a>
+        )}
+
+        {mapping ? (
+          <MappingEditor check={mapping} map={columnMap} busy={pending || checking} onPick={(c, f) => pick(mapping, c, f)} onDone={() => setEditing(false)} />
+        ) : (
+          file && (
+            <div className="space-y-4 rounded-xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {checking ? (
+                  <p className="text-sm text-slate-600">Membaca dan mengecek file…</p>
+                ) : check?.ok && !showResult && !pending ? (
+                  <CheckChips ready={check.ready} />
+                ) : (
+                  <span />
+                )}
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setEditing(true)} disabled={pending || !check?.ok || !check.columns.length} className={secondaryButton}>
+                    Ubah Mapping
+                  </button>
+                  <button type="submit" disabled={pending || checking || !check} className={primaryButton}>
+                    {pending ? "Mengunggah…" : "Unggah"}
+                  </button>
+                </div>
+              </div>
+              {!showResult && !pending && !checking && check && !check.ok && (
+                <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                  {check.message}
+                </p>
+              )}
+              {!showResult && !pending && !checking && check?.ok && <CheckDetails check={check} />}
+            </div>
+          )
+        )}
+
         {result && !result.ok && (
           <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             {result.message}
@@ -259,15 +424,6 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
             </div>
           </section>
         )}
-
-        <div className="flex flex-wrap gap-3">
-          <button type="submit" disabled={pending || checking || !check} className={primaryButton}>
-            {pending ? "Mengunggah…" : "Unggah"}
-          </button>
-          <button type="button" onClick={clearFile} disabled={pending || !check} className={secondaryButton}>
-            Ubah Mapping
-          </button>
-        </div>
       </Card>
     </form>
   );

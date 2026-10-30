@@ -3,6 +3,9 @@ import { readFileSync, statSync } from 'node:fs';
 import { shot } from './evidence.js';
 import { storageState } from './roles.js';
 
+// Jenis data is the first combobox of the page; the history filters below the form carry the same label.
+const jenisData = (page: Page) => page.getByRole('combobox', { name: 'Jenis data' }).first();
+
 test.describe('Unggah Data', () => {
   test.use({ storageState: storageState('data-operasional-skn') });
 
@@ -10,15 +13,16 @@ test.describe('Unggah Data', () => {
     await page.goto('unggah-data');
     await expect(page.getByRole('heading', { name: 'Unggah Data' })).toBeVisible();
     // SCRUM-144: Data Operasional is tied to one dapur, so the dapur is shown, not picked.
-    await expect(page.getByText(/^Dapur: SKN/)).toBeVisible();
-    await expect(page.getByRole('combobox')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Cashflow/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Input Maker/ })).toBeVisible();
+    await expect(page.getByText(/^SKN/).first()).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Dapur' })).toHaveCount(0);
+    await expect(jenisData(page)).toHaveValue('CASHFLOW');
+    await expect(jenisData(page).getByRole('option', { name: 'Input Maker' })).toHaveCount(1);
     await expect(page.getByLabel(/Bulan/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Upload History' })).toBeVisible();
   });
 
   test('[SCRUM-25] riwayat unggahan menampilkan profil mapping, validasi, dan publish @smoke', async ({ page }) => {
-    // Upload history lives on Validasi Data now — Unggah Data itself only has the upload form.
+    // The full history (with these columns) lives on Validasi Data; Unggah Data shows a shorter one under the form.
     await page.goto('mapping-validasi');
     for (const col of ['Profil mapping', 'Divalidasi', 'Dipublish']) await expect(page.getByRole('columnheader', { name: col })).toBeVisible();
   });
@@ -32,10 +36,10 @@ test.describe('Unggah Data', () => {
     expect(download.suggestedFilename()).toBe('template-cashflow-v1.xlsx');
     // Sheets, headers and dropdowns are asserted in backend/src/lib/templates.test.ts.
     expect(statSync((await download.path())!).size).toBeGreaterThan(2000);
-    await page.getByRole('button', { name: /Master Menu/ }).click();
+    await jenisData(page).selectOption({ label: 'Master Menu' });
     await expect(link).toBeVisible();
     await shot(page, 'SCRUM-125', 2, 'menu-ada-link-template');
-    await page.getByRole('button', { name: /Purchase Order/ }).click();
+    await jenisData(page).selectOption({ label: 'Purchase Order' });
     await expect(link).toHaveCount(0);
     await shot(page, 'SCRUM-125', 3, 'jenis-lain-tanpa-link');
   });
@@ -53,9 +57,9 @@ test.describe.serial('Unggah Data: unggah file', () => {
   const result = (page: Page) => page.locator('section[aria-live=polite]');
 
   // Steps up to the chosen file, so tests can capture each step of the flow.
-  async function pick(page: Page, domain: RegExp | null, name: string, buffer: Buffer, ticket?: string, formShot = false) {
+  async function pick(page: Page, domain: string | null, name: string, buffer: Buffer, ticket?: string, formShot = false) {
     await page.goto('unggah-data');
-    if (domain) await page.getByRole('button', { name: domain }).click();
+    if (domain) await jenisData(page).selectOption({ label: domain });
     if (ticket && formShot) await shot(page, ticket, 1, 'pilih-kitchen-dan-jenis-data');
     await page.locator('input[type=file]').setInputFiles({ name, mimeType: 'text/csv', buffer });
     // The check card (FR-AI-01) is what turns Unggah on.
@@ -77,7 +81,7 @@ test.describe.serial('Unggah Data: unggah file', () => {
   });
 
   test('[SCRUM-36] menu Sukun terunggah dengan profil menu @smoke', async ({ page }) => {
-    await pick(page, /^Master Menu/, 'menu-sukun.csv', menu);
+    await pick(page, 'Master Menu', 'menu-sukun.csv', menu);
     await submit(page);
     await expect(result(page).getByText('Perlu dicek')).toBeVisible();
     await shot(result(page), 'SCRUM-36', 1, 'hasil-menu-terbaca');
@@ -108,5 +112,16 @@ test.describe.serial('Unggah Data: unggah file', () => {
     await shot(row, 'SCRUM-124', 3, 'berkas-lama-diganti');
     await page.getByRole('columnheader', { name: 'Dipublish' }).scrollIntoViewIfNeeded();
     await shot(page, 'SCRUM-25', 1, 'kolom-profil-validasi-publish');
+  });
+
+  test('[SCRUM-39] Ubah Mapping: kolom tak dikenal diarahkan ke kolom SOP, file lalu dikenali profil @smoke', async ({ page }) => {
+    await pick(page, null, 'kolom-tgl.csv', Buffer.from(cashflow.toString('utf8').replace(',tanggal,', ',tgl,')));
+    await page.getByRole('button', { name: 'Ubah Mapping' }).click();
+    await page.getByLabel('Dibaca sebagai untuk kolom tgl').selectOption('txn_date');
+    await expect(page.getByText('Diubah')).toBeVisible();
+    await page.getByRole('button', { name: 'Selesai' }).click();
+    await submit(page);
+    // Without the override this file is "Format berbeda".
+    await expect(result(page).getByText('Perlu dicek')).toBeVisible();
   });
 });

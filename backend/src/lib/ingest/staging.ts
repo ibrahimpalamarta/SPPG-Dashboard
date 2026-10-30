@@ -56,6 +56,8 @@ export type ParseContext = {
   loadedAt: Date;
   /** SCRUM-42: Master Reference "Kategori pengeluaran". Absent (dry run, tests) = categories are not normalised. */
   expenseCategories?: string[];
+  /** "Ubah Mapping": `sheet|column letter` → canonical field the uploader says it holds; "" = not used. */
+  columnMap?: Record<string, string>;
 };
 
 /** Turns the raw sheets into staged rows for one domain. */

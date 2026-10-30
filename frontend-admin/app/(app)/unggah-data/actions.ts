@@ -11,6 +11,12 @@ export type UploadAdvice = {
   issues: { code: string; advice: string }[];
 };
 
+/** One header of the file and the SOP field it is read as (null: not used). `sheet|column` identifies it in `columnMap`. */
+export type FileColumn = { sheet: string; column: string; header: string; field: string | null };
+
+/** A canonical field of the SOP and the header its template writes it under. */
+export type SopField = { field: string; header: string };
+
 /** The "Siap diunggah" / "Perlu dicek" card, built before anything is stored. */
 export type CheckResult =
   | {
@@ -18,6 +24,9 @@ export type CheckResult =
       ready: boolean;
       issues: { code: string; message: string; label: string; count: number }[];
       columnDiff: ColumnDiff[];
+      rowCount: number;
+      columns: FileColumn[];
+      fields: SopField[];
       ai: UploadAdvice | null;
     }
   | { ok: false; message: string };
@@ -57,11 +66,12 @@ export async function checkFile(form: FormData): Promise<CheckResult> {
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Pilih file .xlsx atau .csv terlebih dahulu." };
   if (!form.get("period")) form.delete("period");
+  if (!form.get("columnMap")) form.delete("columnMap");
 
   const res = await apiFetch("/upload-batches?dryRun=true", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return failure(res.status, body);
-  return { ok: true, ready: body.ready, issues: body.issues, columnDiff: body.columnDiff, ai: body.ai };
+  return { ok: true, ready: body.ready, issues: body.issues, columnDiff: body.columnDiff, rowCount: body.rowCount, columns: body.columns, fields: body.fields, ai: body.ai };
 }
 
 /**
@@ -73,6 +83,7 @@ export async function uploadFile(_prev: UploadResult | null, form: FormData): Pr
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Pilih file .xlsx atau .csv terlebih dahulu." };
   if (!form.get("period")) form.delete("period");
+  if (!form.get("columnMap")) form.delete("columnMap");
 
   const res = await apiFetch("/upload-batches", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));

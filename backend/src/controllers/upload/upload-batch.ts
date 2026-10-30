@@ -264,6 +264,7 @@ export const createUploadBatch =
       sourceFileName: originalname,
       fileHash,
       loadedAt: new Date(),
+      columnMap: body.columnMap,
     });
 
     // SCRUM-6 AC1 + SCRUM-150: read and check the file, write nothing. Same parser
@@ -290,6 +291,8 @@ export const createUploadBatch =
         rows: parsed.batch.rows.slice(0, PREVIEW_ROWS),
         ready: parsed.detection.ok && !needsAttention(found),
         columnDiff,
+        columns: parsed.columns,
+        fields: parsed.fields,
         // One line per kind of problem, not per row: a file can carry thousands.
         issues: [...new Map(found.map((i) => [i.code, i])).values()].map((i) => ({ code: i.code, message: i.message, label: issueLabel(i), count: parsed.mapping?.issueCounts[i.code] ?? 1 })),
         ai: await checkUpload({ columnDiff, issueCounts: parsed.mapping?.issueCounts ?? {} }),
