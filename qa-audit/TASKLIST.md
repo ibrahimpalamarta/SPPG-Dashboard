@@ -52,7 +52,7 @@ Setiap tiket dianggap selesai bila semua poin di kolom *Selesai bila* lulus, dan
 | T12 | Schema mismatch handling + layar kolom berbeda | 94, 124 | IN_PROGRESS (B-SCHEMA) |
 | T13 | Sukun Cashflow profile/adapter | 27, 55 | IN REVIEW (B-DD) |
 | T14 | Lawang + persiapan DNM/PCK/SML Cashflow | 32, 56, 57 | IN REVIEW (B-SAMPLE-LWG/OTHER) |
-| T15 | Menu common adapter + menu_recipe_line + profil 5 dapur | 31, 73, 58 | IN_PROGRESS (B-MAPOUT; T15.3 B-SAMPLE-LWG/OTHER) |
+| T15 | Menu common adapter + menu_recipe_line + profil 5 dapur | 31, 73, 58 | IN_PROGRESS (31/73 siap review; T15.3 B-SAMPLE-LWG/OTHER) |
 | **Tahap 4 — Kanonik Finance** ||||
 | T16 | finance_transaction header/line + anti-double-count | 77, 40, 98, 41 | IN REVIEW |
 | T17 | Rantai RAB → PO → GR → Payment (Sukun) | 44, 28, 45, 29, 46, 47, 30 | BLOCKED (B-SRC-SKN) (B-RAW) |
@@ -183,8 +183,8 @@ logika yang di-hardcode berdasarkan nama dapur.
 #### T15 — Menu mapping · Butuh: T08, T11 · Status: IN_PROGRESS (B-MAPOUT)
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T15.1 | SCRUM-31 | Menu common adapter MAP-SKN-MENU-001 | IN_PROGRESS (B-MAPOUT, B-DD) | U | Menu Upload v1 → menu_recipe_line; varian multi-sheet/header SKN ditangani |
-| T15.2 | SCRUM-73 | [DATA-041] menu_recipe_line canonical transform | IN_PROGRESS (B-MAPOUT, B-DD) | U, D | Baris berisi serving_date, kitchen/region, menu, porsi/segmen, gizi, porsi rencana, lineage. Sheet/baris duplikat di-dedup dengan key yang disepakati |
+| T15.1 | SCRUM-31 | Menu common adapter MAP-SKN-MENU-001 | IN_PROGRESS (siap review; B-DD) | U | Menu Upload v1 → menu_recipe_line; varian multi-sheet/header SKN ditangani |
+| T15.2 | SCRUM-73 | [DATA-041] menu_recipe_line canonical transform | IN_PROGRESS (siap review; B-DD) | U, D | Baris berisi serving_date, kitchen/region, menu, porsi/segmen, gizi, porsi rencana, lineage. Sheet/baris duplikat di-dedup dengan key yang disepakati |
 | T15.3 | SCRUM-58 | [DATA-025] Profil Menu 5 dapur | TODO (B-SAMPLE-LWG/OTHER) | U | Lima profil → menu_recipe_upload. Periode PCK eksplisit. Bumil/Busui DNM dipertahankan. Multi-ingredient SML di-flag, tidak dikarang |
 
 ### Tahap 4 — Kanonik Finance
@@ -205,8 +205,8 @@ logika yang di-hardcode berdasarkan nama dapur.
 |---|---|---|---|---|---|
 | T17.1 | SCRUM-44 | [DATA-011] Sukun RAB mapping profile | IN REVIEW (B-DD) | U, D | Layout presentasi di-flatten; record budget harian + bahan dibuat; planned cost tertelusur ke baris source |
 | T17.2 | SCRUM-28 | Sukun RAB adapter | IN REVIEW | U | RAB → rab_daily_budget / rab_ingredient_budget |
-| T17.3 | SCRUM-45 | [DATA-012] Sukun PO mapping + stable IDs | TODO | U | po_id dan po_line_id stabil; label supplier/item mentah ada; FK ke rab_id bila ada; duplikat ditangani |
-| T17.4 | SCRUM-29 | Sukun PO adapter | TODO | U | List PO/Nota Pesanan → purchase_order_line |
+| T17.3 | SCRUM-45 | [DATA-012] Sukun PO mapping + stable IDs | IN_PROGRESS (tabel ada; B-SRC-SKN) | U | po_id dan po_line_id stabil; label supplier/item mentah ada; FK ke rab_id bila ada; duplikat ditangani |
+| T17.4 | SCRUM-29 | Sukun PO adapter | IN_PROGRESS (tabel ada; B-SRC-SKN) | U | List PO/Nota Pesanan → purchase_order_line |
 | T17.5 | SCRUM-46 | [DATA-013] Goods Receipt mapping (opsional) | TODO | U | receipt_id/line; qty_match_status diturunkan dari ordered vs received; flag manual tidak otoritatif. Bukan blocker Phase 1 |
 | T17.6 | SCRUM-47 | [DATA-014] Vendor payment workflow chain | TODO | U | payment_request_id; link receipt/PO/supplier; timestamp maker, approval, payment; payment_reference wajib bila paid |
 | T17.7 | SCRUM-30 | Sukun Payment adapter | TODO | U, D | input_maker_upload → vendor_payment_workflow. TAGIHAN/TANGGAL **tidak** otomatis jadi paid_amount/maker_input_time |
