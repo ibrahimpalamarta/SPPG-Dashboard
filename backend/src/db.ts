@@ -60,4 +60,8 @@ export type Db = Pick<
   | 'validationIssue'
   | 'stagingRow'
   | 'governmentSubmissionLog'
+  | 'financeBalance'
+  | 'rabDailyBudget'
+  | 'menuRecipeLine'
+  | 'beneficiaryDailyCount'
 >;

@@ -44,3 +44,8 @@ export const summaryQuery = refineDateRange(pageQuery.extend(dateRangeFields));
 export const dashboardQuery = refineDateRange(
   z.object({ ...dateRangeFields, kitchenId: optionalBigInt }),
 );
+
+/** SCRUM-115: menu KPIs also filter by region (kitchens.city_regency). */
+export const menuKpiQuery = refineDateRange(
+  z.object({ ...dateRangeFields, kitchenId: optionalBigInt, region: z.string().trim().min(1).max(100).optional() }),
+);

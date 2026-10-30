@@ -105,7 +105,7 @@ describe('publish (SCRUM-95/78/96)', () => {
     assert.equal(out.status, 200);
     assert.equal(out.body?.status, 'PUBLISHED');
     // One supersede statement per canonical table.
-    assert.equal(calls.raw.length, 4);
+    assert.equal(calls.raw.length, 6);
     assert.ok(calls.raw.every((sql) => sql.includes("status = 'PUBLISHED'")));
     assert.deepEqual(calls.audits, ['upload_batch.published']);
   });

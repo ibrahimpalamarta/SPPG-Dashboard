@@ -25,6 +25,8 @@ const SUPERSEDE = [
   ['rab_daily_budgets', ['budget_date', 'portion_segment']],
   ['menu_recipe_lines', ['serving_date', 'portion_segment', 'menu_name', 'ingredient']],
   ['vendor_payment_workflows', ['payment_request_id']],
+  ['beneficiary_daily_counts', ['count_date', 'location_ref', 'segment']],
+  ['finance_balances', ['balance_date', 'account_ref']],
 ] as const;
 
 export type SupersedeCounts = Record<(typeof SUPERSEDE)[number][0], number>;

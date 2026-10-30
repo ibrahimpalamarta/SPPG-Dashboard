@@ -19,6 +19,7 @@ import {
   akgComplianceRouter,
   dailyKitchenRouter,
   dashboardRouter,
+  kpiRouter,
   menuCostRouter,
   menuNutritionRouter,
   summaryRouter,
@@ -76,6 +77,7 @@ apiRouter.use('/akg-compliances', akgComplianceRouter);
 apiRouter.use('/menu-costs', menuCostRouter);
 apiRouter.use('/summaries', summaryRouter);
 apiRouter.use('/dashboard', dashboardRouter);
+apiRouter.use('/kpi', kpiRouter);
 
 // CMS
 apiRouter.use('/cms/announcements', announcementRouter);

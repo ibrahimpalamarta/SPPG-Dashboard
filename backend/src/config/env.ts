@@ -108,6 +108,10 @@ const schema = z.object({
         .map((o) => o.trim())
         .filter(Boolean),
     ),
+
+  // SCRUM-64/100: Planned Cost per Portion stays off until B-PLAN (SCRUM-123
+  // "data Rencana disembunyikan" vs AC-DASH-01) is decided.
+  KPI_PLANNED_COST: z.enum(['true']).optional(),
 });
 
 /**
