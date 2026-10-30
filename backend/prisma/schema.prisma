@@ -137,6 +137,27 @@ enum ReferenceEntryKind {
   KODE
 }
 
+/// SCRUM-51: CRITICAL menahan batch (tidak bisa ke READY/publish) sampai
+/// di-resolve; HIGH dan MEDIUM tampil untuk dicek.
+enum IssueSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+}
+
+/// SCRUM-51: apa yang dilakukan pipeline terhadap baris yang memicu rule.
+enum IssueAction {
+  REJECT
+  REVIEW
+  NORMALIZE
+  FLAG
+}
+
+enum IssueStatus {
+  OPEN
+  RESOLVED
+}
+
 // ---------------------------------------------------------------------------
 // Identitas & audit
 // ---------------------------------------------------------------------------
@@ -178,6 +199,7 @@ model User {
   auditLogs        AuditLog[]
   galleryImages    GalleryImage[]
   uploadBatches    UploadBatch[]
+  resolvedIssues   ValidationIssue[]
   cmsAnnouncements CmsAnnouncement[]
   cmsDocuments     CmsDocument[]
 
@@ -501,6 +523,7 @@ model UploadBatch {
   vendorPayments      VendorPaymentWorkflow[]
   menuRecipeLines     MenuRecipeLine[]
   purchaseOrderLines  PurchaseOrderLine[]
+  validationIssues    ValidationIssue[]
 
   @@index([kitchenId, uploadDate])
   @@index([kitchenId, domain, uploadDate])
@@ -632,6 +655,10 @@ model RabDailyBudget {
   budgetDate     DateTime @map("budget_date") @db.Date
   portionSegment String   @map("portion_segment")
   plannedCost    Decimal  @map("planned_cost") @db.Decimal(16, 2)
+
+  /// SCRUM-53: baris bahan tanpa Total Harga. Lebih dari 0 = planned_cost
+  /// hanya Σ yang terbaca; KPI menandainya tidak lengkap, bukan menganggap 0.
+  missingLineTotals Int @default(0) @map("missing_line_totals")
 
   /// Jumlah paket/porsi rencana hari itu (PRD §7.1 "package count"): terbesar
   /// dari "Kebutuhan Makanan Kemasan (pax)"; NULL bila tidak ada baris yang
@@ -765,6 +792,38 @@ model MenuRecipeLine {
   @@index([uploadBatchId])
   @@index([sourceRecordId])
   @@map("menu_recipe_lines")
+}
+
+/// SCRUM-33/51/68: satu temuan rule DQ per baris sumber. Ditulis ulang tiap
+/// parse (satu transaksi dengan staging), jadi resolve hilang bila berkas
+/// di-parse ulang. Baris yang ditolak tetap tertelusur lewat source_record_id.
+model ValidationIssue {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+  kitchenId     BigInt      @map("kitchen_id")
+
+  /// Kode issue adapter (NO_TXN_ID, MISSING_AMOUNT, ...) dan rule DQ-xxx bila ada.
+  code           String
+  ruleId         String?       @map("rule_id")
+  severity       IssueSeverity
+  action         IssueAction
+  sourceRecordId String?       @map("source_record_id")
+  message        String
+
+  status       IssueStatus @default(OPEN)
+  note         String?
+  resolvedById BigInt?     @map("resolved_by")
+  resolvedBy   User?       @relation(fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?   @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([uploadBatchId, status, severity])
+  @@index([kitchenId, status, severity])
+  @@index([sourceRecordId])
+  @@map("validation_issues")
 }
 
 /// SCRUM-29/45: baris List PO / Nota Pesanan. Belum ada writer: sumber PO Sukun

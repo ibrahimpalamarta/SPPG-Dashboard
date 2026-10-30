@@ -1,6 +1,6 @@
 import type { StagedSheet, StagingRow } from '../ingest/staging.js';
 import type { MappingOutput, MappingProfile } from './profiles.js';
-import { fieldReader, parseDate, parseNumber, text, type Issue, type Normalization } from './values.js';
+import { fieldReader, normalizeUnit, parseDate, parseNumber, text, type Issue, type Normalization } from './values.js';
 
 export type CashflowLine = {
   source_record_id: string;
@@ -76,7 +76,7 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
       item_name: text(f.item_name),
       counterparty: text(f.counterparty),
       qty: note('NUMBER_PARSED', 'qty', parseNumber(f.qty)),
-      unit: fold('unit', (s) => s.toLowerCase()),
+      unit: note('UNIT_NORMALIZED', 'unit', normalizeUnit(text(f.unit))),
       unit_price: money('unit_price'),
       line_amount: money('line_amount'),
     };
@@ -125,9 +125,11 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
     if (totalsSeen.get(txn.txn_id)!.size > 1) {
       issues.push({ code: 'TOTAL_INCONSISTENT', rule: 'DQ-004', message: `${txn.txn_id}: nilai total berbeda antar baris.` });
     }
+    // SCRUM-53: a missing line amount is unknown, not 0; MISSING_AMOUNT already reports it.
+    const complete = txn.lines.every((l) => l.line_amount !== null);
     const sum = txn.lines.reduce((n, l) => n + (l.line_amount ?? 0), 0);
     // Half a rupiah covers spreadsheet rounding of qty × price.
-    if (txn.txn_total !== null && Math.abs(sum - txn.txn_total) > 0.5) {
+    if (complete && txn.txn_total !== null && Math.abs(sum - txn.txn_total) > 0.5) {
       issues.push({ code: 'LINES_NOT_TOTAL', rule: 'DQ-004', message: `${txn.txn_id}: jumlah baris ${rupiah(sum)} ≠ total ${rupiah(txn.txn_total)}.` });
     }
     // DQ-025: not eligible for KPIs until a reviewer confirms it.

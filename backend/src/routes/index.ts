@@ -11,6 +11,7 @@ import { ingredientRouter } from './master/ingredient.js';
 import { akgTargetRouter } from './master/akg-target.js';
 import { referenceEntryRouter } from './master/reference-entry.js';
 import { uploadBatchRouter } from './upload/upload-batch.js';
+import { validationIssueRouter } from './upload/validation-issue.js';
 import { menuPlanRouter } from './menu/menu-plan.js';
 import { inboxRouter } from './inbox/inbox.js';
 import {
@@ -62,6 +63,7 @@ apiRouter.use('/reference-entries', referenceEntryRouter);
 
 // Upload & operational
 apiRouter.use('/upload-batches', uploadBatchRouter);
+apiRouter.use('/validation-issues', validationIssueRouter);
 apiRouter.use('/menu-plans', menuPlanRouter);
 apiRouter.use('/inbox', inboxRouter);
 

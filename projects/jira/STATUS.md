@@ -53,3 +53,12 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | SCRUM-56 | [DATA-023] Lawang Cashflow profile | mapping | 3 | TODO | To Do | — | 2026-10-23 | B-SAMPLE-LWG |
 | SCRUM-32 | Lawang Cashflow adapter | mapping | 3 | TODO | To Do | — | 2026-10-23 |  |
 | SCRUM-57 | [DATA-024] Persiapan adapter DNM/PCK/SML | mapping | 3 | TODO | To Do | — | 2026-10-23 |  |
+| SCRUM-33 | Generic validation framework | validation | 4 | IN_PROGRESS (siap review) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | Registry severity/aksi `lib/validation/rules.ts`; issue per baris di `validation_issues` |
+| SCRUM-51 | [DATA-018] Severity & quarantine workflow | validation | 4 | IN_PROGRESS (siap review; Data Health di Tahap 8) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | CRITICAL OPEN menahan READY (409 batch_blocked); Tandai sudah dicek + catatan wajib |
+| SCRUM-52 | [DATA-019] Shared normalization | validation | 4 | IN_PROGRESS (siap review) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | `normalizeUnit` + tanggal mustahil ditolak + desimal koma/titik |
+| SCRUM-53 | [DATA-020] Missing data is not zero | validation | 4 | IN_PROGRESS (siap review; KPI di Tahap 7) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | `rab_daily_budgets.missing_line_totals`; LINES_NOT_TOTAL tidak lagi menganggap kosong = 0 |
+| SCRUM-34 | Finance DQ rules | validation | 4 | IN_PROGRESS (siap review; transfer di SCRUM-43) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | Rule finance terdaftar dengan severity |
+| SCRUM-68 | [DATA-035] Validation queue | validation | 4 | IN_PROGRESS (siap review) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | `GET /api/validation-issues` + `POST /resolve` |
+| SCRUM-85 | [DATA-047] Menu DQ rules lintas template | validation | 4 | IN_PROGRESS (Sukun siap review; dapur lain butuh SCRUM-58) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | Rule menu Sukun + URT_LOOKS_LIKE_DATE |
+| SCRUM-120 | Latest Cross-Kitchen Menu DQ Rules | validation | 4 | IN_PROGRESS (Sukun siap review) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | Satu unit dengan SCRUM-85; SCRUM-128 duplikat |
+| SCRUM-128 | (duplikat SCRUM-120) | validation | 4 | DUPLICATE | To Do | — | 2026-10-30 | Tidak dikerjakan |

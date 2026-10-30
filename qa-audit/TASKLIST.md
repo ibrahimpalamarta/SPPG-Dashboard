@@ -58,10 +58,10 @@ Setiap tiket dianggap selesai bila semua poin di kolom *Selesai bila* lulus, dan
 | T17 | Rantai RAB → PO → GR → Payment (Sukun) | 44, 28, 45, 29, 46, 47, 30 | BLOCKED (B-SRC-SKN) (B-RAW) |
 | T18 | Dataset finance_balance + beneficiary_daily_count + PII | 49, 50, 72 | BLOCKED (B-SRC-SKN) |
 | **Tahap 5 — Validasi & Publish** ||||
-| T19 | Normalisasi bersama (tanggal/mata uang/unit) + missing ≠ 0 | 52, 53 | BLOCKED (B-SRC-SKN) |
-| T20 | Validation framework + severity & quarantine | 33, 51 | IN REVIEW (link PO/GR: B-SRC-SKN) |
+| T19 | Normalisasi bersama (tanggal/mata uang/unit) + missing ≠ 0 | 52, 53 | IN_PROGRESS (siap review) |
+| T20 | Validation framework + severity & quarantine | 33, 51 | IN_PROGRESS (siap review) |
 | T21 | Finance DQ: kategori, transfer internal, SLA D0/D+1, rekonsiliasi Ringkasan_Transaksi | 34, 42, 43, 48, 84, 119 (127 duplikat) | IN REVIEW |
-| T22 | Menu DQ lintas template dapur | 85, 120 (128 duplikat) | BLOCKED (B-SRC-SKN) |
+| T22 | Menu DQ lintas template dapur | 85, 120 (128 duplikat) | IN_PROGRESS (Sukun siap review) |
 | T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | BLOCKED (B-SRC-SKN) |
 | **Tahap 6 — KPI & Dashboard** ||||
 | T24 | Widget Finance: Top 5 Supplier, Expense Mix, Planned Cost/Portion, Saldo, EFI Transfer | 62, 97, 63, 99, 64, 100, 65, 101, 66, 102 | BLOCKED (B-SRC-SKN) |
@@ -226,19 +226,19 @@ tidak menggandakan fakta; batch koreksi menggantikan yang lama dan histori tetap
 #### T19 — Normalisasi · Butuh: T07, T08 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T19.1 | SCRUM-52 | [DATA-019] Normalisasi tanggal/mata uang/unit/desimal | TODO | U | Varian tanggal Excel/teks; Rp/angka; alias Kg/kg/Pax; koma/titik desimal; tanggal mustahil ditolak |
-| T19.2 | SCRUM-53 | [DATA-020] Missing ≠ 0 | TODO | U | NULL/MISSING dipertahankan; ada flag completeness; KPI membedakan 0 dan missing; source hilang tampil di Data Health |
+| T19.1 | SCRUM-52 | [DATA-019] Normalisasi tanggal/mata uang/unit/desimal | IN_PROGRESS (siap review) | U | Varian tanggal Excel/teks; Rp/angka; alias Kg/kg/Pax; koma/titik desimal; tanggal mustahil ditolak |
+| T19.2 | SCRUM-53 | [DATA-020] Missing ≠ 0 | IN_PROGRESS (siap review; KPI di T24/T25) | U | NULL/MISSING dipertahankan; ada flag completeness; KPI membedakan 0 dan missing; source hilang tampil di Data Health |
 
 #### T20 — Validation framework · Butuh: T19 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T20.1 | SCRUM-33 | Generic validation framework | TODO | U | Severity Blocker/Warning/Info; detail baris + field + rule |
-| T20.2 | SCRUM-51 | [DATA-018] Severity & quarantine | TODO | U | Critical/High/Medium; aksi Reject/Review/Normalize/Flag; baris ditolak tetap tertelusur ke batch dan source; hasil tampil di Data Health |
+| T20.1 | SCRUM-33 | Generic validation framework | IN_PROGRESS (siap review) | U | Severity Blocker/Warning/Info; detail baris + field + rule |
+| T20.2 | SCRUM-51 | [DATA-018] Severity & quarantine | IN_PROGRESS (siap review; Data Health di T26) | U | Critical/High/Medium; aksi Reject/Review/Normalize/Flag; baris ditolak tetap tertelusur ke batch dan source; hasil tampil di Data Health |
 
 #### T21 — Finance DQ · Butuh: T16, T20 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T21.1 | SCRUM-34 | Finance DQ rules (payung) | TODO | U | Anti-double-count, IDR numerik, klasifikasi transfer, missing ≠ 0 aktif sebagai rule |
+| T21.1 | SCRUM-34 | Finance DQ rules (payung) | IN_PROGRESS (siap review; transfer di T21.3) | U | Anti-double-count, IDR numerik, klasifikasi transfer, missing ≠ 0 aktif sebagai rule |
 | T21.2 | SCRUM-42 | [DATA-009] Normalisasi kategori via Master Reference | TODO | U | Kategori mentah dipertahankan; kategori normal dari master; nilai tak termapping di-flag |
 | T21.3 | SCRUM-43 | [DATA-010] Klasifikasi transfer internal | TODO | U | transaction_type mendukung transfer internal; KPI spend tidak menghitungnya; test mencakup pasangan mutasi |
 | T21.4 | SCRUM-48 | [DATA-015] Urutan payment & SLA D0/D+1 | TODO | U | receipt ≤ maker ≤ approval ≤ payment; klasifikasi SAME_DAY/D+1/BREACH; urutan invalid di-flag. Butuh T17.6 |
@@ -249,8 +249,8 @@ tidak menggandakan fakta; batch koreksi menggantikan yang lama dan histori tetap
 #### T22 — Menu DQ · Butuh: T15, T20 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T22.1 | SCRUM-85 | [DATA-047] Menu DQ lintas template dapur | TODO | U, D | Periode PCK kosong; multi-sheet/casing SKN; label maternal + provenance harga DNM; multi-ingredient + kelengkapan SML; gizi/harga kosong LWG. Outlier di-review, tidak dikoreksi diam-diam |
-| T22.2 | SCRUM-120 | Latest Cross-Kitchen Menu DQ Rules | TODO | U | Periode kosong, koma desimal, sheet duplikat, plausibilitas gizi, provenance harga AI/inferred, varian Bumil/Busui, kelengkapan SML |
+| T22.1 | SCRUM-85 | [DATA-047] Menu DQ lintas template dapur | IN_PROGRESS (Sukun siap review) | U, D | Periode PCK kosong; multi-sheet/casing SKN; label maternal + provenance harga DNM; multi-ingredient + kelengkapan SML; gizi/harga kosong LWG. Outlier di-review, tidak dikoreksi diam-diam |
+| T22.2 | SCRUM-120 | Latest Cross-Kitchen Menu DQ Rules | IN_PROGRESS (Sukun siap review) | U | Periode kosong, koma desimal, sheet duplikat, plausibilitas gizi, provenance harga AI/inferred, varian Bumil/Busui, kelengkapan SML |
 | — | SCRUM-128 | (duplikat SCRUM-120) | DUPLICATE | — | Tutup bersama SCRUM-120 |
 
 #### T23 — Review & publish · Butuh: T20 · Status: TODO
@@ -303,7 +303,7 @@ Urutan di tiap task: **semantic query dulu (backend), lalu widget (UI).**
 | T26.5 | SCRUM-59 | [DATA-026] government_submission_log + dedup | TODO | U | Submission merujuk source_record_id; sistem/modul/status tersimpan; KPI mengecualikan salinan submission |
 | T26.6 | SCRUM-107 | Government submission lineage | TODO | U | Submission SIPGN/POP/Aksis tertaut ke source_record_id, tanpa fakta ganda |
 | T26.7 | SCRUM-67 | [DATA-034] Expected source checklist + completeness | TODO | U | Checklist per dapur/fase; status submitted/missing/error/accepted; source di luar scope dikecualikan; missing ≠ 0 |
-| T26.8 | SCRUM-68 | [DATA-035] Validation queue | TODO | U, UI | Filter dapur/batch/rule/severity; link ke source record; auto-fix terlihat; item bisa diproses ulang |
+| T26.8 | SCRUM-68 | [DATA-035] Validation queue | IN_PROGRESS (siap review) | U, UI | Filter dapur/batch/rule/severity; link ke source record; auto-fix terlihat; item bisa diproses ulang |
 | T26.9 | SCRUM-104 | Data Health overview | TODO | UI | Kelengkapan, data hilang, error, jumlah issue, publish terakhir per dapur/domain |
 
 ### Tahap 7 — Fallback & Foto

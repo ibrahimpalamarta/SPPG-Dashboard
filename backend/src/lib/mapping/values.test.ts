@@ -1,7 +1,7 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RawCell } from '../ingest/workbook.js';
-import { parseDate, parseNumber, titleCase } from './values.js';
+import { normalizeUnit, parseDate, parseNumber, titleCase } from './values.js';
 
 const s = (value: string): RawCell => ({ value, type: 'string' });
 
@@ -70,5 +70,22 @@ describe('DQ-002/003/010 normalisation', () => {
 
   test('multi-word segment keeps each word capitalised', () => {
     assert.equal(titleCase('BUMIL & busui'), 'Bumil & Busui');
+  });
+});
+
+describe('SCRUM-52 shared normalisation', () => {
+  test('unit spellings fold to one code; unknown units are only lower-cased', () => {
+    assert.deepEqual(['Kg', 'KG', 'Kilogram', 'gr', 'Ltr', 'Pax', 'porsi', 'Buah', 'ikat'].map(normalizeUnit), ['kg', 'kg', 'kg', 'g', 'l', 'pax', 'pax', 'pcs', 'ikat']);
+    assert.equal(normalizeUnit(null), null);
+  });
+
+  test('impossible calendar dates are rejected, not rolled over', () => {
+    assert.equal(parseDate(s('31/02/2026')), null);
+    assert.equal(parseDate(s('29/02/2028')), '2028-02-29');
+  });
+
+  test('decimal comma and decimal dot read the same', () => {
+    assert.equal(parseNumber(s('16,45')), 16.45);
+    assert.equal(parseNumber(s('16.45')), 16.45);
   });
 });

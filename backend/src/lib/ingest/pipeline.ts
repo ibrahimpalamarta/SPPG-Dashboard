@@ -6,7 +6,8 @@ import { menuParser } from './menu.js';
 import { inputMakerParser } from './input-maker.js';
 import { detectProfile, type Detection } from '../mapping/detect.js';
 import type { MappingOutput, MappingProfile } from '../mapping/profiles.js';
-import type { Issue, Normalization } from '../mapping/values.js';
+import type { Normalization } from '../mapping/values.js';
+import { classify, type ClassifiedIssue } from '../validation/rules.js';
 
 /**
  * The generic fallback: every sheet. Domains with no dedicated parser
@@ -33,7 +34,7 @@ export type MappingSummary = {
   records: number;
   totals: Record<string, number>;
   issueCounts: Record<string, number>;
-  issues: Issue[];
+  issues: ClassifiedIssue[];
   normalized: Normalization[];
   columns: MappedColumn[];
 };
@@ -69,7 +70,7 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
     }
     const { profile } = detection;
     const out = profile.apply(batch.sheets, batch.rows, profile);
-    await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, templateVersion: profile.version, loadedAt: ctx.loadedAt, domain: profile.domain, records: out.records });
+    await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, templateVersion: profile.version, loadedAt: ctx.loadedAt, domain: profile.domain, records: out.records, issues: out.issues });
     return { ok: true, batch, detection, mapping: summarise(profile, out, batch.sheets) };
   } catch (err) {
     await staging.deleteBatch(ctx.uploadBatchId);
@@ -88,7 +89,7 @@ function summarise(profile: MappingProfile, out: MappingOutput, sheets: StagedSh
     records: out.records.length,
     totals: out.totals,
     issueCounts,
-    issues: out.issues,
+    issues: classify(out.issues),
     normalized: out.normalized ?? [],
     columns: sheets
       .filter((s) => s.headerRow !== null && !s.skipped)

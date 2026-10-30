@@ -89,6 +89,8 @@ export default async function Page({
         <FindingsPanel
           key={batch.publicId}
           findings={findings}
+          batchId={batch.publicId}
+          canResolve={batch.status === "NEEDS_REVIEW" && me.permissions.includes("upload:create")}
           panels={{
             [tabs[1]]: <ColumnTable result={detail.mappingResult} />,
             [tabs[3]]: (

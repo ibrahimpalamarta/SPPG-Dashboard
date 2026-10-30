@@ -29,6 +29,11 @@ export const ERRORS = {
     status: 409,
     body: { error: 'invalid_transition', message: 'Status batch tidak bisa diubah ke status tersebut.' },
   },
+  // SCRUM-51: quarantine. `details.openCritical` says how many are left.
+  BATCH_BLOCKED: {
+    status: 409,
+    body: { error: 'batch_blocked', message: 'Masih ada temuan "Wajib diperbaiki" yang belum ditandai sudah dicek.' },
+  },
   // SCRUM-121: member administration.
   LAST_SUPER_ADMIN: {
     status: 409,

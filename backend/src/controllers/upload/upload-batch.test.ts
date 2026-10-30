@@ -78,6 +78,7 @@ async function run(handler: ReturnType<typeof createUploadBatch>, req: Partial<R
 function fakeDb(
   overrides: Partial<Record<string, unknown>> = {},
   kitchen: Partial<Record<string, unknown>> = {},
+  openCritical = 0,
 ) {
   const calls: { findManyWhere?: unknown; created?: unknown; updates: unknown[]; audits: string[] } = { updates: [], audits: [] };
   let row: Record<string, unknown> = {};
@@ -103,6 +104,7 @@ function fakeDb(
       ...overrides,
     },
     kitchen: { findUnique: async () => ({ id: 3n }), ...kitchen },
+    validationIssue: { count: async () => openCritical, groupBy: async () => [] },
     auditLog: {
       create: async (args: { data: { action: string } }) => {
         calls.audits.push(args.data.action);
@@ -472,5 +474,29 @@ describe('updateUploadBatch (SCRUM-22)', () => {
 
     assert.equal(out.status, 200);
     assert.deepEqual(calls.updates, [{ status: 'FAILED', notes: 'kolom BDD kosong' }]);
+  });
+
+  test('open CRITICAL issues keep the batch out of READY (SCRUM-51 quarantine)', async () => {
+    const { db, calls } = fakeDb({ findUnique: async () => ({ id: 9n, publicId: 'pub-1', kitchenId: 3n, status: 'NEEDS_REVIEW' }) }, {}, 2);
+    const out = await run(updateUploadBatch(db), {
+      user: userWith('SUPER_ADMIN'),
+      valid: { params: { id: 9n }, body: { status: 'READY' } },
+    });
+
+    assert.equal(out.status, 409);
+    assert.equal(out.body?.error, 'batch_blocked');
+    assert.deepEqual(out.body?.details, { openCritical: 2 });
+    assert.equal(calls.updates.length, 0);
+  });
+
+  test('READY once every CRITICAL issue is resolved', async () => {
+    const { db, calls } = fakeDb({ findUnique: async () => ({ id: 9n, publicId: 'pub-1', kitchenId: 3n, status: 'NEEDS_REVIEW' }) });
+    const out = await run(updateUploadBatch(db), {
+      user: userWith('SUPER_ADMIN'),
+      valid: { params: { id: 9n }, body: { status: 'READY' } },
+    });
+
+    assert.equal(out.status, 200);
+    assert.deepEqual(calls.updates, [{ status: 'READY' }]);
   });
 });

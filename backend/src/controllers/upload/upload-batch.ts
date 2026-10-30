@@ -13,6 +13,7 @@ import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
 import { buildTemplate, type TemplateKind } from '../../lib/templates.js';
 import { canTransition } from '../../lib/upload-status.js';
+import { openBlockers } from '../../lib/validation/rules.js';
 import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
 import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
 import type { ColumnDiff } from '../../lib/mapping/detect.js';
@@ -85,7 +86,13 @@ export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, r
     sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
-  sendJson(res, row);
+  // Validasi Data shows, per issue code, whether it is still open and why it was closed.
+  const issueStatus = await db.validationIssue.groupBy({
+    by: ['code', 'status', 'note'],
+    where: { uploadBatchId: row.publicId },
+    _count: { _all: true },
+  });
+  sendJson(res, { ...row, issueStatus: issueStatus.map(({ code, status, note, _count }) => ({ code, status, note, count: _count._all })) });
 };
 
 /** The batch in the caller's dapur, or null once a 404/403 has been sent. */
@@ -464,6 +471,13 @@ export const updateUploadBatch = (db: Db = prisma): RequestHandler => async (req
   if (body.status && !canTransition(current.status, body.status)) {
     sendError(res, 'INVALID_TRANSITION', { from: current.status, to: body.status });
     return;
+  }
+  if (body.status === UploadStatus.READY) {
+    const blockers = await openBlockers(db, current.publicId);
+    if (blockers > 0) {
+      sendError(res, 'BATCH_BLOCKED', { openCritical: blockers });
+      return;
+    }
   }
 
   const row = await db.uploadBatch.update({

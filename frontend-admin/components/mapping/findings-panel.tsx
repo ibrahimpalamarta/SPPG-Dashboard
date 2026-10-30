@@ -1,7 +1,8 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
+import { resolveIssues } from "@/app/(app)/mapping-validasi/actions";
 import { Badge } from "@/components/ui/badge";
 import { severityMeta, tabs, type Finding, type Severity } from "@/lib/mapping-validasi";
 
@@ -13,7 +14,60 @@ const tabSeverities: Partial<Record<string, Severity[]>> = {
 
 const inTab = (findings: Finding[], t: string) => findings.filter((f) => tabSeverities[t]?.includes(f.severity));
 
-export function FindingsPanel({ findings, panels }: { findings: Finding[]; panels: Partial<Record<string, ReactNode>> }) {
+/** Closes every open issue of one code with a mandatory note; the page re-renders from the server afterwards. */
+function ResolveForm({ batchId, code }: { batchId: string; code: string }) {
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        start(async () => setError(await resolveIssues(batchId, code, note)));
+      }}
+      className="space-y-3"
+    >
+      <label className="block text-sm font-semibold text-slate-900">
+        Catatan
+        <textarea
+          required
+          rows={3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Contoh: sudah dikonfirmasi ke dapur, baris ini memang subtotal"
+          className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+        />
+      </label>
+      {error && (
+        <p role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      <div className="flex justify-end">
+        <button
+          disabled={pending}
+          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+        >
+          <Check className="size-4" aria-hidden="true" />
+          {pending ? "Menyimpan…" : "Tandai sudah dicek"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function FindingsPanel({
+  findings,
+  panels,
+  batchId,
+  canResolve,
+}: {
+  findings: Finding[];
+  panels: Partial<Record<string, ReactNode>>;
+  batchId: string;
+  /** Data Operasional while the batch is still NEEDS_REVIEW. */
+  canResolve: boolean;
+}) {
   const [tab, setTab] = useState(tabs[0]);
   const [selectedId, setSelectedId] = useState(findings[0]?.id);
 
@@ -58,7 +112,7 @@ export function FindingsPanel({ findings, panels }: { findings: Finding[]; panel
                       <span className="block font-semibold text-slate-900">{f.title}</span>
                       <span className="mt-1 block text-sm text-slate-500">{f.section}</span>
                     </span>
-                    <Badge tone={m.tone}>{m.statusLabel}</Badge>
+                    {f.resolvedNote != null ? <Badge tone="green">Sudah dicek</Badge> : <Badge tone={m.tone}>{m.statusLabel}</Badge>}
                   </button>
                 </li>
               );
@@ -82,23 +136,12 @@ export function FindingsPanel({ findings, panels }: { findings: Finding[]; panel
               </ul>
             )}
 
-            {selected.severity === "check" && (
-              <>
-                <label className="block text-sm font-semibold text-slate-900">
-                  Catatan (opsional)
-                  <textarea
-                    rows={3}
-                    placeholder="Contoh: sudah dikonfirmasi ke dapur"
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
-                  />
-                </label>
-                <div className="flex justify-end">
-                  <button className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">
-                    <Check className="size-4" aria-hidden="true" />
-                    Tandai sudah dicek
-                  </button>
-                </div>
-              </>
+            {selected.resolvedNote != null ? (
+              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                <span className="font-semibold">Sudah dicek.</span> {selected.resolvedNote}
+              </p>
+            ) : (
+              selected.code && canResolve && <ResolveForm key={selected.id} batchId={batchId} code={selected.code} />
             )}
           </div>
         </div>

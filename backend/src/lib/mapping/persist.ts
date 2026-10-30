@@ -3,6 +3,8 @@ import type { CashflowTxn } from './sukun-cashflow.js';
 import type { RabDailyBudget } from './sukun-rab.js';
 import type { InputMakerLine } from './input-maker.js';
 import type { MenuRecipeLine } from './sukun-menu.js';
+import type { Issue } from './values.js';
+import { classify } from '../validation/rules.js';
 
 /** What an adapter produced for a batch, ready to store (B-MAPOUT: stored at upload). */
 export type MappedRecords = {
@@ -12,6 +14,8 @@ export type MappedRecords = {
   loadedAt: Date;
   domain: UploadDomain;
   records: unknown[];
+  /** Stored as validation_issue rows (SCRUM-33/51). */
+  issues?: Issue[];
 };
 
 // Postgres caps a statement at 65535 bind parameters; the widest row here has ~13.
@@ -34,6 +38,7 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
   await tx.rabDailyBudget.deleteMany({ where: { uploadBatchId } });
   await tx.vendorPaymentWorkflow.deleteMany({ where: { uploadBatchId } });
   await tx.menuRecipeLine.deleteMany({ where: { uploadBatchId } });
+  await tx.validationIssue.deleteMany({ where: { uploadBatchId } });
 
   // PRD §7.2 traceability: kitchen_id, source_system and source_file_name are the batch's.
   const batch = await tx.uploadBatch.findUniqueOrThrow({
@@ -49,6 +54,20 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
     templateVersion: mapped.templateVersion,
     loadedAt: mapped.loadedAt,
   };
+  await insertChunked(classify(mapped.issues ?? []), (chunk) =>
+    tx.validationIssue.createMany({
+      data: chunk.map((i) => ({
+        uploadBatchId,
+        kitchenId: batch.kitchenId,
+        code: i.code,
+        ruleId: i.rule ?? null,
+        severity: i.severity,
+        action: i.action,
+        sourceRecordId: i.sourceRecordId ?? null,
+        message: i.message,
+      })),
+    }),
+  );
   if (mapped.domain === 'CASHFLOW') {
     const txns = mapped.records as CashflowTxn[];
     await insertChunked(txns, (chunk) =>
@@ -150,6 +169,7 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
           budgetDate: new Date(d.budget_date),
           portionSegment: d.portion_segment,
           plannedCost: d.planned_cost,
+          missingLineTotals: d.missing_line_totals,
           packageCount: d.package_count,
         })),
         select: { id: true, budgetDate: true, portionSegment: true },
