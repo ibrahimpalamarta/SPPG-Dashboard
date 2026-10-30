@@ -2,9 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync, statSync } from 'node:fs';
 import { shot } from './evidence.js';
 import { storageState } from './roles.js';
+import { pilih } from './ui.js';
 
-// Jenis data is the first combobox of the page; the history filters below the form carry the same label.
-const jenisData = (page: Page) => page.getByRole('combobox', { name: 'Jenis data' }).first();
+const jenisData = (page: Page) => page.getByRole('combobox', { name: 'Jenis data', exact: true });
 
 test.describe('Unggah Data', () => {
   test.use({ storageState: storageState('data-operasional-skn') });
@@ -15,16 +15,17 @@ test.describe('Unggah Data', () => {
     // SCRUM-144: Data Operasional is tied to one dapur, so the dapur is shown, not picked.
     await expect(page.getByText(/^SKN/).first()).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Dapur' })).toHaveCount(0);
-    await expect(jenisData(page)).toHaveValue('CASHFLOW');
-    await expect(jenisData(page).getByRole('option', { name: 'Input Maker' })).toHaveCount(1);
+    await expect(jenisData(page)).toHaveText('Cashflow');
+    await jenisData(page).click();
+    await expect(page.getByRole('option', { name: 'Input Maker' })).toHaveCount(1);
     await expect(page.getByLabel(/Bulan/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Upload History' })).toBeVisible();
   });
 
   test('[SCRUM-25] riwayat unggahan menampilkan profil mapping, validasi, dan publish @smoke', async ({ page }) => {
-    // The full history (with these columns) lives on Validasi Data; Unggah Data shows a shorter one under the form.
+    // The full history lives on Validasi Data; the status badge carries validation and publish, the mapping profile is in the opened file.
     await page.goto('mapping-validasi');
-    for (const col of ['Profil mapping', 'Divalidasi', 'Dipublish']) await expect(page.getByRole('columnheader', { name: col })).toBeVisible();
+    for (const col of ['File', 'Dapur', 'Jenis data', 'Diunggah', 'Status']) await expect(page.getByRole('columnheader', { name: col })).toBeVisible();
   });
 
   test('[SCRUM-125][SCRUM-130] template cashflow resmi bisa diunduh dengan file xlsx @smoke', async ({ page }) => {
@@ -36,10 +37,10 @@ test.describe('Unggah Data', () => {
     expect(download.suggestedFilename()).toBe('template-cashflow-v1.xlsx');
     // Sheets, headers and dropdowns are asserted in backend/src/lib/templates.test.ts.
     expect(statSync((await download.path())!).size).toBeGreaterThan(2000);
-    await jenisData(page).selectOption({ label: 'Master Menu' });
+    await pilih(page, 'Jenis data', 'Master Menu');
     await expect(link).toBeVisible();
     await shot(page, 'SCRUM-125', 2, 'menu-ada-link-template');
-    await jenisData(page).selectOption({ label: 'Purchase Order' });
+    await pilih(page, 'Jenis data', 'Purchase Order');
     await expect(link).toHaveCount(0);
     await shot(page, 'SCRUM-125', 3, 'jenis-lain-tanpa-link');
   });
@@ -59,7 +60,7 @@ test.describe.serial('Unggah Data: unggah file', () => {
   // Steps up to the chosen file, so tests can capture each step of the flow.
   async function pick(page: Page, domain: string | null, name: string, buffer: Buffer, ticket?: string, formShot = false) {
     await page.goto('unggah-data');
-    if (domain) await jenisData(page).selectOption({ label: domain });
+    if (domain) await pilih(page, 'Jenis data', domain);
     if (ticket && formShot) await shot(page, ticket, 1, 'pilih-kitchen-dan-jenis-data');
     await page.locator('input[type=file]').setInputFiles({ name, mimeType: 'text/csv', buffer });
     // The check card (FR-AI-01) is what turns Unggah on.
@@ -110,14 +111,13 @@ test.describe.serial('Unggah Data: unggah file', () => {
     const row = page.getByRole('row', { name: /kolom-beda\.csv/ });
     await expect(row.getByText('Diganti')).toBeVisible();
     await shot(row, 'SCRUM-124', 3, 'berkas-lama-diganti');
-    await page.getByRole('columnheader', { name: 'Dipublish' }).scrollIntoViewIfNeeded();
-    await shot(page, 'SCRUM-25', 1, 'kolom-profil-validasi-publish');
+    await shot(page, 'SCRUM-25', 1, 'kolom-status-validasi-publish');
   });
 
   test('[SCRUM-39] Ubah Mapping: kolom tak dikenal diarahkan ke kolom SOP, file lalu dikenali profil @smoke', async ({ page }) => {
     await pick(page, null, 'kolom-tgl.csv', Buffer.from(cashflow.toString('utf8').replace(',tanggal,', ',tgl,')));
     await page.getByRole('button', { name: 'Ubah Mapping' }).click();
-    await page.getByLabel('Dibaca sebagai untuk kolom tgl').selectOption('txn_date');
+    await pilih(page, 'Dibaca sebagai untuk kolom tgl', 'tanggal');
     await expect(page.getByText('Diubah')).toBeVisible();
     await page.getByRole('button', { name: 'Selesai' }).click();
     await submit(page);

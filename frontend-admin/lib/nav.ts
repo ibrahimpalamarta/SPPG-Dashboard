@@ -14,9 +14,8 @@ export const NAV = [
   { group: "Dashboard", href: "/finance", label: "Finance & Cost", icon: "Wallet", permission: "dashboard:view" },
   { group: "Dashboard", href: "/kesehatan-data", label: "Kelengkapan Data", icon: "Activity", permission: "dashboard:view" },
   { group: "Data", href: "/unggah-data", label: "Unggah Data", icon: "Upload", permission: "upload:create" },
-  // SCRUM-148: Data Operasional checks and publishes its own files; Admin only watches them in Upload History.
-  { group: "Data", href: "/mapping-validasi", label: "Validasi Data", icon: "Map", permission: "batch:publish" },
-  { group: "Data", href: "/upload-history", label: "Upload History", icon: "History", permission: "upload:view" },
+  // SCRUM-148: Data Operasional checks and publishes its own files; Admin only watches them in Validasi Data.
+  { group: "Data", href: "/mapping-validasi", label: "Validasi Data", icon: "History", permission: "upload:view" },
   { group: "Data", href: "/referensi-data", label: "Data Reference", icon: "BookOpen", permission: "reference:view" },
   // File yang perlu diperbaiki (Data Operasional) dan undangan kedaluwarsa (Admin).
   { group: "Data", href: "/inbox", label: "Inbox", icon: "Inbox", permission: "dashboard:view" },

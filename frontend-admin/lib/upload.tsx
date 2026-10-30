@@ -1,3 +1,5 @@
+import { Check, Eye, Loader, Replace, TriangleAlert, X, type LucideIcon } from "lucide-react";
+
 /** Mirrors backend `UploadDomain` (schema.prisma), in PRD order. */
 export const DOMAINS = [
   { value: "CASHFLOW", label: "Cashflow" },
@@ -11,23 +13,28 @@ export const DOMAINS = [
 
 /** Backend `UploadStatus` → PRD FR-UP-05 wording + badge colour. */
 export const STATUS = {
-  PROCESSING: { label: "Processing", tone: "bg-slate-100 text-slate-700" },
-  NEEDS_REVIEW: { label: "Needs Review", tone: "bg-amber-100 text-amber-800" },
-  NEEDS_MAPPING_UPDATE: { label: "Needs Mapping Update", tone: "bg-amber-100 text-amber-800" },
-  PUBLISHED: { label: "Published", tone: "bg-emerald-700 text-white" },
-  FAILED: { label: "Failed", tone: "bg-red-100 text-red-800" },
-  SUPERSEDED: { label: "Diganti", tone: "bg-slate-100 text-slate-700" },
-} as const satisfies Record<string, { label: string; tone: string }>;
+  PROCESSING: { label: "Processing", tone: "border-slate-200 bg-slate-50 text-slate-600", icon: Loader },
+  NEEDS_REVIEW: { label: "Belum selesai dicek", tone: "border-sky-200 bg-sky-50 text-sky-700", icon: Eye },
+  NEEDS_MAPPING_UPDATE: { label: "Needs Mapping Update", tone: "border-amber-200 bg-amber-50 text-amber-700", icon: TriangleAlert },
+  PUBLISHED: { label: "Dipublish", tone: "border-emerald-200 bg-emerald-50 text-emerald-700", icon: Check },
+  FAILED: { label: "Failed", tone: "border-red-200 bg-red-50 text-red-700", icon: X },
+  SUPERSEDED: { label: "Diganti", tone: "border-slate-200 bg-slate-50 text-slate-600", icon: Replace },
+} as const satisfies Record<string, { label: string; tone: string; icon: LucideIcon }>;
 
 /**
  * A few error codes read better than their status: a header-only template is
  * held for re-upload, not broken (SCRUM-131).
  */
-const BY_ERROR_CODE: Record<string, { label: string; tone: string }> = {
-  EMPTY_FILE: { label: "Ditahan · file kosong", tone: "bg-amber-100 text-amber-800" },
+const BY_ERROR_CODE: Record<string, { label: string; tone: string; icon: LucideIcon }> = {
+  EMPTY_FILE: { label: "Ditahan · file kosong", tone: "border-amber-200 bg-amber-50 text-amber-700", icon: TriangleAlert },
 };
 
 export function StatusBadge({ status, errorCode }: { status: string; errorCode?: string | null }) {
-  const s = (errorCode && BY_ERROR_CODE[errorCode]) || STATUS[status as keyof typeof STATUS] || { label: status, tone: "bg-slate-100 text-slate-700" };
-  return <span className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs font-semibold ${s.tone}`}>{s.label}</span>;
+  const s = (errorCode && BY_ERROR_CODE[errorCode]) || STATUS[status as keyof typeof STATUS] || { label: status, tone: "border-slate-200 bg-slate-50 text-slate-600", icon: Loader };
+  return (
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium ${s.tone}`}>
+      <s.icon className="size-3" aria-hidden="true" />
+      {s.label}
+    </span>
+  );
 }

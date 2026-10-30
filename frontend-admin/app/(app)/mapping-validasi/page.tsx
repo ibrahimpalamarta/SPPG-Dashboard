@@ -23,25 +23,18 @@ const RECORDS_PAGE_SIZE = 20;
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ batch?: string; listPage?: string; recordsPage?: string }>;
+  searchParams: Promise<{ batch?: string; listPage?: string; recordsPage?: string; kitchenId?: string; domain?: string; status?: string }>;
 }) {
-  const [me, params] = await Promise.all([requirePage("/mapping-validasi"), searchParams]);
-  if (!me.permissions.includes("upload:view")) {
-    return (
-      <EmptyState title="Tidak ada akses">
-        <p>Peran Anda belum dapat melihat file yang diunggah.</p>
-      </EmptyState>
-    );
+  const [me, { batch: batchId, listPage, recordsPage: recordsPageParam, ...filters }] = await Promise.all([requirePage("/mapping-validasi"), searchParams]);
+
+  if (!batchId) {
+    return <BatchList page={Number(listPage) || 1} canDelete={me.permissions.includes("batch:publish")} filters={filters} kitchens={me.kitchens} />;
   }
 
-  if (!params.batch) {
-    return <BatchList page={Number(params.listPage) || 1} canDelete={me.permissions.includes("batch:publish")} />;
-  }
-
-  const recordsPage = Number(params.recordsPage) || 1;
+  const recordsPage = Number(recordsPageParam) || 1;
   const { data } = await apiGet<{ data: Batch[] }>("/upload-batches?pageSize=50");
   // FAILED never held usable data (incl. empty and replaced files), so there is nothing to map or validate.
-  const batch = data.find((b) => b.publicId === params.batch && b.status !== "FAILED");
+  const batch = data.find((b) => b.publicId === batchId && b.status !== "FAILED");
   if (!batch) {
     return (
       <EmptyState title="File tidak ditemukan">
