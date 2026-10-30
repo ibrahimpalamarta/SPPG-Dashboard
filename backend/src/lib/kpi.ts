@@ -176,7 +176,7 @@ export function nutritionBySegment(rows: MenuRow[]) {
   });
 }
 
-export type BeneficiaryRow = { segment: string; plannedCount: number | null; actualCount: number | null };
+export type BeneficiaryRow = { countDate: Date; segment: string; plannedCount: number | null; actualCount: number | null };
 
 /**
  * SCRUM-50/103/129: delivered portions per segment from the aggregate
@@ -193,10 +193,13 @@ export function deliveredPortions(rows: BeneficiaryRow[]) {
   }));
   const actual = sum(segments.map((s) => s.actual));
   const reportedTotal = sum(rows.filter(isTotal).map((r) => r.actualCount));
+  // SCRUM-103: "Penerima Manfaat / hari" = actual over the days that reported one.
+  const days = new Set(rows.filter((r) => !isTotal(r) && r.actualCount !== null).map((r) => day(r.countDate))).size;
   return {
     segments,
     planned: sum(segments.map((s) => s.planned)),
     actual,
+    perDay: actual === null || days === 0 ? null : Math.round(actual / days),
     status: actual === null ? ('MISSING' as const) : reportedTotal !== null && reportedTotal !== actual ? ('MISMATCH' as const) : ('OK' as const),
     ...(reportedTotal !== null && { reportedTotal }),
   };

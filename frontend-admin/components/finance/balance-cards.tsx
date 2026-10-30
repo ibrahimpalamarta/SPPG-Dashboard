@@ -5,17 +5,6 @@ import { dateLabel, rp, rpFull, type FinanceKpi } from "@/lib/kpi";
 
 const tableHead = "px-4 py-3 font-medium";
 
-function Unofficial() {
-  return (
-    <Badge tone="amber">
-      <span className="inline-flex items-center gap-1.5">
-        <TriangleAlert className="size-3.5" aria-hidden="true" />
-        Belum resmi
-      </span>
-    </Badge>
-  );
-}
-
 function Notice({ children }: { children: React.ReactNode }) {
   return (
     <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
@@ -25,22 +14,14 @@ function Notice({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** SCRUM-101: a draft until Finance picks the official balance source (OD-02); "Belum ada data" when there is none. */
+/** SCRUM-101: Draft vs official stays in the backend until OD-02 (no "Belum resmi" label on screen); "Belum ada data" when there is none. */
 export function AccountBalance({ balance }: { balance: FinanceKpi["balance"] }) {
   const total = balance.accounts.reduce((n, a) => n + (a.balance ?? 0), 0);
   return (
-    <FinanceCard title="Saldo Rekening" icon={Landmark} badge={<Unofficial />}>
+    <FinanceCard title="Saldo Rekening" icon={Landmark}>
       <p className="text-3xl font-bold text-slate-900">{balance.status === "UNAVAILABLE" ? "-" : rpFull(total)}</p>
       {balance.asOf && <p className="mt-1 text-sm text-slate-500">per {dateLabel(balance.asOf)}</p>}
-      <Notice>
-        {balance.status === "UNAVAILABLE" ? (
-          <>Belum ada data saldo yang dipublish untuk dapur ini.</>
-        ) : (
-          <>
-            Angka ini <strong>belum resmi</strong> karena Finance belum memutuskan sumber saldo yang dipakai (VA/Aksis, mutasi bank, atau LapKeu).
-          </>
-        )}
-      </Notice>
+      {balance.status === "UNAVAILABLE" && <Notice>Belum ada data saldo yang dipublish untuk dapur ini.</Notice>}
       {balance.accounts.length > 0 && (
         <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full min-w-[26rem] text-left text-sm">
@@ -70,16 +51,13 @@ export function AccountBalance({ balance }: { balance: FinanceKpi["balance"] }) 
 /** SCRUM-102: latest EFI transfers (incentive to Yayasan Edufarmers), kept out of supplier spend. */
 export function EfiTransfer({ efi }: { efi: FinanceKpi["efi"] }) {
   return (
-    <FinanceCard title="Transfer EFI Terakhir" icon={ArrowLeftRight} badge={<Unofficial />}>
+    <FinanceCard title="Transfer EFI Terakhir" icon={ArrowLeftRight}>
       <p className="text-3xl font-bold text-slate-900">{efi.latest?.amount != null ? rpFull(efi.latest.amount) : "-"}</p>
       {efi.latest && (
         <p className="mt-1 text-sm text-slate-500">
           {dateLabel(efi.latest.date)} · {efi.latest.ref}
         </p>
       )}
-      <Notice>
-        Angka ini <strong>belum resmi</strong> karena arti “transfer EFI” belum disepakati. Sementara memakai pembayaran Insentif ke Yayasan Edufarmers.
-      </Notice>
       {efi.transfers.length === 0 ? (
         <p className="mt-4 text-sm text-slate-500">Belum ada transfer EFI yang dipublish.</p>
       ) : (

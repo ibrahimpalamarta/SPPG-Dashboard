@@ -113,24 +113,26 @@ describe('menu KPIs (SCRUM-74/76/116)', () => {
 
 describe('delivered portions & beneficiaries (SCRUM-50/103/129/72)', () => {
   test('no actual counts is MISSING, never 0', () => {
-    const d = deliveredPortions([{ segment: 'Besar', plannedCount: 400, actualCount: null }]);
+    const d = deliveredPortions([{ countDate: new Date('2026-05-04'), segment: 'Besar', plannedCount: 400, actualCount: null }]);
     assert.equal(d.actual, null);
     assert.equal(d.status, 'MISSING');
     assert.equal(d.planned, 400);
+    assert.equal(d.perDay, null);
   });
 
   test('a source total that disagrees with Σ segments flags the card', () => {
     const d = deliveredPortions([
-      { segment: 'Besar', plannedCount: 400, actualCount: 390 },
-      { segment: 'Kecil', plannedCount: 300, actualCount: 300 },
-      { segment: 'Total', plannedCount: null, actualCount: 700 },
+      { countDate: new Date('2026-05-04'), segment: 'Besar', plannedCount: 400, actualCount: 390 },
+      { countDate: new Date('2026-05-04'), segment: 'Kecil', plannedCount: 300, actualCount: 300 },
+      { countDate: new Date('2026-05-04'), segment: 'Total', plannedCount: null, actualCount: 700 },
     ]);
     assert.equal(d.actual, 690);
+    assert.equal(d.perDay, 690);
     assert.equal(d.status, 'MISMATCH');
   });
 
   test('the output is aggregate only: no person-level field exists to leak', () => {
-    const json = JSON.stringify(deliveredPortions([{ segment: 'Besar', plannedCount: 1, actualCount: 1 }]));
+    const json = JSON.stringify(deliveredPortions([{ countDate: new Date('2026-05-04'), segment: 'Besar', plannedCount: 1, actualCount: 1 }]));
     for (const pii of ['nik', 'nama', 'name', 'telepon', 'phone', 'alamat', 'address']) assert.ok(!json.toLowerCase().includes(`"${pii}"`), pii);
   });
 });

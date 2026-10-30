@@ -117,7 +117,7 @@ export const getMenuKpi = (db: Db = prisma): RequestHandler => async (req, res) 
       },
     }),
     canSeeCost(req.user!.role)
-      ? db.beneficiaryDailyCount.findMany({ where: { ...base, countDate: window }, select: { segment: true, plannedCount: true, actualCount: true } })
+      ? db.beneficiaryDailyCount.findMany({ where: { ...base, countDate: window }, select: { countDate: true, segment: true, plannedCount: true, actualCount: true } })
       : null,
   ]);
   const rows = lines.map((l) => ({

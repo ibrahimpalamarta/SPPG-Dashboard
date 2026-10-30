@@ -20,7 +20,7 @@ export type MenuKpi = {
   window: { from: string; to: string } | null;
   topMenus: { name: string; days: number; kitchens: string[] }[];
   nutrition: { segment: string; days: number; incompleteDays: number; perPortion: Nutrients; plannedPortions: number | null }[];
-  portions?: { segments: { segment: string; planned: number | null; actual: number | null }[]; planned: number | null; actual: number | null; status: "OK" | "MISSING" | "MISMATCH" };
+  portions?: { segments: { segment: string; actual: number | null }[]; actual: number | null; perDay: number | null; status: "OK" | "MISSING" | "MISMATCH" };
 };
 
 /** Finance KPIs are cost-cleared: a role without clearance gets null, not an error page. */

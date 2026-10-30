@@ -54,7 +54,7 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 
 **D-19 · 2026-10-30 · Eligibility KPI (SCRUM-54).** `ELIGIBLE_REVIEW_STATUSES = ['TERKONFIRMASI']` di `backend/src/lib/publish.ts`: konstanta kode, berubah lewat deploy. KPI hanya membaca batch PUBLISHED, baris yang tidak superseded, dan (untuk finance) review status eligible.
 
-**D-20 · 2026-10-30 · ASUMSI definisi Transfer EFI (SCRUM-66).** Transaksi bertipe INSENTIF yang uraian atau penerimanya cocok `edufarmers|insentif yayasan` (mengikuti mockup: "Pembayaran Insentif Yayasan … · Yayasan Edufarmers"). Ditandai `is_efi_transfer`, dikeluarkan dari spend, dan tampil berlabel "Belum resmi". Arti "transfer EFI" perlu dikonfirmasi Finance.
+**D-20 · 2026-10-30 · ASUMSI definisi Transfer EFI (SCRUM-66).** Transaksi bertipe INSENTIF yang uraian atau penerimanya cocok `edufarmers|insentif yayasan` (mengikuti mockup: "Pembayaran Insentif Yayasan … · Yayasan Edufarmers"). Ditandai `is_efi_transfer` dan dikeluarkan dari spend; label "Belum resmi" tidak ditampilkan (deskripsi Jira SCRUM-102). Arti "transfer EFI" perlu dikonfirmasi Finance.
 
 **D-21 · 2026-10-30 · ASUMSI Top 5 Menu (SCRUM-74, OD-13).** Window = 14 hari tanggal layanan, berakhir di `dateTo` atau tanggal published terakhir. Dasar ranking = jumlah hari layanan berbeda (`basis: serving_days` di response). Dikecualikan: menu bertipe Makanan Pokok/Bumbu/Garnish dan nama yang diawali "Nasi" atau memuat "bumbu"/"garnish". Daerah = `kitchens.city_regency`.
 

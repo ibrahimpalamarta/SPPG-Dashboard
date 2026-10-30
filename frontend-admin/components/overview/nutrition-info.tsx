@@ -16,11 +16,14 @@ const NUTRIENTS = [
 
 const orMissing = (n: number | null) => (n === null ? "Belum ada data" : count.format(n));
 
-/** SCRUM-116/129: nutrition per portion per segment, planned vs delivered portions. Missing is shown as missing, never 0. */
+/**
+ * SCRUM-116/129: delivered (actual) portions only, per segment summing to the
+ * total, plus nutrition per portion per segment. Planned portions are not
+ * shown here. Missing is shown as missing, never 0.
+ */
 export function NutritionInfo({ menu }: { menu: MenuKpi }) {
   const { nutrition, portions } = menu;
   const incomplete = nutrition.reduce((n, s) => n + s.incompleteDays, 0);
-  const actualOf = (segment: string) => portions?.segments.find((s) => s.segment === segment)?.actual ?? null;
 
   return (
     <Card className="p-6">
@@ -45,16 +48,23 @@ export function NutritionInfo({ menu }: { menu: MenuKpi }) {
         <p className="mt-5 text-sm text-slate-500">Belum ada data menu yang dipublish.</p>
       ) : (
         <>
-          <h4 className="mt-5 text-sm font-semibold text-slate-800">Porsi rencana vs tersalurkan</h4>
-          <ul className="mt-3 flex flex-col gap-2 text-sm">
-            {nutrition.map(({ segment, plannedPortions }) => (
-              <li key={segment} className="flex items-center gap-2">
-                <span className="flex-1 text-slate-700">{segment}</span>
-                <span className="text-slate-500">Rencana {orMissing(plannedPortions)}</span>
-                {portions && <strong className="w-36 text-right text-slate-800">Tersalurkan {orMissing(actualOf(segment))}</strong>}
-              </li>
-            ))}
-          </ul>
+          {portions && portions.status === "OK" && (
+            <>
+              <h4 className="mt-5 text-sm font-semibold text-slate-800">Porsi tersalurkan per segmen</h4>
+              <ul className="mt-3 flex flex-col gap-2 text-sm">
+                {portions.segments.map(({ segment, actual }) => (
+                  <li key={segment} className="flex items-center gap-2">
+                    <span className="flex-1 text-slate-700">{segment}</span>
+                    <strong className="text-slate-800">{orMissing(actual)}</strong>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 flex justify-between border-t border-slate-100 pt-3 text-sm font-semibold text-slate-900">
+                <span>Total porsi tersalurkan</span>
+                <span>{orMissing(portions.actual)}</span>
+              </div>
+            </>
+          )}
 
           <h4 className="mt-5 text-sm font-semibold text-slate-800">Gizi rata-rata per porsi</h4>
           <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200">
