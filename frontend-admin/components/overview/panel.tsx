@@ -1,9 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { DetailLink } from "@/components/ui/detail-link";
+import { InsightBox } from "@/components/ui/insight-box";
 import { SourceLink } from "@/components/ui/source-link";
 
-export function Panel({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
+export function Panel({ title, icon: Icon, insight, children }: { title: string; icon: LucideIcon; insight?: string; children: React.ReactNode }) {
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between">
@@ -14,6 +15,7 @@ export function Panel({ title, icon: Icon, children }: { title: string; icon: Lu
         <DetailLink />
       </div>
       <div className="mt-6">{children}</div>
+      {insight && <InsightBox>{insight}</InsightBox>}
       <div className="mt-6 flex justify-end border-t border-slate-100 pt-4">
         <SourceLink />
       </div>

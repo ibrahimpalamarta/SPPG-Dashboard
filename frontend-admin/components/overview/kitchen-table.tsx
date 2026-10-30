@@ -23,7 +23,7 @@ export function KitchenTable({ kitchens }: { kitchens: KitchenCompleteness[] }) 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
-            {kitchens.map(({ name, region, percent, issues, lastPublish }) => (
+            {[...kitchens].sort((a, b) => b.percent - a.percent).map(({ name, region, percent, issues, lastPublish }) => (
               <tr key={name}>
                 <td className="px-4 py-3">
                   <p className="font-semibold text-slate-800">{name}</p>
