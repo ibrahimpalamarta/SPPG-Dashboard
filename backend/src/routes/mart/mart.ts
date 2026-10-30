@@ -5,6 +5,7 @@ import { wrap } from '../../lib/wrap.js';
 import { COST_ROLES } from '../../lib/visibility.js';
 import {
   akgComplianceQuery,
+  completenessQuery,
   dailyKitchenQuery,
   dashboardQuery,
   menuCostQuery,
@@ -21,6 +22,7 @@ import {
 } from '../../controllers/mart/mart.js';
 import { getDashboardSummary } from '../../controllers/mart/dashboard.js';
 import { getFinanceKpi, getMenuKpi } from '../../controllers/mart/kpi.js';
+import { getCompleteness } from '../../controllers/mart/completeness.js';
 
 /**
  * Pre-computed marts, all read-only. Each router is mounted separately in
@@ -57,3 +59,4 @@ export const kpiRouter = Router();
 kpiRouter.use(requirePermission('dashboard:view'));
 kpiRouter.get('/finance', requireRole(...COST_ROLES), validate({ query: dashboardQuery }), wrap(getFinanceKpi()));
 kpiRouter.get('/menu', validate({ query: menuKpiQuery }), wrap(getMenuKpi()));
+kpiRouter.get('/completeness', validate({ query: completenessQuery }), wrap(getCompleteness()));

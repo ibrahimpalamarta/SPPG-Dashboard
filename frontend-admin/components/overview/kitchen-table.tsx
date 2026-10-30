@@ -1,9 +1,11 @@
 import { HeartPulse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { kitchens } from "@/lib/mock/kelengkapan";
+import { completenessColor, dateLabel, type KitchenCompleteness } from "@/lib/kpi";
 
-export function KitchenTable() {
+const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
+
+export function KitchenTable({ kitchens }: { kitchens: KitchenCompleteness[] }) {
   return (
     <Card className="p-6">
       <h3 className="flex items-center gap-3 text-base font-semibold text-slate-900">
@@ -21,31 +23,32 @@ export function KitchenTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
-            {kitchens.map(({ code, name, note, completeness, phase, issue, lastPublish }) => (
-              <tr key={code}>
+            {kitchens.map(({ name, region, percent, issues, lastPublish }) => (
+              <tr key={name}>
+                <td className="px-4 py-3">
+                  <p className="font-semibold text-slate-800">{name}</p>
+                  {region && <p className="text-xs text-slate-500">{region}</p>}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{code}</span>
-                    <div>
-                      <p className="font-semibold text-slate-800">{name}</p>
-                      <p className="text-xs text-slate-500">{note}</p>
+                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                      <div className={`grow-x h-full rounded-full ${completenessColor(percent).bar}`} style={{ width: `${percent}%` }} />
                     </div>
+                    <span className="font-semibold text-slate-800">{percent}%</span>
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  {completeness === undefined ? (
-                    <Badge tone="slate">{phase}</Badge>
+                  {issues.fix ? (
+                    <Badge tone="red">{issues.fix} wajib diperbaiki</Badge>
+                  ) : issues.review ? (
+                    <Badge tone="amber">{issues.review} perlu dicek</Badge>
                   ) : (
-                    <div className="flex items-center gap-3">
-                      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-emerald-50">
-                        <div className="grow-x h-full rounded-full bg-emerald-500" style={{ width: `${completeness}%` }} />
-                      </div>
-                      <span className="font-semibold text-slate-800">{completeness}%</span>
-                    </div>
+                    <span className="text-slate-400">—</span>
                   )}
                 </td>
-                <td className="px-4 py-3">{issue ? <Badge tone={issue.tone}>{issue.label}</Badge> : <span className="text-slate-400">—</span>}</td>
-                <td className="px-4 py-3 text-slate-500">{lastPublish ?? "—"}</td>
+                <td className="px-4 py-3 text-slate-500" title={lastPublish ? dateLabel(lastPublish.at) : undefined}>
+                  {lastPublish ? `${shortDate(lastPublish.at)} · ${lastPublish.label}` : "—"}
+                </td>
               </tr>
             ))}
           </tbody>

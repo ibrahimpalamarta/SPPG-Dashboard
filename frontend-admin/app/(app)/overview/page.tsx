@@ -4,17 +4,16 @@ import { KelengkapanSection } from "@/components/overview/kelengkapan-section";
 import { MenuGiziSection } from "@/components/overview/menu-gizi-section";
 import { TopSuppliers } from "@/components/overview/top-suppliers";
 import { WelcomeCard } from "@/components/overview/welcome-card";
-import { SampleDataNote } from "@/components/ui/sample-data-note";
 import { apiGet } from "@/lib/api";
 import { requirePage } from "@/lib/guard";
-import { financeKpi, mixSlices, type MenuKpi } from "@/lib/kpi";
+import { financeKpi, mixSlices, type KitchenCompleteness, type MenuKpi } from "@/lib/kpi";
 
 export const metadata: Metadata = { title: "Overview · SPPG Internal" };
 
 export default async function OverviewPage() {
   const me = await requirePage("/overview");
   // SCRUM-97..116: published data only; finance is null for roles without cost clearance.
-  const [finance, menu] = await Promise.all([financeKpi(), apiGet<MenuKpi>("/kpi/menu")]);
+  const [finance, menu, completeness] = await Promise.all([financeKpi(), apiGet<MenuKpi>("/kpi/menu"), apiGet<{ kitchens: KitchenCompleteness[] }>("/kpi/completeness")]);
   return (
     <div className="mx-auto max-w-400 space-y-5">
       <WelcomeCard name={me.fullName ?? me.email ?? "Pengguna"} finance={finance} menu={menu} />
@@ -25,9 +24,7 @@ export default async function OverviewPage() {
         </div>
       )}
       <MenuGiziSection menu={menu} />
-      {/* Kelengkapan Data is Tahap 8 (SCRUM-104): still sample data. */}
-      <SampleDataNote />
-      <KelengkapanSection />
+      <KelengkapanSection kitchens={completeness.kitchens} />
     </div>
   );
 }
