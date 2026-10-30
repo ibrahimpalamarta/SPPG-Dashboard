@@ -1,5 +1,6 @@
-import { RefreshCw, Users, WalletCards } from "lucide-react";
+import { RefreshCw, Users, Warehouse, WalletCards } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { MorphSelect } from "@/components/ui/morph-select";
 import { StatCard, type Stat } from "@/components/overview/stat-card";
 import { portionsInsight, runwayInsight } from "@/lib/insight";
 import { dateLabel, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
@@ -47,7 +48,17 @@ export function WelcomeCard({ name, finance, menu }: { name: string; finance: Fi
   const items = stats(finance, menu);
   return (
     <Card className="p-6 sm:p-7">
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Selamat Datang, {name}!</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Selamat Datang, {name}!</h1>
+        {/* Hardcoded until the dapur and period filters are wired to data. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex h-10 items-center gap-2.5 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-800">
+            <Warehouse className="size-4 text-slate-600" aria-hidden="true" />
+            SPPG Sukun Kebonsari 2
+          </span>
+          <MorphSelect label="Periode" options={[{ value: "2026-08-10", label: "Periode: 10 – 21 Agu 2026" }]} defaultValue="2026-08-10" className="w-64" />
+        </div>
+      </div>
       {items.length > 0 && (
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           {items.map((stat) => (
