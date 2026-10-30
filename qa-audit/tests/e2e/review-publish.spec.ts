@@ -206,6 +206,28 @@ test.describe.serial('Review dan publish', () => {
     });
   });
 
+  test('[SCRUM-158] AI Insight maksimal 2 kalimat dan berisi rekomendasi tindakan @smoke @kpi', async ({ browser }) => {
+    await sebagai(browser, 'admin', async (page) => {
+      await page.goto('overview');
+      const main = page.getByRole('main');
+      await expect(main.getByText('AI Insight', { exact: true })).toHaveCount(9);
+      for (const teks of await main.locator('p.leading-relaxed').allTextContents()) {
+        expect(teks.match(/[.!?](\s|$)/g)?.length, teks).toBeLessThanOrEqual(2);
+      }
+      await shot(page, 'SCRUM-158', 1, 'ai-insight-1-2-kalimat');
+    });
+  });
+
+  test('[SCRUM-159] Kelengkapan Data tidak menampilkan AI Insight @smoke @kpi', async ({ browser }) => {
+    await sebagai(browser, 'admin', async (page) => {
+      await page.goto('kesehatan-data');
+      const main = page.getByRole('main');
+      await expect(main.getByRole('heading', { level: 1, name: 'Kelengkapan Data' })).toBeVisible();
+      await expect(main.getByText(/AI Insight/)).toHaveCount(0);
+      await shot(page, 'SCRUM-159', 1, 'kelengkapan-data-tanpa-ai');
+    });
+  });
+
   test('[AC-PUB-02][SCRUM-78][SCRUM-96] unggah ulang isi sama dan dipublish tidak menggandakan angka Finance @smoke @kpi', async ({ browser }) => {
     const ulang = Buffer.concat([cashflow, Buffer.from('\n\n\n')]);
     await unggahKirimPublish(browser, `ulang-${FILE}`, ulang);
