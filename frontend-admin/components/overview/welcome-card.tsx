@@ -1,6 +1,7 @@
 import { RefreshCw, Users, WalletCards } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatCard, type Stat } from "@/components/overview/stat-card";
+import { portionsInsight, runwayInsight } from "@/lib/insight";
 import { dateLabel, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
 
 const count = new Intl.NumberFormat("id-ID");
@@ -19,6 +20,7 @@ function stats(finance: FinanceKpi | null, menu: MenuKpi): Stat[] {
       label: "Penerima Manfaat / hari",
       value: perDay === null ? "-" : count.format(perDay),
       status: status === "MISSING" ? "Belum ada data" : status === "MISMATCH" ? "Total segmen tidak cocok" : undefined,
+      insight: portionsInsight(menu.portions),
     });
   }
   if (finance) {
@@ -29,6 +31,7 @@ function stats(finance: FinanceKpi | null, menu: MenuKpi): Stat[] {
       label: balance.asOf ? `Saldo Rekening · per ${dateLabel(balance.asOf)}` : "Saldo Rekening",
       value: balance.status === "UNAVAILABLE" ? "-" : rp(sum),
       status: balance.status === "UNAVAILABLE" ? "Belum ada data" : undefined,
+      insight: runwayInsight(finance, sum),
     });
     out.push({
       icon: RefreshCw,

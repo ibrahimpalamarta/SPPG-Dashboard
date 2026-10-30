@@ -7,6 +7,7 @@ import { WelcomeCard } from "@/components/overview/welcome-card";
 import { SampleDataNote } from "@/components/ui/sample-data-note";
 import { apiGet } from "@/lib/api";
 import { requirePage } from "@/lib/guard";
+import { expenseInsight, supplierInsight } from "@/lib/insight";
 import { financeKpi, mixSlices, type MenuKpi } from "@/lib/kpi";
 
 export const metadata: Metadata = { title: "Overview · SPPG Internal" };
@@ -20,8 +21,8 @@ export default async function OverviewPage() {
       <WelcomeCard name={me.fullName ?? me.email ?? "Pengguna"} finance={finance} menu={menu} />
       {finance && (
         <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-          <TopSuppliers suppliers={finance.topSuppliers} />
-          <ExpenseComposition slices={mixSlices(finance)} total={finance.spend.total} />
+          <TopSuppliers suppliers={finance.topSuppliers} insight={supplierInsight(finance)} />
+          <ExpenseComposition slices={mixSlices(finance)} total={finance.spend.total} insight={expenseInsight(finance)} />
         </div>
       )}
       <MenuGiziSection menu={menu} />

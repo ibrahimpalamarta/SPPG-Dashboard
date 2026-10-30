@@ -29,9 +29,9 @@ export function ExpenseDonut({ slices, total }: { slices: Slice[]; total: number
   );
 }
 
-export function ExpenseComposition({ slices, total }: { slices: Slice[]; total: number }) {
+export function ExpenseComposition({ slices, total, insight }: { slices: Slice[]; total: number; insight?: string }) {
   return (
-    <Panel title="Komposisi Pengeluaran" icon={CircleDollarSign}>
+    <Panel title="Komposisi Pengeluaran" icon={CircleDollarSign} insight={insight}>
       <ExpenseDonut slices={slices} total={total} />
     </Panel>
   );
