@@ -347,6 +347,41 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.deepEqual(stored.mapping.columns.find((c) => c.header === 'jumlah_baris'), { sheet: 'Transaksi_Kas', column: 'M', header: 'jumlah_baris', field: 'line_amount' });
   });
 
+  test('a recognised file with no finding is published on the spot, audited as automatic (SCRUM-150)', async () => {
+    const { db, calls } = fakeDb({}, skn);
+    const tx = {
+      uploadBatch: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ status: 'PUBLISHED', validatedAt: new Date(), publishedAt: new Date() }) },
+      $executeRaw: async () => 0,
+    };
+    Object.assign(db, { $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx) });
+    const clean = fixture('sukun-menu.csv').toString('utf8').split('\n').slice(0, 3).join('\n');
+    const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(Buffer.from(clean), 'MENU'));
+
+    assert.equal(out.status, 201);
+    assert.deepEqual((out.body?.mapping as { issueCounts: unknown }).issueCounts, {});
+    assert.equal(out.body?.status, 'PUBLISHED');
+    assert.equal(out.body?.autoPublished, true);
+    assert.deepEqual(calls.audits, ['upload_batch.created', 'upload_batch.profile_detected', 'upload_batch.published']);
+  });
+
+  test('dryRun checks a recognised file and writes nothing: ready only without findings (SCRUM-150)', async () => {
+    const check = async (csv: Buffer, domain: string) => {
+      const { db, calls } = fakeDb({}, skn);
+      const req = sukun(csv, domain);
+      const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), { ...req, valid: { ...req.valid, query: { dryRun: true } } });
+      assert.equal(out.status, 200);
+      assert.equal(calls.created, undefined);
+      return out.body as { ready: boolean; issues: { label: string; count: number }[] };
+    };
+
+    const dirty = await check(fixture('sukun-cashflow.csv'), 'CASHFLOW');
+    assert.equal(dirty.ready, false);
+    assert.ok(dirty.issues.length > 0 && dirty.issues.every((i) => ['Wajib diperbaiki', 'Perlu dicek', 'Dirapikan otomatis'].includes(i.label)));
+
+    const clean = await check(Buffer.from(fixture('sukun-menu.csv').toString('utf8').split('\n').slice(0, 3).join('\n')), 'MENU');
+    assert.deepEqual([clean.ready, clean.issues], [true, []]);
+  });
+
   test('a file missing a profile column is quarantined with the diff (SCRUM-94)', async () => {
     const csv = fixture('sukun-cashflow.csv').toString('utf8').replace('jumlah_baris', 'jml');
     const { db, calls } = fakeDb({}, skn);

@@ -3,9 +3,24 @@
 import { revalidatePath } from "next/cache";
 import { apiFetch, apiSend } from "@/lib/api";
 
-export type UploadedSheet = { name: string; headerRow: number | null; rowCount: number };
 export type ColumnDiff = { sheet: string; missing: string[]; unexpected: string[] };
-export type MappingSummary = { profileId: string; version: string; records: number; issueCounts: Record<string, number> };
+
+/** SCRUM-150: the AI's reading of unknown columns and a fix per issue code; null when it had nothing to say or is off. */
+export type UploadAdvice = {
+  columns: { header: string; readAs: string | null; reason: string }[];
+  issues: { code: string; advice: string }[];
+};
+
+/** The "Siap diunggah" / "Perlu dicek" card, built before anything is stored. */
+export type CheckResult =
+  | {
+      ok: true;
+      ready: boolean;
+      issues: { code: string; message: string; label: string; count: number }[];
+      columnDiff: ColumnDiff[];
+      ai: UploadAdvice | null;
+    }
+  | { ok: false; message: string };
 
 export type UploadResult =
   | {
@@ -13,12 +28,8 @@ export type UploadResult =
       batchId: string;
       status: string;
       errorCode: string | null;
-      mappingProfileId: string | null;
-      columnDiff: ColumnDiff[];
-      mapping: MappingSummary | null;
-      rowCount: number;
       errorSummary: string | null;
-      sheets: UploadedSheet[];
+      autoPublished: boolean;
       warning?: string;
     }
   | { ok: false; message: string };
@@ -34,6 +45,25 @@ export async function deleteBatch(id: string): Promise<string | null> {
   return null;
 }
 
+/** The backend's verdict on a rejected upload or check, in Indonesian. */
+function failure(status: number, body: { message?: string; details?: { fields?: Record<string, string[]> } }) {
+  if (status === 403) return { ok: false as const, message: body.message ?? "Anda tidak memiliki akses untuk mengunggah." };
+  const fields = body.details?.fields;
+  return { ok: false as const, message: fields ? Object.values(fields).flat().join(" ") : `Upload gagal (${status}). Coba lagi beberapa saat lagi.` };
+}
+
+/** Reads the picked file and reports what an upload would do, storing nothing (POST /api/upload-batches?dryRun=true). */
+export async function checkFile(form: FormData): Promise<CheckResult> {
+  const file = form.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Pilih file .xlsx atau .csv terlebih dahulu." };
+  if (!form.get("period")) form.delete("period");
+
+  const res = await apiFetch("/upload-batches?dryRun=true", { method: "POST", body: form });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return failure(res.status, body);
+  return { ok: true, ready: body.ready, issues: body.issues, columnDiff: body.columnDiff, ai: body.ai };
+}
+
 /**
  * Forwards the form to POST /api/upload-batches with the session's token —
  * the browser never holds an API token. Validation, scope and size limits are
@@ -46,23 +76,14 @@ export async function uploadFile(_prev: UploadResult | null, form: FormData): Pr
 
   const res = await apiFetch("/upload-batches", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    if (res.status === 403) return { ok: false, message: body.message ?? "Anda tidak memiliki akses untuk mengunggah." };
-    const fields = body.details?.fields as Record<string, string[]> | undefined;
-    return { ok: false, message: fields ? Object.values(fields).flat().join(" ") : `Upload gagal (${res.status}). Coba lagi beberapa saat lagi.` };
-  }
+  if (!res.ok) return failure(res.status, body);
   return {
     ok: true,
     batchId: body.publicId,
     status: body.status,
     errorCode: body.errorCode,
-    mappingProfileId: body.mappingProfileId,
-    columnDiff: body.columnDiff ?? [],
-    mapping: body.mapping,
-    rowCount: body.rowCount,
     errorSummary: body.errorSummary,
-    sheets: body.sheets,
+    autoPublished: body.autoPublished,
     warning: body.warning?.message,
   };
 }
