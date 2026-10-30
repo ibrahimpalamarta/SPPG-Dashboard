@@ -6,7 +6,7 @@ import { sendJson } from '../../lib/serialize.js';
 import { kitchenScope } from '../../lib/scope.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import { openBlockers } from '../../lib/validation/rules.js';
-import { ELIGIBLE_REVIEW_STATUSES, supersedePublished } from '../../lib/publish.js';
+import { ELIGIBLE_REVIEW_STATUSES, publishBatch } from '../../lib/publish.js';
 
 /**
  * SCRUM-148/151: no Admin review. Data Operasional checks the findings
@@ -51,22 +51,7 @@ export const publishUploadBatch = (db: Db = prisma): RequestHandler => async (re
     return;
   }
 
-  const { row, superseded, replaced } = await db.$transaction(async (tx) => {
-    // Status flips first, so a concurrent second publish matches nothing and supersedes nothing twice.
-    const { count } = await tx.uploadBatch.updateMany({
-      where: { id: batch.id, status: UploadStatus.NEEDS_REVIEW },
-      data: { status: UploadStatus.PUBLISHED, validatedAt: new Date(), publishedAt: new Date() },
-    });
-    if (count === 0) return { row: null, superseded: null, replaced: null };
-    const superseded = await supersedePublished(tx, batch.publicId);
-    const replaced = batch.replacesBatchId
-      ? await tx.uploadBatch.updateMany({
-          where: { publicId: batch.replacesBatchId, status: UploadStatus.PUBLISHED },
-          data: { status: UploadStatus.SUPERSEDED, errorCode: 'REPLACED', errorSummary: `Dikoreksi oleh batch ${batch.publicId}.` },
-        })
-      : null;
-    return { row: await tx.uploadBatch.findUniqueOrThrow({ where: { id: batch.id } }), superseded, replaced: replaced?.count ? batch.replacesBatchId : null };
-  });
+  const { row, superseded, replaced } = await publishBatch(db, batch);
   if (!row) {
     sendJson(res, { ...(await db.uploadBatch.findUniqueOrThrow({ where: { id: batch.id } })), alreadyPublished: true });
     return;

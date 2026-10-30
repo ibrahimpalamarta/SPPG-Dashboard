@@ -1,4 +1,5 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, UploadStatus, type UploadBatch } from '@prisma/client';
+import type { Db } from '../db.js';
 
 /**
  * SCRUM-54: review_status values a KPI may count. Baseline (PRD AC-DQ):
@@ -50,4 +51,28 @@ export async function supersedePublished(tx: Pick<Prisma.TransactionClient, '$ex
          AND o.upload_batch_id IN (SELECT public_id FROM upload_batches WHERE status = 'PUBLISHED')`;
   }
   return counts;
+}
+
+/**
+ * NEEDS_REVIEW → PUBLISHED in one transaction, shared by the manual publish
+ * (SCRUM-95/151) and the upload auto-publish (SCRUM-150). `row` is null when a
+ * concurrent publish won the race. The caller has already checked the blockers.
+ */
+export async function publishBatch(db: Db, batch: Pick<UploadBatch, 'id' | 'publicId' | 'replacesBatchId'>) {
+  return db.$transaction(async (tx) => {
+    // Status flips first, so a concurrent second publish matches nothing and supersedes nothing twice.
+    const { count } = await tx.uploadBatch.updateMany({
+      where: { id: batch.id, status: UploadStatus.NEEDS_REVIEW },
+      data: { status: UploadStatus.PUBLISHED, validatedAt: new Date(), publishedAt: new Date() },
+    });
+    if (count === 0) return { row: null, superseded: null, replaced: null };
+    const superseded = await supersedePublished(tx, batch.publicId);
+    const replaced = batch.replacesBatchId
+      ? await tx.uploadBatch.updateMany({
+          where: { publicId: batch.replacesBatchId, status: UploadStatus.PUBLISHED },
+          data: { status: UploadStatus.SUPERSEDED, errorCode: 'REPLACED', errorSummary: `Dikoreksi oleh batch ${batch.publicId}.` },
+        })
+      : null;
+    return { row: await tx.uploadBatch.findUniqueOrThrow({ where: { id: batch.id } }), superseded, replaced: replaced?.count ? batch.replacesBatchId : null };
+  });
 }

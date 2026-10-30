@@ -6,7 +6,7 @@ import { storageState } from './roles.js';
 test.describe('Unggah Data', () => {
   test.use({ storageState: storageState('data-operasional-skn') });
 
-  test('[SCRUM-5][SCRUM-22] form unggah: pilih kitchen, jenis data, periode @smoke', async ({ page }) => {
+  test('[SCRUM-5][SCRUM-22] form unggah: dapur, jenis data, bulan, file @smoke', async ({ page }) => {
     await page.goto('unggah-data');
     await expect(page.getByRole('heading', { name: 'Unggah Data' })).toBeVisible();
     // SCRUM-144: Data Operasional is tied to one dapur, so the dapur is shown, not picked.
@@ -14,7 +14,7 @@ test.describe('Unggah Data', () => {
     await expect(page.getByRole('combobox')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Cashflow/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Input Maker/ })).toBeVisible();
-    await expect(page.getByLabel(/Periode/)).toBeVisible();
+    await expect(page.getByLabel(/Bulan/)).toBeVisible();
   });
 
   test('[SCRUM-25] riwayat unggahan menampilkan profil mapping, validasi, dan publish @smoke', async ({ page }) => {
@@ -25,7 +25,7 @@ test.describe('Unggah Data', () => {
 
   test('[SCRUM-125][SCRUM-130] template cashflow resmi bisa diunduh dengan file xlsx @smoke', async ({ page }) => {
     await page.goto('unggah-data');
-    const link = page.getByRole('link', { name: 'Unduh template kosong resmi' });
+    const link = page.getByRole('link', { name: 'Download template' });
     await expect(link).toBeVisible();
     await shot(page, 'SCRUM-125', 1, 'cashflow-ada-link-template');
     const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);
@@ -57,18 +57,17 @@ test.describe.serial('Unggah Data: unggah file', () => {
     await page.goto('unggah-data');
     if (domain) await page.getByRole('button', { name: domain }).click();
     if (ticket && formShot) await shot(page, ticket, 1, 'pilih-kitchen-dan-jenis-data');
-    await page.getByRole('button', { name: 'Lanjut pilih file' }).click();
     await page.locator('input[type=file]').setInputFiles({ name, mimeType: 'text/csv', buffer });
-    if (ticket) await shot(page, ticket, formShot ? 2 : 1, 'file-dipilih');
+    // The check card (FR-AI-01) is what turns Unggah on.
+    await expect(page.getByRole('button', { name: 'Unggah', exact: true })).toBeEnabled();
+    if (ticket) await shot(page, ticket, formShot ? 2 : 1, 'file-dipilih-dicek');
   }
   const submit = (page: Page) => page.getByRole('button', { name: 'Unggah', exact: true }).click();
 
   test('[SCRUM-5][SCRUM-22][SCRUM-24][SCRUM-35][SCRUM-37] cashflow Sukun terunggah, profil terdeteksi, baris dipetakan @smoke', async ({ page }) => {
     await pick(page, null, 'cashflow-sukun.csv', cashflow, 'SCRUM-5', true);
     await submit(page);
-    await expect(page.getByText(/Profil terdeteksi:\s*MAP-SKN-CF-001/)).toBeVisible();
-    await expect(page.getByText(/record dipetakan/)).toBeVisible();
-    await expect(page.getByText('Needs Review')).toBeVisible();
+    await expect(result(page).getByText('Perlu dicek')).toBeVisible();
     await shot(page, 'SCRUM-5', 3, 'hasil-unggah');
     await shot(result(page), 'SCRUM-35', 1, 'hasil-cashflow-terbaca');
     await page.goto('mapping-validasi');
@@ -80,7 +79,7 @@ test.describe.serial('Unggah Data: unggah file', () => {
   test('[SCRUM-36] menu Sukun terunggah dengan profil menu @smoke', async ({ page }) => {
     await pick(page, /^Master Menu/, 'menu-sukun.csv', menu);
     await submit(page);
-    await expect(page.getByText(/Profil terdeteksi:\s*MAP-SKN-MENU-001/)).toBeVisible();
+    await expect(result(page).getByText('Perlu dicek')).toBeVisible();
     await shot(result(page), 'SCRUM-36', 1, 'hasil-menu-terbaca');
   });
 
@@ -95,14 +94,14 @@ test.describe.serial('Unggah Data: unggah file', () => {
   test('[SCRUM-124][SCRUM-25] kolom berbeda menampilkan perbedaan, unggah ulang menandai berkas lama Diganti @smoke', async ({ page }) => {
     await pick(page, null, 'kolom-beda.csv', Buffer.from('id,txn_id,tanggal\n1,TXN-1,01/03/2026\n'));
     await submit(page);
-    await expect(page.getByText('Needs Mapping Update')).toBeVisible();
-    await expect(page.getByText('Perbedaan kolom dengan format yang dikenal')).toBeVisible();
+    await expect(result(page).getByText('Format berbeda')).toBeVisible();
+    await expect(result(page).getByText(/Kolom tidak ditemukan/)).toBeVisible();
     await shot(page, 'SCRUM-124', 1, 'perbedaan-kolom');
     await page.getByRole('button', { name: 'Unggah Ulang File' }).click();
     await page.locator('input[type=file]').setInputFiles({ name: 'cashflow-perbaikan.csv', mimeType: 'text/csv', buffer: Buffer.from(`${cashflow.toString('utf8')}\n`) });
     await shot(page, 'SCRUM-124', 2, 'file-pengganti-dipilih');
     await submit(page);
-    await expect(page.getByText(/Profil terdeteksi:\s*MAP-SKN-CF-001/)).toBeVisible();
+    await expect(result(page).getByText('Perlu dicek')).toBeVisible();
     await page.goto('mapping-validasi');
     const row = page.getByRole('row', { name: /kolom-beda\.csv/ });
     await expect(row.getByText('Diganti')).toBeVisible();

@@ -22,16 +22,15 @@ async function sebagai<T>(browser: Browser, role: RoleKey, fn: (page: Page) => P
   }
 }
 
-type Jenis = { domain: RegExp | null; profil: RegExp };
-const CASHFLOW: Jenis = { domain: null, profil: /MAP-SKN-CF-001/ };
-const MENU: Jenis = { domain: /^Master Menu/, profil: /MAP-SKN-MENU-001/ };
+type Jenis = { domain: RegExp | null };
+const CASHFLOW: Jenis = { domain: null };
+const MENU: Jenis = { domain: /^Master Menu/ };
 
 // `replaces`: UI hanya mengirim field ini saat mengulang batch NEEDS_MAPPING_UPDATE, jadi untuk
 // koreksi batch Published (SCRUM-96) field disisipkan ke form; server action dan backend tetap asli.
 async function unggah(page: Page, name: string, buffer: Buffer, jenis = CASHFLOW, replaces?: string) {
   await page.goto('unggah-data');
   if (jenis.domain) await page.getByRole('button', { name: jenis.domain }).click();
-  await page.getByRole('button', { name: 'Lanjut pilih file' }).click();
   await page.locator('input[type=file]').setInputFiles({ name, mimeType: 'text/csv', buffer });
   if (replaces) {
     await page.locator('input[type=file]').evaluate((el, id) => {
@@ -43,7 +42,8 @@ async function unggah(page: Page, name: string, buffer: Buffer, jenis = CASHFLOW
     }, replaces);
   }
   await page.getByRole('button', { name: 'Unggah', exact: true }).click();
-  await expect(page.getByText(new RegExp(`Profil terdeteksi:\\s*${jenis.profil.source}`))).toBeVisible();
+  // Temuan menahan file (Perlu dicek); file tanpa temuan langsung Dipublish otomatis.
+  await expect(page.locator('section[aria-live=polite]').getByText(/Perlu dicek|Dipublish otomatis/)).toBeVisible();
 }
 
 async function bukaBatch(page: Page, name: string) {
