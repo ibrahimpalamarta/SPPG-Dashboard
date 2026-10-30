@@ -1,10 +1,10 @@
 import type { UploadDomain } from '@prisma/client';
-import { WorkbookError, readWorkbook } from './workbook.js';
+import { WorkbookError, detectHeaderRow, readWorkbook, type RawSheet } from './workbook.js';
 import { loose, stageRows, type DomainParser, type ParseContext, type StagedBatch, type StagedSheet, type StagingRepository } from './staging.js';
 import { cashflowParser } from './cashflow.js';
 import { menuParser } from './menu.js';
 import { inputMakerParser } from './input-maker.js';
-import { detectProfile, type Detection } from '../mapping/detect.js';
+import { detectProfile, profilesFor, type Detection } from '../mapping/detect.js';
 import type { MappingOutput, MappingProfile } from '../mapping/profiles.js';
 import type { Normalization } from '../mapping/values.js';
 import type { CashflowTxn } from '../mapping/sukun-cashflow.js';
@@ -41,9 +41,35 @@ export type MappingSummary = {
   columns: MappedColumn[];
 };
 
+/** A canonical field of the SOP and the header the template writes it under. */
+export type SopField = { field: string; header: string };
+
 export type PipelineResult =
-  | { ok: true; batch: StagedBatch; detection: Detection; mapping: MappingSummary | null }
+  | { ok: true; batch: StagedBatch; detection: Detection; mapping: MappingSummary | null; columns: MappedColumn[]; fields: SopField[] }
   | { ok: false; errorCode: string; errorSummary: string };
+
+const NOT_USED = '(tidak dipakai)';
+
+/**
+ * "Ubah Mapping": rewrites the header cells the uploader re-pointed to the SOP's own header text, so detection and
+ * the profile read them like any other file. Returns each rewritten header's original text, keyed `sheet|column`.
+ */
+function applyColumnMap(sheets: RawSheet[], map: Record<string, string>, profile: MappingProfile | undefined) {
+  const originals = new Map<string, string>();
+  for (const sheet of sheets) {
+    const header = detectHeaderRow(sheet);
+    if (!header) continue;
+    for (const [column, cell] of Object.entries(header.cells)) {
+      const key = `${sheet.name}|${column}`;
+      const field = map[key];
+      const next = field === undefined ? undefined : field === '' ? NOT_USED : profile?.columns[field];
+      if (next === undefined) continue;
+      originals.set(key, String(cell.value ?? ''));
+      header.cells[column] = { value: next, type: 'string' };
+    }
+  }
+  return originals;
+}
 
 /**
  * read → parse → detect profile → stage → apply profile (SCRUM-39). Any failure leaves **no** staged rows for the batch
@@ -53,6 +79,8 @@ export type PipelineResult =
 export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging: StagingRepository): Promise<PipelineResult> {
   try {
     const sheets = await readWorkbook(buffer, ctx.sourceFileName);
+    const candidate = profilesFor(ctx)[0];
+    const originals = ctx.columnMap ? applyColumnMap(sheets, ctx.columnMap, candidate) : new Map<string, string>();
     const parsed = (parsers[ctx.domain] ?? rawParser)(sheets, ctx);
     if (parsed.rows.length === 0) {
       await staging.deleteBatch(ctx.uploadBatchId);
@@ -66,9 +94,12 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
       }
     }
     const batch = { domain: ctx.domain, ...parsed };
+    const shown = detection.ok ? detection.profile : candidate;
+    const columns = mappedColumns(batch.sheets, shown, originals);
+    const fields = Object.entries(shown?.columns ?? {}).map(([field, header]) => ({ field, header }));
     if (!detection.ok) {
       await staging.replaceBatch(ctx.uploadBatchId, batch);
-      return { ok: true, batch, detection, mapping: null };
+      return { ok: true, batch, detection, mapping: null, columns, fields };
     }
     const { profile } = detection;
     const out = profile.apply(batch.sheets, batch.rows, profile);
@@ -78,7 +109,7 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
       out.issues.push(...reconcileRingkasan(sheets, txns));
     }
     await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, templateVersion: profile.version, loadedAt: ctx.loadedAt, domain: profile.domain, records: out.records, issues: out.issues });
-    return { ok: true, batch, detection, mapping: summarise(profile, out, batch.sheets) };
+    return { ok: true, batch, detection, mapping: summarise(profile, out, columns), columns, fields };
   } catch (err) {
     await staging.deleteBatch(ctx.uploadBatchId);
     if (err instanceof WorkbookError) return { ok: false, errorCode: err.code, errorSummary: err.message };
@@ -86,10 +117,21 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
   }
 }
 
-function summarise(profile: MappingProfile, out: MappingOutput, sheets: StagedSheet[]): MappingSummary {
+/** Every header of the staged sheets with the field the profile reads it into; `originals` restores the text an override replaced. */
+function mappedColumns(sheets: StagedSheet[], profile: MappingProfile | undefined, originals: Map<string, string>): MappedColumn[] {
+  const fields = new Map(Object.entries(profile?.columns ?? {}).map(([field, header]) => [loose(header), field]));
+  return sheets
+    .filter((s) => s.headerRow !== null && !s.skipped)
+    .flatMap((s) =>
+      Object.entries(s.headers)
+        .filter(([, header]) => header.trim() !== '')
+        .map(([column, header]) => ({ sheet: s.name, column, header: originals.get(`${s.name}|${column}`) ?? header, field: fields.get(loose(header)) ?? null })),
+    );
+}
+
+function summarise(profile: MappingProfile, out: MappingOutput, columns: MappedColumn[]): MappingSummary {
   const issueCounts: Record<string, number> = {};
   for (const i of out.issues) issueCounts[i.code] = (issueCounts[i.code] ?? 0) + 1;
-  const fields = new Map(Object.entries(profile.columns).map(([field, header]) => [loose(header), field]));
   return {
     profileId: profile.id,
     version: profile.version,
@@ -98,12 +140,6 @@ function summarise(profile: MappingProfile, out: MappingOutput, sheets: StagedSh
     issueCounts,
     issues: classify(out.issues),
     normalized: out.normalized ?? [],
-    columns: sheets
-      .filter((s) => s.headerRow !== null && !s.skipped)
-      .flatMap((s) =>
-        Object.entries(s.headers)
-          .filter(([, header]) => header.trim() !== '')
-          .map(([column, header]) => ({ sheet: s.name, column, header, field: fields.get(loose(header)) ?? null })),
-      ),
+    columns,
   };
 }

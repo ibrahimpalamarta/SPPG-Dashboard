@@ -22,15 +22,15 @@ async function sebagai<T>(browser: Browser, role: RoleKey, fn: (page: Page) => P
   }
 }
 
-type Jenis = { domain: RegExp | null };
+type Jenis = { domain: string | null };
 const CASHFLOW: Jenis = { domain: null };
-const MENU: Jenis = { domain: /^Master Menu/ };
+const MENU: Jenis = { domain: 'Master Menu' };
 
 // `replaces`: UI hanya mengirim field ini saat mengulang batch NEEDS_MAPPING_UPDATE, jadi untuk
 // koreksi batch Published (SCRUM-96) field disisipkan ke form; server action dan backend tetap asli.
 async function unggah(page: Page, name: string, buffer: Buffer, jenis = CASHFLOW, replaces?: string) {
   await page.goto('unggah-data');
-  if (jenis.domain) await page.getByRole('button', { name: jenis.domain }).click();
+  if (jenis.domain) await page.getByRole('combobox', { name: 'Jenis data' }).first().selectOption({ label: jenis.domain });
   await page.locator('input[type=file]').setInputFiles({ name, mimeType: 'text/csv', buffer });
   if (replaces) {
     await page.locator('input[type=file]').evaluate((el, id) => {
