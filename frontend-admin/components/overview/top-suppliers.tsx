@@ -3,10 +3,10 @@ import { Panel } from "@/components/overview/panel";
 import { rp, type FinanceKpi } from "@/lib/kpi";
 
 /** SCRUM-97: Σ item lines per supplier, external spend only. */
-export function TopSuppliers({ suppliers }: { suppliers: FinanceKpi["topSuppliers"] }) {
+export function TopSuppliers({ suppliers, insight }: { suppliers: FinanceKpi["topSuppliers"]; insight?: string }) {
   const max = suppliers[0]?.amount ?? 0;
   return (
-    <Panel title="Top 5 Supplier" icon={BarChart3}>
+    <Panel title="Top 5 Supplier" icon={BarChart3} insight={insight}>
       {suppliers.length === 0 ? (
         <p className="text-sm text-slate-500">Belum ada data belanja yang dipublish.</p>
       ) : (

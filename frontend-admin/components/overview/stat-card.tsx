@@ -1,9 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import { DetailLink } from "@/components/ui/detail-link";
+import { InsightBox } from "@/components/ui/insight-box";
 
-export type Stat = { icon: LucideIcon; label: string; value: string; status?: string };
+export type Stat = { icon: LucideIcon; label: string; value: string; status?: string; insight?: string };
 
-export function StatCard({ icon: Icon, label, value, status }: Stat) {
+export function StatCard({ icon: Icon, label, value, status, insight }: Stat) {
   return (
     <div className="rounded-xl border border-slate-200 p-4">
       <div className="flex items-start justify-between">
@@ -15,6 +16,7 @@ export function StatCard({ icon: Icon, label, value, status }: Stat) {
       <p className="mt-4 text-sm text-slate-600">{label}</p>
       <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
       {status && <span className="mt-3 inline-flex rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{status}</span>}
+      {insight && <InsightBox>{insight}</InsightBox>}
     </div>
   );
 }
