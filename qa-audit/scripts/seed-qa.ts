@@ -22,6 +22,7 @@ const ACCOUNTS: Account[] = [
   { key: 'finance', fullName: 'QA Finance', role: 'FINANCE', kitchens: 'all' },
   { key: 'kepala-kitchen-skn', fullName: 'QA Kepala Kitchen SKN', role: 'KEPALA_KITCHEN', kitchens: ['SKN'] },
   { key: 'data-steward', fullName: 'QA Data Steward', role: 'DATA_STEWARD', kitchens: 'all' },
+  { key: 'pm', fullName: 'QA PM MBG', role: 'SUPER_ADMIN', kitchens: 'all' },
 ];
 
 // Same statement as backend/scripts/grant-public-role.ts, which cannot run as-is:

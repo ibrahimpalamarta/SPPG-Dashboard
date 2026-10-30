@@ -86,7 +86,7 @@ async function serve() {
   } else {
     const dir = join(QA, '.pg');
     rmSync(dir, { recursive: true, force: true });
-    pg = new EmbeddedPostgres({ databaseDir: dir, user: 'postgres', password: 'postgres', port: PORTS.db, persistent: false });
+    pg = new EmbeddedPostgres({ databaseDir: dir, user: 'postgres', password: 'postgres', port: PORTS.db, persistent: false, initdbFlags: ['--encoding=UTF8', '--locale=C'] });
     await pg.initialise();
     await pg.start();
     await pg.createDatabase('sppg_qa');
