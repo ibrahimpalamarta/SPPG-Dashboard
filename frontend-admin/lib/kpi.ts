@@ -31,7 +31,24 @@ export async function financeKpi(): Promise<FinanceKpi | null> {
   return res.data as unknown as FinanceKpi;
 }
 
-const juta = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** Mirrors backend GET /api/kpi/completeness (lib/completeness.ts): one entry per dapur in the caller's scope. */
+export type KitchenCompleteness = {
+  name: string;
+  region: string | null;
+  items: { label: string; state: "COMPLETE" | "SENT" | "MISSING" }[];
+  complete: number;
+  sent: number;
+  total: number;
+  percent: number;
+  issues: { fix: number; review: number };
+  lastPublish: { at: string; label: string } | null;
+};
+
+/** Red under half, amber until everything is in, green when complete; classes are spelled out so Tailwind keeps them. */
+export const completenessColor = (percent: number) =>
+  percent >= 100 ? { stroke: "stroke-emerald-500", bar: "bg-emerald-500" } : percent >= 50 ? { stroke: "stroke-amber-500", bar: "bg-amber-500" } : { stroke: "stroke-red-600", bar: "bg-red-600" };
+
+const juta =new Intl.NumberFormat("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const full = new Intl.NumberFormat("id-ID");
 const percent = new Intl.NumberFormat("id-ID", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
