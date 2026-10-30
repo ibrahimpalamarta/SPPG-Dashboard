@@ -41,13 +41,13 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | SCRUM-73 | [DATA-041] menu_recipe_line canonical transform | menu-mapping | 3 | IN_PROGRESS (siap review; sebagian BLOCKED: B-DD) | In Progress | `feature/tahap3-menu-recipe-line` | 2026-10-30 | Tabel `menu_recipe_lines` + traceability; Jumlah PM = `planned_portions` |
 | SCRUM-58 | [DATA-025] Profil Menu 5 kitchen | menu-mapping | 3 | TODO | To Do | — | 2026-10-23 |  |
 | SCRUM-30 | Sukun Payment adapter | mapping | 3 | IN REVIEW | To Do | `feature/tahap4-finance-payment-canonical` | 2026-10-28 | MAP-SKN-PAY-001 → `vendor_payment_workflows`; TAGIHAN/TANGGAL tidak jadi paid/maker time |
-| SCRUM-47 | [DATA-014] Vendor payment workflow chain | mapping | 4 | IN REVIEW (sebagian BLOCKED: B-SRC-SKN) | To Do | `feature/tahap4-finance-payment-canonical` | 2026-10-28 | `payment_request_id` stabil; CHECK paid_at ⇒ payment_reference; link PO/receipt menunggu sumber |
+| SCRUM-47 | [DATA-014] Vendor payment workflow chain | mapping | 4 | IN REVIEW (sebagian BLOCKED: B-SRC-SKN) | In Review | `feature/tahap5-finance-canonical` | 2026-10-30 | + `received_at` dan `sla_status` (SCRUM-48); link PO/receipt menunggu sumber |
 | SCRUM-77 | [DATA-006] finance_transaction header | finance-canonical | 4 | IN REVIEW | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-28 | Dibangun di PR #79; kunci unik per batch (kitchen+txn_id ditegakkan saat publish, SCRUM-78) |
 | SCRUM-40 | [DATA-007] finance_transaction_line | finance-canonical | 4 | IN REVIEW | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-28 | Dibangun di PR #79; FK komposit ke header, tanpa total transaksi |
 | SCRUM-98 | Finance canonical header/line | finance-canonical | 4 | IN REVIEW | To Do | `feature/tahap3-p0-cashflow-rab` | 2026-10-28 | Sama dengan SCRUM-77/40 |
 | SCRUM-41 | [DATA-008] Anti-double-count | finance-canonical | 4 | IN REVIEW | To Do | `feature/tahap4-finance-payment-canonical` | 2026-10-28 | Regression test 3-line BELANJA + TOTAL_INCONSISTENT |
-| SCRUM-46 | [DATA-013] Goods Receipt (opsional) | mapping | 4 | BLOCKED (B-SRC-SKN) | To Do | — | 2026-10-28 | Tidak ada sumber Sukun; opsional |
-| SCRUM-49 | [DATA-016] finance_balance | finance-dataset | 4 | BLOCKED (B-SRC-SKN) | To Do | — | 2026-10-28 | Tidak ada sumber saldo Sukun; source-of-truth belum disetujui |
+| SCRUM-46 | [DATA-013] Goods Receipt (opsional) | finance | 5 | IN_PROGRESS (sebagian BLOCKED: B-SRC-SKN) | In Progress | `feature/tahap5-finance-canonical` | 2026-10-30 | Tabel `goods_receipt_lines` ada, adapter menunggu sumber |
+| SCRUM-49 | [DATA-016] finance_balance | finance | 5 | IN_PROGRESS (sebagian BLOCKED: B-SRC-SKN, OD-02) | In Progress | `feature/tahap5-finance-canonical` | 2026-10-30 | Tabel `finance_balances` ada tanpa writer |
 | SCRUM-50 | [DATA-017] beneficiary_daily_count | finance-dataset | 4 | BLOCKED (B-SRC-SKN) | To Do | — | 2026-10-28 | Sumber PM harian Sukun belum ada; "Jumlah PM" menu tidak masuk akal |
 | SCRUM-72 | [DATA-039] Restriksi PII beneficiary | finance-dataset | 4 | BLOCKED (B-SRC-SKN) | To Do | — | 2026-10-28 | Belum ada beneficiary_registry; kolom bank Input Maker sudah tidak di-stage |
 | SCRUM-56 | [DATA-023] Lawang Cashflow profile | mapping | 3 | TODO | To Do | — | 2026-10-23 | B-SAMPLE-LWG |
@@ -62,3 +62,9 @@ Branch Tahap 1 di-push dan direview lewat PR ke `develop`.
 | SCRUM-85 | [DATA-047] Menu DQ rules lintas template | validation | 4 | IN_PROGRESS (Sukun siap review; dapur lain butuh SCRUM-58) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | Rule menu Sukun + URT_LOOKS_LIKE_DATE |
 | SCRUM-120 | Latest Cross-Kitchen Menu DQ Rules | validation | 4 | IN_PROGRESS (Sukun siap review) | In Progress | `feature/tahap4-validasi-dq` | 2026-10-30 | Satu unit dengan SCRUM-85; SCRUM-128 duplikat |
 | SCRUM-128 | (duplikat SCRUM-120) | validation | 4 | DUPLICATE | To Do | — | 2026-10-30 | Tidak dikerjakan |
+| SCRUM-42 | [DATA-009] Normalisasi kategori via Master Reference | finance | 5 | IN_PROGRESS (siap review; B-DD) | In Progress | `feature/tahap5-finance-canonical` | 2026-10-30 | `category_normalized` dari Daftar Kode; UNMAPPED_CATEGORY di-flag |
+| SCRUM-43 | [DATA-010] Transfer internal ≠ spend | finance | 5 | IN_PROGRESS (siap review) | In Progress | `feature/tahap5-finance-canonical` | 2026-10-30 | `is_internal_transfer` (Isi kas kecil dll.); test pasangan mutasi |
+| SCRUM-48 | [DATA-015] Sequence & SLA D0/D+1 | finance | 5 | IN_PROGRESS (siap review; waktu langkah B-SRC-SKN) | In Progress | `feature/tahap5-finance-canonical` | 2026-10-30 | `classifySla`; Input Maker = UNKNOWN |
+| SCRUM-84 | [DATA-046] Rekonsiliasi Ringkasan_Transaksi | finance | 5 | IN_PROGRESS (siap review) | In Progress | `feature/tahap5-finance-canonical` | 2026-10-30 | Count/total/status/Σ dibandingkan tiap upload; selisih Σ = CRITICAL |
+| SCRUM-119 | Cashflow Ringkasan_Transaksi Reconciliation | finance | 5 | IN_PROGRESS (siap review) | In Progress | `feature/tahap5-finance-canonical` | 2026-10-30 | Satu unit dengan SCRUM-84; SCRUM-127 duplikat |
+| SCRUM-127 | (duplikat SCRUM-119) | finance | 5 | DUPLICATE | To Do | — | 2026-10-30 | Tidak dikerjakan |

@@ -105,6 +105,7 @@ function fakeDb(
     },
     kitchen: { findUnique: async () => ({ id: 3n }), ...kitchen },
     validationIssue: { count: async () => openCritical, groupBy: async () => [] },
+    referenceEntry: { findFirst: async () => null },
     auditLog: {
       create: async (args: { data: { action: string } }) => {
         calls.audits.push(args.data.action);
@@ -341,7 +342,8 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.deepEqual(out.body?.columnDiff, []);
     // Kept on the batch for the Validasi Data page (B-MAPOUT).
     const stored = final.mappingResult as { mapping: { issues: unknown[]; columns: { header: string; field: string | null }[] } };
-    assert.equal(stored.mapping.issues.length, 12);
+    // 12 adapter issues + RECON_NO_SUMMARY + one UNMAPPED_CATEGORY per label (this fake has no Master Reference).
+    assert.equal(stored.mapping.issues.length, 15);
     assert.deepEqual(stored.mapping.columns.find((c) => c.header === 'jumlah_baris'), { sheet: 'Transaksi_Kas', column: 'M', header: 'jumlah_baris', field: 'line_amount' });
   });
 

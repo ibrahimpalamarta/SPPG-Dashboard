@@ -158,6 +158,16 @@ enum IssueStatus {
   RESOLVED
 }
 
+/// SCRUM-48: barang diterima → dibayar. UNKNOWN selama sumber tidak membawa
+/// waktunya (Input Maker tidak punya, OD-14); urutan terbalik = INVALID_SEQUENCE.
+enum PaymentSla {
+  SAME_DAY
+  D_PLUS_1
+  BREACH
+  INVALID_SEQUENCE
+  UNKNOWN
+}
+
 // ---------------------------------------------------------------------------
 // Identitas & audit
 // ---------------------------------------------------------------------------
@@ -356,6 +366,8 @@ model Kitchen {
   vendorPayments      VendorPaymentWorkflow[]
   menuRecipeLines     MenuRecipeLine[]
   purchaseOrderLines  PurchaseOrderLine[]
+  goodsReceiptLines   GoodsReceiptLine[]
+  financeBalances     FinanceBalance[]
 
   @@index([status])
   @@map("kitchens")
@@ -523,6 +535,8 @@ model UploadBatch {
   vendorPayments      VendorPaymentWorkflow[]
   menuRecipeLines     MenuRecipeLine[]
   purchaseOrderLines  PurchaseOrderLine[]
+  goodsReceiptLines   GoodsReceiptLine[]
+  financeBalances     FinanceBalance[]
   validationIssues    ValidationIssue[]
 
   @@index([kitchenId, uploadDate])
@@ -586,7 +600,10 @@ model FinanceTransaction {
   txnDate      DateTime? @map("txn_date") @db.Date
   txnType      String?   @map("txn_type")
   direction    String?
+  /// Label mentah sumber (SCRUM-42).
   category     String?
+  /// SCRUM-42: kategori Master Reference "Kategori pengeluaran"; NULL = tidak termapping (di-flag UNMAPPED_CATEGORY).
+  categoryNormalized String? @map("category_normalized")
   description  String?
   txnTotal     Decimal?  @map("txn_total") @db.Decimal(14, 2)
   reviewStatus String?   @map("review_status")
@@ -594,9 +611,13 @@ model FinanceTransaction {
   confidence   String?
 
   /// DQ PRD §7.4: petty cash dan transfer internal bukan pengeluaran eksternal
-  /// (Top 5 Supplier / Expense Mix hanya menjumlah yang true). TODO(B-DD): aturan
-  /// klasifikasi final; sementara arah KELUAR.
+  /// (Top 5 Supplier / Expense Mix hanya menjumlah yang true): arah KELUAR dan
+  /// bukan transfer internal.
   isExternalSpend Boolean @map("is_external_spend")
+
+  /// SCRUM-43: pindah dana antar rekening/kas dapur sendiri (Isi kas kecil,
+  /// transfer internal). Tidak pernah dihitung sebagai belanja.
+  isInternalTransfer Boolean @default(false) @map("is_internal_transfer")
 
   lines FinanceTransactionLine[]
 
@@ -732,11 +753,14 @@ model VendorPaymentWorkflow {
   paymentInvoiceLink  String?   @map("payment_invoice_link")
 
   /// Rantai workflow. Semuanya NULL dari Input Maker (tidak ada buktinya di sumber).
+  /// SCRUM-48: receivedAt = barang diterima (Goods Receipt), awal hitungan SLA.
+  receivedAt       DateTime? @map("received_at")
   makerInputAt     DateTime? @map("maker_input_at")
   approvedAt       DateTime? @map("approved_at")
   paidAt           DateTime? @map("paid_at")
   paidAmount       Decimal?  @map("paid_amount") @db.Decimal(16, 2)
   paymentReference String?   @map("payment_reference")
+  slaStatus        PaymentSla @default(UNKNOWN) @map("sla_status")
 
   @@unique([uploadBatchId, paymentRequestId])
   @@index([kitchenId, requestDate])
@@ -824,6 +848,72 @@ model ValidationIssue {
   @@index([kitchenId, status, severity])
   @@index([sourceRecordId])
   @@map("validation_issues")
+}
+
+/// SCRUM-46 (opsional Phase 1): baris Goods Receipt. Belum ada writer: sumber
+/// GR Sukun belum tersedia (B-SRC-SKN). qty_match_status diturunkan adapter
+/// dari ordered vs received; flag manual sumber disimpan mentah, tidak otoritatif.
+model GoodsReceiptLine {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  mappingProfileId String       @map("mapping_profile_id")
+  kitchenId        BigInt       @map("kitchen_id")
+  kitchen          Kitchen      @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  sourceRecordId   String       @map("source_record_id")
+  sourceSystem     SourceSystem @map("source_system")
+  sourceFileName   String       @map("source_file_name")
+  templateVersion  String?      @map("template_version")
+  loadedAt         DateTime     @map("loaded_at")
+
+  receiptId     String    @map("receipt_id")
+  receiptLineId String    @map("receipt_line_id")
+  receivedAt    DateTime? @map("received_at")
+  poId          String?   @map("po_id")
+  poLineId      String?   @map("po_line_id")
+
+  itemName       String?  @map("item_name")
+  unit           String?
+  orderedQty     Decimal? @map("ordered_qty") @db.Decimal(14, 3)
+  receivedQty    Decimal? @map("received_qty") @db.Decimal(14, 3)
+  /// MATCH / SHORT / OVER; NULL bila salah satu qty kosong.
+  qtyMatchStatus String?  @map("qty_match_status")
+  sourceFlag     String?  @map("source_flag")
+
+  @@unique([uploadBatchId, receiptId, receiptLineId])
+  @@index([kitchenId, receivedAt])
+  @@index([sourceRecordId])
+  @@map("goods_receipt_lines")
+}
+
+/// SCRUM-49: saldo per dapur × tanggal × rekening. Belum ada writer: sumber
+/// saldo Sukun dan source-of-truth (OD-02) belum disetujui (B-SRC-SKN). KPI
+/// Saldo (SCRUM-65) tetap Draft sampai source dikonfigurasi.
+model FinanceBalance {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  mappingProfileId String       @map("mapping_profile_id")
+  kitchenId        BigInt       @map("kitchen_id")
+  kitchen          Kitchen      @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  sourceRecordId   String       @map("source_record_id")
+  sourceSystem     SourceSystem @map("source_system")
+  sourceFileName   String       @map("source_file_name")
+  templateVersion  String?      @map("template_version")
+  loadedAt         DateTime     @map("loaded_at")
+
+  balanceDate DateTime @map("balance_date") @db.Date
+  /// Label rekening (mis. "BRI Operasional"), bukan nomor rekening lengkap.
+  accountRef  String   @map("account_ref")
+  balance     Decimal? @db.Decimal(16, 2)
+
+  @@unique([uploadBatchId, balanceDate, accountRef])
+  @@index([kitchenId, balanceDate])
+  @@map("finance_balances")
 }
 
 /// SCRUM-29/45: baris List PO / Nota Pesanan. Belum ada writer: sumber PO Sukun

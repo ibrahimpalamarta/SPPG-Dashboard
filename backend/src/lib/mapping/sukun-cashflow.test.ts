@@ -13,7 +13,7 @@ describe('MAP-SKN-CF-001 adapter (SCRUM-27/55)', () => {
     assert.equal(mapping.records, 15);
     // Σ `total` of each transaction once, as in the source.
     assert.deepEqual(mapping.totals, { KELUAR: 169058236, MASUK: 2000000 });
-    assert.deepEqual(mapping.issueCounts, { MISSING_AMOUNT: 5, NO_TXN_ID: 3, NEEDS_REVIEW: 4 });
+    assert.deepEqual(mapping.issueCounts, { MISSING_AMOUNT: 5, NO_TXN_ID: 3, NEEDS_REVIEW: 4, RECON_NO_SUMMARY: 1 });
   });
 
   test('Rupiah with thousand dots, decimal-comma qty, folded type/direction/unit', async () => {
@@ -37,7 +37,7 @@ describe('MAP-SKN-CF-001 adapter (SCRUM-27/55)', () => {
         [1, 'pcs', 17000, 17000],
       ],
     );
-    assert.deepEqual(mapping?.issues, []);
+    assert.deepEqual(mapping?.issues.map((i) => i.code), ['RECON_NO_SUMMARY']);
     // Each clean-up is logged once per field with its first example; values already clean ("17000", "BELANJA") are not.
     const n = Object.fromEntries(mapping!.normalized.map((x) => [`${x.code}:${x.field}`, [x.count, x.example.raw, x.example.value]]));
     assert.deepEqual(n['CURRENCY_PARSED:unit_price'], [1, 'Rp40.000', 40000]);
@@ -58,7 +58,7 @@ describe('MAP-SKN-CF-001 adapter (SCRUM-27/55)', () => {
       ]),
       'CASHFLOW',
     );
-    assert.deepEqual(mapping?.issueCounts, { TOTAL_INCONSISTENT: 1, LINES_NOT_TOTAL: 1 });
+    assert.deepEqual(mapping?.issueCounts, { TOTAL_INCONSISTENT: 1, LINES_NOT_TOTAL: 1, RECON_NO_SUMMARY: 1 });
     assert.match(mapping!.issues[1]!.message, /TXN-X2: jumlah baris Rp45\.000 ≠ total Rp50\.000/);
   });
 });

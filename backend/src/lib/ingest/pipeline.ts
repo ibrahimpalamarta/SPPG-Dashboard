@@ -7,6 +7,8 @@ import { inputMakerParser } from './input-maker.js';
 import { detectProfile, type Detection } from '../mapping/detect.js';
 import type { MappingOutput, MappingProfile } from '../mapping/profiles.js';
 import type { Normalization } from '../mapping/values.js';
+import type { CashflowTxn } from '../mapping/sukun-cashflow.js';
+import { normalizeCategories, reconcileRingkasan } from '../mapping/cashflow-checks.js';
 import { classify, type ClassifiedIssue } from '../validation/rules.js';
 
 /**
@@ -70,6 +72,11 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
     }
     const { profile } = detection;
     const out = profile.apply(batch.sheets, batch.rows, profile);
+    if (profile.domain === 'CASHFLOW') {
+      const txns = out.records as CashflowTxn[];
+      if (ctx.expenseCategories) out.issues.push(...normalizeCategories(txns, ctx.expenseCategories));
+      out.issues.push(...reconcileRingkasan(sheets, txns));
+    }
     await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, templateVersion: profile.version, loadedAt: ctx.loadedAt, domain: profile.domain, records: out.records, issues: out.issues });
     return { ok: true, batch, detection, mapping: summarise(profile, out, batch.sheets) };
   } catch (err) {

@@ -19,10 +19,14 @@ export type CashflowTxn = {
   txn_type: string | null;
   direction: string | null;
   category: string | null;
+  /** SCRUM-42: filled from the Master Reference after the adapter (`lib/mapping/cashflow-checks.ts`). */
+  category_normalized: string | null;
   description: string | null;
   txn_total: number | null;
-  /** DQ PRD §7.4: money in (petty cash) is not external spend. TODO(B-DD): final rule. */
+  /** DQ PRD §7.4: money out to someone else. Money in and internal transfers are not spend. */
   is_external_spend: boolean;
+  /** SCRUM-43: moving money between the kitchen's own accounts (topping up petty cash). */
+  is_internal_transfer: boolean;
   review_status: string | null;
   review_note: string | null;
   confidence: string | null;
@@ -32,6 +36,13 @@ export type CashflowTxn = {
 const REQUIRED = ['txn_date', 'txn_type', 'direction', 'category', 'description', 'counterparty', 'review_status'] as const;
 
 const upper = (s: string) => s.toUpperCase();
+
+/**
+ * SCRUM-43: "Isi kas kecil" (Master Reference "Jenis transaksi") moves money
+ * from the bank account to the kitchen's own petty cash; the spend happens
+ * later as BELANJA lines, so counting the top-up too would double it.
+ */
+const INTERNAL_TRANSFER_TYPES = new Set(['ISI KAS KECIL', 'TRANSFER INTERNAL', 'PINDAH BUKU']);
 const rupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
 
 /**
@@ -99,15 +110,19 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
         issues.push({ code: 'MISSING_REQUIRED', rule: 'DQ-019', sourceRecordId: id, message: `${txnId} baris ${row.sourceRowNumber}: ${missing.join(', ')} kosong/tidak terbaca.` });
       }
       const direction = fold('direction', upper);
+      const txnType = fold('txn_type', upper);
+      const internal = INTERNAL_TRANSFER_TYPES.has(txnType?.replace(/[\s_]+/g, ' ') ?? '');
       txn = {
         txn_id: txnId,
         txn_date: note('DATE_PARSED', 'txn_date', parseDate(f.txn_date)),
-        txn_type: fold('txn_type', upper),
+        txn_type: txnType,
         direction,
         category: text(f.category),
+        category_normalized: null,
         description: text(f.description),
         txn_total: total,
-        is_external_spend: direction === 'KELUAR',
+        is_external_spend: direction === 'KELUAR' && !internal,
+        is_internal_transfer: internal,
         review_status: fold('review_status', upper),
         review_note: text(f.review_note),
         confidence: fold('confidence', (s) => s.toLowerCase()),

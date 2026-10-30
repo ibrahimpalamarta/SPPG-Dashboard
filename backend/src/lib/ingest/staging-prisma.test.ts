@@ -118,7 +118,7 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
   test('Cashflow: headers first, then lines, after the old canonical rows are cleared', async () => {
     calls.length = 0;
     const line = (id: string) => ({ source_record_id: id, line_id: null, item_name: null, counterparty: null, qty: 1, unit: 'kg', unit_price: 5, line_amount: 5 });
-    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, description: null, txn_total: 10, is_external_spend: true, review_status: null, review_note: null, confidence: null, lines: [line('a'), line('b')] };
+    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, category_normalized: null, description: null, txn_total: 10, is_external_spend: true, is_internal_transfer: false, review_status: null, review_note: null, confidence: null, lines: [line('a'), line('b')] };
     await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', templateVersion: '1', loadedAt, domain: 'CASHFLOW', records: [txn] });
     assert.deepEqual(calls, ['staging:delete', 'txn:delete', 'day:delete', 'pay:delete', 'menu:delete', 'issue:delete', 'txn:1', 'line:2']);
   });
@@ -126,7 +126,7 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
   test('every canonical record carries the PRD §7.2 traceability fields', async () => {
     traced.length = 0;
     const line = { source_record_id: 'SKN:CASHFLOW:abc:Transaksi_Kas:2', line_id: null, item_name: null, counterparty: null, qty: 1, unit: 'kg', unit_price: 5, line_amount: 5 };
-    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, description: null, txn_total: 5, is_external_spend: true, review_status: null, review_note: null, confidence: null, lines: [line] };
+    const txn = { txn_id: 'T1', txn_date: '2026-03-05', txn_type: 'BELANJA', direction: 'KELUAR', category: null, category_normalized: null, description: null, txn_total: 5, is_external_spend: true, is_internal_transfer: false, review_status: null, review_note: null, confidence: null, lines: [line] };
     await repo.replaceBatch('b-1', empty, { profileId: 'MAP-SKN-CF-001', templateVersion: '1', loadedAt, domain: 'CASHFLOW', records: [txn] });
     assert.deepEqual(traced[0], {
       uploadBatchId: 'b-1',
@@ -142,9 +142,11 @@ describe('PrismaStagingRepository writes the mapped records (B-MAPOUT)', () => {
       txnType: 'BELANJA',
       direction: 'KELUAR',
       category: null,
+      categoryNormalized: null,
       description: null,
       txnTotal: 5,
       isExternalSpend: true,
+      isInternalTransfer: false,
       reviewStatus: null,
       reviewNote: null,
       confidence: null,

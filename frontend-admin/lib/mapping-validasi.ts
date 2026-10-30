@@ -97,6 +97,16 @@ const issueMeta: Record<string, { title: string; description: string }> = {
   URT_LOOKS_LIKE_DATE: { title: "Jumlah URT mirip tanggal Excel", description: "Kemungkinan pecahan (mis. 1/2) yang diubah Excel menjadi tanggal." },
   DUPLICATE_LINE: { title: "Baris duplikat", description: "Tanggal, porsi, menu, dan bahan yang sama muncul lagi; baris pertama yang dipakai." },
   MISSING_DATE: { title: "Tanggal kosong", description: "TANGGAL kosong atau tidak terbaca." },
+  UNMAPPED_CATEGORY: {
+    title: "Kategori belum ada di Daftar Kode",
+    description: "Kategori mentah tidak cocok dengan daftar Kategori pengeluaran di Data Reference, jadi belum masuk Komposisi Pengeluaran.",
+  },
+  RECON_SUM_MISMATCH: { title: "Total tidak cocok dengan Ringkasan_Transaksi", description: "Σ total transaksi berbeda dari Σ total di sheet ringkasan." },
+  RECON_COUNT_MISMATCH: { title: "Jumlah transaksi tidak cocok dengan ringkasan", description: "Banyaknya txn_id di Transaksi_Kas berbeda dari Ringkasan_Transaksi." },
+  RECON_TXN_MISSING: { title: "Transaksi hanya ada di salah satu sheet", description: "txn_id ada di Transaksi_Kas atau Ringkasan_Transaksi saja." },
+  RECON_TOTAL_MISMATCH: { title: "Total transaksi berbeda dari ringkasan", description: "Total satu transaksi berbeda dari baris ringkasannya." },
+  RECON_STATUS_MISMATCH: { title: "Status review berbeda dari ringkasan", description: "status_review di Transaksi_Kas berbeda dari Ringkasan_Transaksi." },
+  RECON_NO_SUMMARY: { title: "Tidak ada sheet Ringkasan_Transaksi", description: "Total transaksi tidak bisa dicocokkan karena file tidak membawa sheet ringkasan." },
 };
 
 const normalizedTitle: Record<string, string> = {

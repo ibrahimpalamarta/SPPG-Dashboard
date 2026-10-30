@@ -60,7 +60,7 @@ Setiap tiket dianggap selesai bila semua poin di kolom *Selesai bila* lulus, dan
 | **Tahap 5 — Validasi & Publish** ||||
 | T19 | Normalisasi bersama (tanggal/mata uang/unit) + missing ≠ 0 | 52, 53 | IN_PROGRESS (siap review) |
 | T20 | Validation framework + severity & quarantine | 33, 51 | IN_PROGRESS (siap review) |
-| T21 | Finance DQ: kategori, transfer internal, SLA D0/D+1, rekonsiliasi Ringkasan_Transaksi | 34, 42, 43, 48, 84, 119 (127 duplikat) | IN REVIEW |
+| T21 | Finance DQ: kategori, transfer internal, SLA D0/D+1, rekonsiliasi Ringkasan_Transaksi | 34, 42, 43, 48, 84, 119 (127 duplikat) | IN_PROGRESS (siap review) |
 | T22 | Menu DQ lintas template dapur | 85, 120 (128 duplikat) | IN_PROGRESS (Sukun siap review) |
 | T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | BLOCKED (B-SRC-SKN) |
 | **Tahap 6 — KPI & Dashboard** ||||
@@ -207,14 +207,14 @@ logika yang di-hardcode berdasarkan nama dapur.
 | T17.2 | SCRUM-28 | Sukun RAB adapter | IN REVIEW | U | RAB → rab_daily_budget / rab_ingredient_budget |
 | T17.3 | SCRUM-45 | [DATA-012] Sukun PO mapping + stable IDs | IN_PROGRESS (tabel ada; B-SRC-SKN) | U | po_id dan po_line_id stabil; label supplier/item mentah ada; FK ke rab_id bila ada; duplikat ditangani |
 | T17.4 | SCRUM-29 | Sukun PO adapter | IN_PROGRESS (tabel ada; B-SRC-SKN) | U | List PO/Nota Pesanan → purchase_order_line |
-| T17.5 | SCRUM-46 | [DATA-013] Goods Receipt mapping (opsional) | TODO | U | receipt_id/line; qty_match_status diturunkan dari ordered vs received; flag manual tidak otoritatif. Bukan blocker Phase 1 |
+| T17.5 | SCRUM-46 | [DATA-013] Goods Receipt mapping (opsional) | IN_PROGRESS (tabel ada; B-SRC-SKN) | U | receipt_id/line; qty_match_status diturunkan dari ordered vs received; flag manual tidak otoritatif. Bukan blocker Phase 1 |
 | T17.6 | SCRUM-47 | [DATA-014] Vendor payment workflow chain | TODO | U | payment_request_id; link receipt/PO/supplier; timestamp maker, approval, payment; payment_reference wajib bila paid |
 | T17.7 | SCRUM-30 | Sukun Payment adapter | TODO | U, D | input_maker_upload → vendor_payment_workflow. TAGIHAN/TANGGAL **tidak** otomatis jadi paid_amount/maker_input_time |
 
 #### T18 — Saldo, beneficiary, PII · Butuh: T16 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T18.1 | SCRUM-49 | [DATA-016] finance_balance + source-of-truth guard | TODO | U | Satu saldo per kitchen × tanggal × rekening; source_system ada; KPI tetap draft sampai source resmi dikonfigurasi |
+| T18.1 | SCRUM-49 | [DATA-016] finance_balance + source-of-truth guard | IN_PROGRESS (tabel ada; B-SRC-SKN, OD-02) | U | Satu saldo per kitchen × tanggal × rekening; source_system ada; KPI tetap draft sampai source resmi dikonfigurasi |
 | T18.2 | SCRUM-50 | [DATA-017] beneficiary_daily_count | TODO | U | Key kitchen/tanggal/lokasi/segmen; planned dan actual terpisah; missing = NULL; tanpa PII individu |
 | T18.3 | SCRUM-72 | [DATA-039] Restriksi PII beneficiary | TODO | U, UI | Dataset manajemen tanpa PII; tabel restricted terisolasi; akses tercatat; export/dashboard tidak bisa mengeluarkan NIK/nama/telepon/alamat |
 
@@ -239,11 +239,11 @@ tidak menggandakan fakta; batch koreksi menggantikan yang lama dan histori tetap
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
 | T21.1 | SCRUM-34 | Finance DQ rules (payung) | IN_PROGRESS (siap review; transfer di T21.3) | U | Anti-double-count, IDR numerik, klasifikasi transfer, missing ≠ 0 aktif sebagai rule |
-| T21.2 | SCRUM-42 | [DATA-009] Normalisasi kategori via Master Reference | TODO | U | Kategori mentah dipertahankan; kategori normal dari master; nilai tak termapping di-flag |
-| T21.3 | SCRUM-43 | [DATA-010] Klasifikasi transfer internal | TODO | U | transaction_type mendukung transfer internal; KPI spend tidak menghitungnya; test mencakup pasangan mutasi |
-| T21.4 | SCRUM-48 | [DATA-015] Urutan payment & SLA D0/D+1 | TODO | U | receipt ≤ maker ≤ approval ≤ payment; klasifikasi SAME_DAY/D+1/BREACH; urutan invalid di-flag. Butuh T17.6 |
-| T21.5 | SCRUM-84 | [DATA-046] Rekonsiliasi header ke Ringkasan_Transaksi | TODO | U, D | Jumlah txn_id unik, total, dan review status dibandingkan; selisih material → blocker/warning; sheet ringkasan tidak membuat baris finance_transaction |
-| T21.6 | SCRUM-119 | Cashflow Ringkasan_Transaksi Reconciliation | TODO | U | Sama dengan T21.5, berlaku di setiap upload Cashflow |
+| T21.2 | SCRUM-42 | [DATA-009] Normalisasi kategori via Master Reference | IN_PROGRESS (siap review; B-DD) | U | Kategori mentah dipertahankan; kategori normal dari master; nilai tak termapping di-flag |
+| T21.3 | SCRUM-43 | [DATA-010] Klasifikasi transfer internal | IN_PROGRESS (siap review) | U | transaction_type mendukung transfer internal; KPI spend tidak menghitungnya; test mencakup pasangan mutasi |
+| T21.4 | SCRUM-48 | [DATA-015] Urutan payment & SLA D0/D+1 | IN_PROGRESS (siap review; waktu langkah B-SRC-SKN) | U | receipt ≤ maker ≤ approval ≤ payment; klasifikasi SAME_DAY/D+1/BREACH; urutan invalid di-flag. Butuh T17.6 |
+| T21.5 | SCRUM-84 | [DATA-046] Rekonsiliasi header ke Ringkasan_Transaksi | IN_PROGRESS (siap review) | U, D | Jumlah txn_id unik, total, dan review status dibandingkan; selisih material → blocker/warning; sheet ringkasan tidak membuat baris finance_transaction |
+| T21.6 | SCRUM-119 | Cashflow Ringkasan_Transaksi Reconciliation | IN_PROGRESS (siap review) | U | Sama dengan T21.5, berlaku di setiap upload Cashflow |
 | — | SCRUM-127 | (duplikat SCRUM-119) | DUPLICATE | — | Tutup bersama SCRUM-119 |
 
 #### T22 — Menu DQ · Butuh: T15, T20 · Status: TODO

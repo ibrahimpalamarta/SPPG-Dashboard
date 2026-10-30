@@ -18,6 +18,14 @@ export const RULES: Record<string, RuleMeta> = {
   MISSING_AMOUNT: { severity: 'HIGH', action: 'REVIEW' },
   LINE_AMOUNT_MISMATCH: { severity: 'HIGH', action: 'REVIEW' },
   NEEDS_REVIEW: { severity: 'MEDIUM', action: 'FLAG' },
+  UNMAPPED_CATEGORY: { severity: 'MEDIUM', action: 'FLAG' },
+  // Ringkasan_Transaksi reconciliation (SCRUM-84/119): a material gap in the grand total holds the batch.
+  RECON_SUM_MISMATCH: { severity: 'CRITICAL', action: 'REVIEW' },
+  RECON_COUNT_MISMATCH: { severity: 'HIGH', action: 'REVIEW' },
+  RECON_TXN_MISSING: { severity: 'HIGH', action: 'REVIEW' },
+  RECON_TOTAL_MISMATCH: { severity: 'HIGH', action: 'REVIEW' },
+  RECON_STATUS_MISMATCH: { severity: 'MEDIUM', action: 'FLAG' },
+  RECON_NO_SUMMARY: { severity: 'MEDIUM', action: 'FLAG' },
   // Menu / RAB (SCRUM-85/120)
   INVALID_DATE: { severity: 'CRITICAL', action: 'REJECT' },
   MISSING_VALUE: { severity: 'HIGH', action: 'REVIEW' },

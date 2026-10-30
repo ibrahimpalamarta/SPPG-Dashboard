@@ -5,6 +5,7 @@ import type { InputMakerLine } from './input-maker.js';
 import type { MenuRecipeLine } from './sukun-menu.js';
 import type { Issue } from './values.js';
 import { classify } from '../validation/rules.js';
+import { classifySla } from './payment-sla.js';
 
 /** What an adapter produced for a batch, ready to store (B-MAPOUT: stored at upload). */
 export type MappedRecords = {
@@ -72,7 +73,7 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
     const txns = mapped.records as CashflowTxn[];
     await insertChunked(txns, (chunk) =>
       tx.financeTransaction.createMany({
-        data: chunk.map(({ lines, txn_date, txn_type, direction, category, description, txn_total, is_external_spend, review_status, review_note, confidence, txn_id }) => ({
+        data: chunk.map(({ lines, txn_date, txn_type, direction, category, category_normalized, description, txn_total, is_external_spend, is_internal_transfer, review_status, review_note, confidence, txn_id }) => ({
           ...trace,
           // The transaction is traced to its first source row.
           sourceRecordId: lines[0]!.source_record_id,
@@ -81,9 +82,11 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
           txnType: txn_type,
           direction,
           category,
+          categoryNormalized: category_normalized,
           description,
           txnTotal: txn_total,
           isExternalSpend: is_external_spend,
+          isInternalTransfer: is_internal_transfer,
           reviewStatus: review_status,
           reviewNote: review_note,
           confidence,
@@ -124,6 +127,8 @@ export async function writeCanonical(tx: Prisma.TransactionClient, uploadBatchId
           checklist: l.checklist,
           supplierInvoiceLink: l.supplier_invoice_link,
           paymentInvoiceLink: l.payment_invoice_link,
+          // SCRUM-48: no step times in Input Maker, so UNKNOWN until a source carries them.
+          slaStatus: classifySla({ receivedAt: null, makerInputAt: null, approvedAt: null, paidAt: null }),
         })),
       }),
     );

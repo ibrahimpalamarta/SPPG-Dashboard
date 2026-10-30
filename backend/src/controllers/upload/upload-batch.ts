@@ -201,6 +201,13 @@ const PREVIEW_ROWS = 50;
 export const uploadKey = (publicId: string, fileName = ''): string =>
   `upload-batches/${publicId}${isCsv(fileName) ? '.csv' : '.xlsx'}`;
 
+/** SCRUM-42: Data Reference › Daftar Kode › "Kategori pengeluaran", as the PM last edited it. */
+async function expenseCategories(db: Db): Promise<string[]> {
+  const row = await db.referenceEntry.findFirst({ where: { kind: 'KODE', fields: { path: ['daftar'], equals: 'Kategori pengeluaran' } } });
+  const pilihan = (row?.fields as { pilihan?: unknown } | undefined)?.pilihan;
+  return Array.isArray(pilihan) ? pilihan.filter((p): p is string => typeof p === 'string') : [];
+}
+
 /** PRD §9 copy for a file no mapping profile recognises, plus what is missing (SCRUM-94). */
 const notRecognised = (diff: ColumnDiff[]) => {
   const missing = [...new Set(diff.flatMap((d) => d.missing))];
@@ -352,7 +359,11 @@ export const createUploadBatch =
       }
 
       // Turen has no code yet (B-TUREN); its numeric id is just as stable.
-      const parsed = await parseToStaging(buffer, context(batch.publicId, kitchen.code ?? String(kitchen.id)), staging);
+      const parsed = await parseToStaging(
+        buffer,
+        { ...context(batch.publicId, kitchen.code ?? String(kitchen.id)), expenseCategories: await expenseCategories(db) },
+        staging,
+      );
       if (!parsed.ok) {
         return finish({ storageKey, status: UploadStatus.FAILED, errorCode: parsed.errorCode, errorSummary: parsed.errorSummary });
       }
