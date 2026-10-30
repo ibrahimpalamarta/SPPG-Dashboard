@@ -73,7 +73,7 @@ async function unggahKirimPublish(browser: Browser, name: string, buffer: Buffer
     await bukaBatch(page, name);
     await tandaiTemuan(page);
     await page.getByRole('button', { name: 'Setujui & Publish' }).click();
-    await expect(page.getByText('Published')).toBeVisible();
+    await expect(page.getByText('Dipublish')).toBeVisible();
     return batchId(page);
   });
 }
@@ -109,7 +109,7 @@ test.describe.serial('Review dan publish', () => {
       await bukaBatch(page, FILE);
       await page.getByRole('button', { name: 'Setujui & Publish' }).click();
       await expect(page.getByRole('alert').filter({ hasText: 'Wajib diperbaiki' })).toBeVisible();
-      await expect(page.getByText('Needs Review')).toBeVisible();
+      await expect(page.getByText('Belum selesai dicek')).toBeVisible();
       await shot(page, 'SCRUM-151', 1, 'publish-ditolak-temuan-wajib');
     });
   });
@@ -119,11 +119,11 @@ test.describe.serial('Review dan publish', () => {
       await bukaBatch(page, FILE);
       await tandaiTemuan(page);
       await page.getByRole('button', { name: 'Setujui & Publish' }).click();
-      await expect(page.getByText('Published')).toBeVisible();
+      await expect(page.getByText('Dipublish')).toBeVisible();
       batchAwal = batchId(page);
       await shot(page, 'SCRUM-151', 2, 'published');
       await page.reload();
-      await expect(page.getByText('Published')).toBeVisible();
+      await expect(page.getByText('Dipublish')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Setujui & Publish' })).toHaveCount(0);
     });
   });
@@ -132,7 +132,7 @@ test.describe.serial('Review dan publish', () => {
     await sebagai(browser, 'admin', async (page) => {
       await page.goto('upload-history');
       const baris = page.getByRole('row', { name: new RegExp(`^${FILE.replace('.', '\\.')}`) });
-      await expect(baris.getByText('Published')).toBeVisible();
+      await expect(baris.getByText('Dipublish')).toBeVisible();
       await expect(baris.getByRole('link', { name: `Export ${FILE}` })).toBeVisible();
       await expect(page.getByRole('link', { name: `Buka ${FILE}` })).toHaveCount(0);
       await shot(page, 'SCRUM-148', 1, 'upload-history-admin');
@@ -208,7 +208,7 @@ test.describe.serial('Review dan publish', () => {
       await page.goto('upload-history');
       await shot(page, 'SCRUM-96', 1, 'batch-lama-diganti');
       await expect(page.getByRole('row', { name: new RegExp(`^${FILE.replace('.', '\\.')}`) }).getByText('Diganti')).toBeVisible();
-      await expect(page.getByRole('row', { name: new RegExp(`^${nama.replace('.', '\\.')}`) }).getByText('Published')).toBeVisible();
+      await expect(page.getByRole('row', { name: new RegExp(`^${nama.replace('.', '\\.')}`) }).getByText('Dipublish')).toBeVisible();
       expect(await kartu(page, 'Belanja ke supplier')).toBe(belanja);
       expect(await kartu(page, 'Jumlah transaksi')).toBe(transaksi);
     });
