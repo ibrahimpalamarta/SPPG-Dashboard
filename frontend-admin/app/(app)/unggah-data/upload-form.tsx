@@ -6,6 +6,7 @@ import { startTransition, useActionState, useRef, useState, useTransition } from
 import { checkFile, uploadFile, type CheckResult, type FileColumn, type UploadResult } from "./actions";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { MorphSelect } from "@/components/ui/morph-select";
 import type { Kitchen } from "@/lib/me";
 
 const field = "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20";
@@ -147,8 +148,8 @@ function MappingEditor({
           </button>
         </div>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="w-full min-w-[32rem] text-left text-sm">
+      <div className="rounded-xl border border-slate-200">
+        <table className="w-full text-left text-sm">
           <thead className="text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">Kolom di file</th>
@@ -167,14 +168,13 @@ function MappingEditor({
                     {sheets > 1 && <span className="ml-2 text-xs text-slate-500">{c.sheet}</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <select aria-label={`Dibaca sebagai untuk kolom ${c.header}`} value={map[key] ?? c.field ?? ""} onChange={(e) => onPick(c, e.target.value)} className={`${field} max-w-xs`}>
-                      <option value="">Tidak dipakai</option>
-                      {check.fields.map((f) => (
-                        <option key={f.field} value={f.field}>
-                          {f.header}
-                        </option>
-                      ))}
-                    </select>
+                    <MorphSelect
+                      label={`Dibaca sebagai untuk kolom ${c.header}`}
+                      value={map[key] ?? c.field ?? ""}
+                      onChange={(v) => onPick(c, v)}
+                      className="w-full max-w-xs"
+                      options={[{ value: "", label: "Tidak dipakai" }, ...check.fields.map((f) => ({ value: f.field, label: f.header }))]}
+                    />
                   </td>
                   <td className="px-4 py-3 text-right">
                     {changed ? <Badge tone="amber">Diubah</Badge> : c.field ? <Badge tone="green">Yakin</Badge> : <Badge tone="slate">Tidak dipakai</Badge>}
@@ -255,24 +255,20 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
       <Card className="space-y-5 p-6">
         <div className="grid gap-4 sm:grid-cols-3">
           {kitchens.length > 1 ? (
-            <label className="block space-y-2 text-sm">
-              <span className="font-semibold text-slate-800">Dapur</span>
-              <select
+            <div className="space-y-2 text-sm">
+              <span className="block font-semibold text-slate-800">Dapur</span>
+              <MorphSelect
+                label="Dapur"
                 value={kitchen}
-                onChange={(e) => {
-                  setKitchen(e.target.value);
+                onChange={(v) => {
+                  setKitchen(v);
                   resetMapping();
-                  runCheck({ kitchenId: e.target.value, columnMap: "" });
+                  runCheck({ kitchenId: v, columnMap: "" });
                 }}
-                className={field}
-              >
-                {kitchens.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.code ? `${k.code} · ${k.name}` : k.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                className="w-full"
+                options={kitchens.map((k) => ({ value: k.id, label: k.code ? `${k.code} · ${k.name}` : k.name }))}
+              />
+            </div>
           ) : (
             // SCRUM-144: Data Operasional is tied to one dapur, so there is nothing to pick.
             <div className="space-y-2 text-sm">
@@ -284,24 +280,20 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
             </div>
           )}
 
-          <label className="block space-y-2 text-sm">
-            <span className="font-semibold text-slate-800">Jenis data</span>
-            <select
+          <div className="space-y-2 text-sm">
+            <span className="block font-semibold text-slate-800">Jenis data</span>
+            <MorphSelect
+              label="Jenis data"
               value={domain}
-              onChange={(e) => {
-                setDomain(e.target.value);
+              onChange={(v) => {
+                setDomain(v);
                 resetMapping();
-                runCheck({ domain: e.target.value, columnMap: "" });
+                runCheck({ domain: v, columnMap: "" });
               }}
-              className={field}
-            >
-              {DOMAIN_OPTIONS.map((d) => (
-                <option key={d.value} value={d.value}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              className="w-full"
+              options={DOMAIN_OPTIONS}
+            />
+          </div>
 
           <label className="block space-y-2 text-sm">
             <span className="font-semibold text-slate-800">

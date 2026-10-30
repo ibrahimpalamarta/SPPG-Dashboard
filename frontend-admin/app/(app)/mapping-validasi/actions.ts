@@ -23,6 +23,5 @@ export async function publishBatch(id: string): Promise<string | null> {
   }
   if (!res.ok) return "Gagal menyimpan. Coba lagi beberapa saat lagi.";
   revalidatePath("/mapping-validasi");
-  revalidatePath("/upload-history");
   return null;
 }

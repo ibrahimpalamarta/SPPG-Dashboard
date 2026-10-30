@@ -5,6 +5,7 @@ import { createContext, use, useActionState, useEffect, useState, type ReactNode
 import { createUser, saveUser, type UserActionState } from "./actions";
 import { Field, FormMessage, field, primaryButton, secondaryButton } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
+import { MorphSelect } from "@/components/ui/morph-select";
 import type { Kitchen } from "@/lib/me";
 import { ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
 
@@ -32,7 +33,7 @@ function Result({ state }: { state: UserActionState }) {
 
 const ROLE_OPTIONS: { role: Role; description: string }[] = [
   { role: "DATA_ADMIN", description: "Satu dapur: unggah file, cek validasi, dan Setujui & Publish sendiri." },
-  { role: "ADMIN", description: "Semua dapur: mengelola anggota, hak akses, Data Reference, dan melihat Upload History." },
+  { role: "ADMIN", description: "Semua dapur: mengelola anggota, hak akses, Data Reference, dan melihat Validasi Data." },
 ];
 
 /** Mirrors backend KITCHEN_SCOPED_ROLES: Data Operasional is tied to exactly one dapur. */
@@ -51,19 +52,17 @@ const RoleCard = ({ option, checked, onSelect }: { option: (typeof ROLE_OPTIONS)
 /** One dapur, required (SCRUM-144). */
 function KitchenSelect({ kitchens, defaultId }: { kitchens: Kitchen[]; defaultId?: string }) {
   return (
-    <label className="block space-y-1">
+    <div className="space-y-1">
       <span className="block font-medium text-slate-700">Dapur</span>
-      <select name="kitchenIds" required defaultValue={defaultId ?? ""} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800">
-        <option value="" disabled>
-          Pilih dapur
-        </option>
-        {kitchens.map((k) => (
-          <option key={k.id} value={k.id}>
-            {kitchenLabel(k)}
-          </option>
-        ))}
-      </select>
-    </label>
+      <MorphSelect
+        name="kitchenIds"
+        label="Dapur"
+        required
+        defaultValue={defaultId}
+        className="w-full"
+        options={[{ value: "", label: "Pilih dapur" }, ...kitchens.map((k) => ({ value: k.id, label: kitchenLabel(k) }))]}
+      />
+    </div>
   );
 }
 
