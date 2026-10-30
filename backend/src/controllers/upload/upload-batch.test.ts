@@ -78,6 +78,7 @@ async function run(handler: ReturnType<typeof createUploadBatch>, req: Partial<R
 function fakeDb(
   overrides: Partial<Record<string, unknown>> = {},
   kitchen: Partial<Record<string, unknown>> = {},
+  openCritical = 0,
 ) {
   const calls: { findManyWhere?: unknown; created?: unknown; updates: unknown[]; audits: string[] } = { updates: [], audits: [] };
   let row: Record<string, unknown> = {};
@@ -103,6 +104,8 @@ function fakeDb(
       ...overrides,
     },
     kitchen: { findUnique: async () => ({ id: 3n }), ...kitchen },
+    validationIssue: { count: async () => openCritical, groupBy: async () => [] },
+    referenceEntry: { findFirst: async () => null },
     auditLog: {
       create: async (args: { data: { action: string } }) => {
         calls.audits.push(args.data.action);
@@ -137,10 +140,10 @@ describe('listUploadBatches (SCRUM-7)', () => {
     assert.equal(out.body?.error, 'forbidden_kitchen');
   });
 
-  test('a SUPER_ADMIN is not kitchen-filtered', async () => {
+  test('a ADMIN is not kitchen-filtered', async () => {
     const { db, calls } = fakeDb();
     await run(listUploadBatches(db), {
-      user: userWith('SUPER_ADMIN'),
+      user: userWith('ADMIN'),
       valid: { query: { page: 1, pageSize: 25 } },
     });
 
@@ -190,7 +193,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     // Staging only: nothing canonical rides along any more.
     assert.equal('menuPlans' in created, false);
 
-    // Kitchen 3 has no code and so no profile (SCRUM-39): quarantined, never READY.
+    // Kitchen 3 has no code and so no profile (SCRUM-39): quarantined, never PUBLISHED.
     const final = calls.updates.at(-1) as Record<string, unknown>;
     assert.equal(final.status, 'NEEDS_MAPPING_UPDATE');
     assert.equal(final.errorCode, 'PROFILE_NOT_DETECTED');
@@ -297,7 +300,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
 
     const out = await run(createUploadBatch(db, put, new InMemoryStagingRepository()), {
       ...(await withFile()),
-      user: userWith('SUPER_ADMIN'),
+      user: userWith('ADMIN'),
     });
 
     assert.equal(out.status, 400);
@@ -339,7 +342,8 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     assert.deepEqual(out.body?.columnDiff, []);
     // Kept on the batch for the Validasi Data page (B-MAPOUT).
     const stored = final.mappingResult as { mapping: { issues: unknown[]; columns: { header: string; field: string | null }[] } };
-    assert.equal(stored.mapping.issues.length, 12);
+    // 12 adapter issues + RECON_NO_SUMMARY + one UNMAPPED_CATEGORY per label (this fake has no Master Reference).
+    assert.equal(stored.mapping.issues.length, 15);
     assert.deepEqual(stored.mapping.columns.find((c) => c.header === 'jumlah_baris'), { sheet: 'Transaksi_Kas', column: 'M', header: 'jumlah_baris', field: 'line_amount' });
   });
 
@@ -367,12 +371,22 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
   });
 
   test('replaces must name an open batch of the same kitchen and domain', async () => {
-    for (const old of [null, { id: 7n, kitchenId: 4n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'MENU', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'CASHFLOW', status: 'PUBLISHED' }]) {
+    for (const old of [null, { id: 7n, kitchenId: 4n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'MENU', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'CASHFLOW', status: 'FAILED' }]) {
       const { db, calls } = fakeDb({ findUnique: async () => old }, skn);
       const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: '11111111-1111-4111-8111-111111111111' }));
       assert.equal(out.status, 400, JSON.stringify(old, (_k, v) => (typeof v === 'bigint' ? String(v) : v)));
       assert.equal(calls.created, undefined);
     }
+  });
+
+  test('a correction of a published batch leaves it published until the correction is (SCRUM-96)', async () => {
+    const old = { id: 7n, publicId: '11111111-1111-4111-8111-111111111111', kitchenId: 3n, domain: 'CASHFLOW', status: 'PUBLISHED' };
+    const { db, calls } = fakeDb({ findUnique: async () => old }, skn);
+    const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: old.publicId }));
+    assert.equal(out.status, 201);
+    assert.equal((calls.created as { replacesBatchId: string }).replacesBatchId, old.publicId);
+    assert.ok(!calls.updates.some((u) => (u as { status?: string }).status === 'SUPERSEDED'));
+    assert.ok(!calls.audits.includes('upload_batch.replaced'));
   });
 
   test('a DATA_ADMIN cannot upload for another dapur', async () => {
@@ -398,7 +412,7 @@ describe('Validasi Data records/history (B-MAPOUT)', () => {
   test('404 when the batch does not exist', async () => {
     for (const handler of handlers) {
       const { db } = fakeDb();
-      assert.equal((await run(handler(db), req('SUPER_ADMIN', null))).status, 404);
+      assert.equal((await run(handler(db), req('ADMIN', null))).status, 404);
     }
   });
 
@@ -430,8 +444,8 @@ describe('updateUploadBatch (SCRUM-22)', () => {
   test('404 when the batch does not exist', async () => {
     const { db } = fakeDb();
     const out = await run(updateUploadBatch(db), {
-      user: userWith('SUPER_ADMIN'),
-      valid: { params: { id: 9n }, body: { status: 'READY' } },
+      user: userWith('ADMIN'),
+      valid: { params: { id: 9n }, body: { status: 'FAILED' } },
     });
 
     assert.equal(out.status, 404);
@@ -441,7 +455,7 @@ describe('updateUploadBatch (SCRUM-22)', () => {
     const { db } = fakeDb({ findUnique: async () => ({ id: 9n, kitchenId: 4n, status: 'NEEDS_REVIEW' }) });
     const out = await run(updateUploadBatch(db), {
       user: userWith('DATA_ADMIN', 3n),
-      valid: { params: { id: 9n }, body: { status: 'READY' } },
+      valid: { params: { id: 9n }, body: { status: 'FAILED' } },
     });
 
     assert.equal(out.status, 403);
@@ -452,8 +466,8 @@ describe('updateUploadBatch (SCRUM-22)', () => {
       findUnique: async () => ({ id: 9n, kitchenId: 3n, status: 'FAILED' }),
     });
     const out = await run(updateUploadBatch(db), {
-      user: userWith('SUPER_ADMIN'),
-      valid: { params: { id: 9n }, body: { status: 'READY' } },
+      user: userWith('ADMIN'),
+      valid: { params: { id: 9n }, body: { status: 'FAILED' } },
     });
 
     assert.equal(out.status, 409);
@@ -466,7 +480,7 @@ describe('updateUploadBatch (SCRUM-22)', () => {
       findUnique: async () => ({ id: 9n, kitchenId: 3n, status: 'NEEDS_REVIEW' }),
     });
     const out = await run(updateUploadBatch(db), {
-      user: userWith('SUPER_ADMIN'),
+      user: userWith('ADMIN'),
       valid: { params: { id: 9n }, body: { status: 'FAILED', notes: 'kolom BDD kosong' } },
     });
 

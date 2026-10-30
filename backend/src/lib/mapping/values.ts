@@ -28,6 +28,31 @@ export const text = (cell: RawCell | undefined): string | null => {
 /** "kecil", "Besar ", "BUMIL & busui" → "Kecil", "Besar", "Bumil & Busui" (DQ-010). */
 export const titleCase = (s: string | null) => s && s.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 
+/** Spellings seen for the same unit (DQ-007). Anything else is only lower-cased, never guessed. */
+const UNIT_ALIASES: Record<string, string> = {
+  kilogram: 'kg',
+  kgs: 'kg',
+  gram: 'g',
+  gr: 'g',
+  grm: 'g',
+  liter: 'l',
+  ltr: 'l',
+  lt: 'l',
+  mililiter: 'ml',
+  pax: 'pax',
+  porsi: 'pax',
+  pcs: 'pcs',
+  buah: 'pcs',
+  bh: 'pcs',
+};
+
+/** SCRUM-52: "Kg", "KG", "Kilogram" → "kg"; "Pax"/"porsi" → "pax". */
+export const normalizeUnit = (s: string | null): string | null => {
+  if (s === null) return null;
+  const lower = s.toLowerCase().replace(/\.$/, '');
+  return UNIT_ALIASES[lower] ?? lower;
+};
+
 /**
  * Indonesian and English separators both appear in the same file
  * ("Rp1.885.000", "Rp3,500", "1,212.00", "16,45"). With both present the last

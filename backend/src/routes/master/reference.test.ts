@@ -6,7 +6,7 @@ import { ingredientRouter } from './ingredient.js';
 import { referenceEntryRouter } from './reference-entry.js';
 import type { Permission, Role } from '../../auth/roles.js';
 
-// Default role map (migration 20261025000000_internal_auth). SUPER_ADMIN holds everything.
+// Default role map (migration 20261025000000_internal_auth). ADMIN holds everything.
 const DATA_ADMIN: Permission[] = ['upload:create', 'upload:view', 'mapping:view', 'mapping:propose', 'reference:view', 'dashboard:view'];
 
 /** Drives the router with an empty body: a 403 means the guard stopped it, a 400 means it got past to validation. */
@@ -36,8 +36,8 @@ describe('SCRUM-20: Data Reference writes need reference:edit', () => {
       assert.equal(await hit(router, 'PATCH', url, 'DATA_ADMIN', DATA_ADMIN), 403);
     });
 
-    test(`${name}: PM MBG passes the guard`, async () => {
-      assert.equal(await hit(router, 'POST', '/', 'SUPER_ADMIN', ['reference:edit']), 400);
+    test(`${name}: ADMIN passes the guard`, async () => {
+      assert.equal(await hit(router, 'POST', '/', 'ADMIN', ['reference:edit']), 400);
     });
   }
 
@@ -46,8 +46,8 @@ describe('SCRUM-20: Data Reference writes need reference:edit', () => {
     assert.equal(await hit(referenceEntryRouter, 'PATCH', '/1', 'DATA_ADMIN', DATA_ADMIN), 403);
   });
 
-  test('reference entries: PM MBG passes the guard', async () => {
+  test('reference entries: ADMIN passes the guard', async () => {
     // Empty body passes referenceEntryUpdate (every field optional), so this needs a body validation rejects to prove it got past the guard.
-    assert.equal(await hit(referenceEntryRouter, 'PATCH', '/1', 'SUPER_ADMIN', ['reference:edit'], { pilihan: 'not-an-array' }), 400);
+    assert.equal(await hit(referenceEntryRouter, 'PATCH', '/1', 'ADMIN', ['reference:edit'], { pilihan: 'not-an-array' }), 400);
   });
 });

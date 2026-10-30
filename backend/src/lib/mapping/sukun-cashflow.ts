@@ -1,6 +1,6 @@
 import type { StagedSheet, StagingRow } from '../ingest/staging.js';
 import type { MappingOutput, MappingProfile } from './profiles.js';
-import { fieldReader, parseDate, parseNumber, text, type Issue, type Normalization } from './values.js';
+import { fieldReader, normalizeUnit, parseDate, parseNumber, text, type Issue, type Normalization } from './values.js';
 
 export type CashflowLine = {
   source_record_id: string;
@@ -19,10 +19,16 @@ export type CashflowTxn = {
   txn_type: string | null;
   direction: string | null;
   category: string | null;
+  /** SCRUM-42: filled from the Master Reference after the adapter (`lib/mapping/cashflow-checks.ts`). */
+  category_normalized: string | null;
   description: string | null;
   txn_total: number | null;
-  /** DQ PRD §7.4: money in (petty cash) is not external spend. TODO(B-DD): final rule. */
+  /** DQ PRD §7.4: money out to someone else. Money in and internal transfers are not spend. */
   is_external_spend: boolean;
+  /** SCRUM-43: moving money between the kitchen's own accounts (topping up petty cash). */
+  is_internal_transfer: boolean;
+  /** SCRUM-66: incentive transfer to Yayasan Edufarmers (EFI); set once all lines are read. */
+  is_efi_transfer: boolean;
   review_status: string | null;
   review_note: string | null;
   confidence: string | null;
@@ -32,6 +38,20 @@ export type CashflowTxn = {
 const REQUIRED = ['txn_date', 'txn_type', 'direction', 'category', 'description', 'counterparty', 'review_status'] as const;
 
 const upper = (s: string) => s.toUpperCase();
+
+/**
+ * SCRUM-43: "Isi kas kecil" (Master Reference "Jenis transaksi") moves money
+ * from the bank account to the kitchen's own petty cash; the spend happens
+ * later as BELANJA lines, so counting the top-up too would double it.
+ */
+const INTERNAL_TRANSFER_TYPES = new Set(['ISI KAS KECIL', 'TRANSFER INTERNAL', 'PINDAH BUKU']);
+
+/**
+ * SCRUM-66 (ASUMSI, decisions D-20): an EFI transfer is an INSENTIF paid to
+ * Yayasan Edufarmers ("Pembayaran Insentif Yayasan Minggu 1 · Yayasan
+ * Edufarmers"). It is shown as its own KPI, never as supplier spend.
+ */
+const EFI = /edufarmers|insentif yayasan/i;
 const rupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
 
 /**
@@ -76,7 +96,7 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
       item_name: text(f.item_name),
       counterparty: text(f.counterparty),
       qty: note('NUMBER_PARSED', 'qty', parseNumber(f.qty)),
-      unit: fold('unit', (s) => s.toLowerCase()),
+      unit: note('UNIT_NORMALIZED', 'unit', normalizeUnit(text(f.unit))),
       unit_price: money('unit_price'),
       line_amount: money('line_amount'),
     };
@@ -99,15 +119,20 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
         issues.push({ code: 'MISSING_REQUIRED', rule: 'DQ-019', sourceRecordId: id, message: `${txnId} baris ${row.sourceRowNumber}: ${missing.join(', ')} kosong/tidak terbaca.` });
       }
       const direction = fold('direction', upper);
+      const txnType = fold('txn_type', upper);
+      const internal = INTERNAL_TRANSFER_TYPES.has(txnType?.replace(/[\s_]+/g, ' ') ?? '');
       txn = {
         txn_id: txnId,
         txn_date: note('DATE_PARSED', 'txn_date', parseDate(f.txn_date)),
-        txn_type: fold('txn_type', upper),
+        txn_type: txnType,
         direction,
         category: text(f.category),
+        category_normalized: null,
         description: text(f.description),
         txn_total: total,
-        is_external_spend: direction === 'KELUAR',
+        is_external_spend: direction === 'KELUAR' && !internal,
+        is_internal_transfer: internal,
+        is_efi_transfer: false,
         review_status: fold('review_status', upper),
         review_note: text(f.review_note),
         confidence: fold('confidence', (s) => s.toLowerCase()),
@@ -122,12 +147,18 @@ export function applySukunCashflow(sheets: StagedSheet[], rows: StagingRow[], pr
 
   const totals: Record<string, number> = {};
   for (const txn of txns.values()) {
+    if (txn.txn_type === 'INSENTIF' && [txn.description, ...txn.lines.map((l) => l.counterparty)].some((s) => s && EFI.test(s))) {
+      txn.is_efi_transfer = true;
+      txn.is_external_spend = false;
+    }
     if (totalsSeen.get(txn.txn_id)!.size > 1) {
       issues.push({ code: 'TOTAL_INCONSISTENT', rule: 'DQ-004', message: `${txn.txn_id}: nilai total berbeda antar baris.` });
     }
+    // SCRUM-53: a missing line amount is unknown, not 0; MISSING_AMOUNT already reports it.
+    const complete = txn.lines.every((l) => l.line_amount !== null);
     const sum = txn.lines.reduce((n, l) => n + (l.line_amount ?? 0), 0);
     // Half a rupiah covers spreadsheet rounding of qty × price.
-    if (txn.txn_total !== null && Math.abs(sum - txn.txn_total) > 0.5) {
+    if (complete && txn.txn_total !== null && Math.abs(sum - txn.txn_total) > 0.5) {
       issues.push({ code: 'LINES_NOT_TOTAL', rule: 'DQ-004', message: `${txn.txn_id}: jumlah baris ${rupiah(sum)} ≠ total ${rupiah(txn.txn_total)}.` });
     }
     // DQ-025: not eligible for KPIs until a reviewer confirms it.

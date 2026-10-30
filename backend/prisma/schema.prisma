@@ -23,15 +23,10 @@ datasource db {
 
 /// Authorization roles, enforced from users.role. Which permissions a role holds
 /// lives in role_permissions and is edited through the admin API.
-/// Daftar role mengikuti PRD Oktober 2026 §3.
+/// SCRUM-152: dua role. ADMIN (dulu PM MBG) dan DATA_ADMIN (Data Operasional).
 enum Role {
-  SUPER_ADMIN
-  MANAGEMENT
-  FINANCE
-  KEPALA_KITCHEN
+  ADMIN
   DATA_ADMIN
-  AHLI_GIZI
-  DATA_STEWARD
 }
 
 /// Status keaktifan akun maupun dapur - ERD memakai ENUM(active,inactive)
@@ -59,7 +54,6 @@ enum UploadStatus {
   PROCESSING
   NEEDS_REVIEW
   NEEDS_MAPPING_UPDATE
-  READY
   PUBLISHED
   FAILED
   /// Berkas diganti unggah ulang (SCRUM-124).
@@ -137,6 +131,50 @@ enum ReferenceEntryKind {
   KODE
 }
 
+/// SCRUM-51: CRITICAL menahan batch (tidak bisa ke READY/publish) sampai
+/// di-resolve; HIGH dan MEDIUM tampil untuk dicek.
+enum IssueSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+}
+
+/// SCRUM-51: apa yang dilakukan pipeline terhadap baris yang memicu rule.
+enum IssueAction {
+  REJECT
+  REVIEW
+  NORMALIZE
+  FLAG
+}
+
+enum IssueStatus {
+  OPEN
+  RESOLVED
+}
+
+/// SCRUM-59/107: sistem pemerintah tujuan laporan.
+enum GovernmentSystem {
+  SIPGN
+  POP
+  AKSIS
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+/// SCRUM-48: barang diterima → dibayar. UNKNOWN selama sumber tidak membawa
+/// waktunya (Input Maker tidak punya, OD-14); urutan terbalik = INVALID_SEQUENCE.
+enum PaymentSla {
+  SAME_DAY
+  D_PLUS_1
+  BREACH
+  INVALID_SEQUENCE
+  UNKNOWN
+}
+
 // ---------------------------------------------------------------------------
 // Identitas & audit
 // ---------------------------------------------------------------------------
@@ -178,6 +216,8 @@ model User {
   auditLogs        AuditLog[]
   galleryImages    GalleryImage[]
   uploadBatches    UploadBatch[]
+  resolvedIssues   ValidationIssue[]
+  submissionLogs   GovernmentSubmissionLog[]
   cmsAnnouncements CmsAnnouncement[]
   cmsDocuments     CmsDocument[]
 
@@ -334,6 +374,9 @@ model Kitchen {
   vendorPayments      VendorPaymentWorkflow[]
   menuRecipeLines     MenuRecipeLine[]
   purchaseOrderLines  PurchaseOrderLine[]
+  goodsReceiptLines   GoodsReceiptLine[]
+  financeBalances     FinanceBalance[]
+  beneficiaryCounts   BeneficiaryDailyCount[]
 
   @@index([status])
   @@map("kitchens")
@@ -491,6 +534,10 @@ model UploadBatch {
   validatedAt DateTime? @map("validated_at")
   publishedAt DateTime? @map("published_at")
 
+  /// SCRUM-96: batch PUBLISHED yang dikoreksi berkas ini. Batch lama baru jadi
+  /// SUPERSEDED saat koreksinya dipublish, jadi data lama tetap tampil sampai itu.
+  replacesBatchId String? @map("replaces_batch_id") @db.Uuid
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -501,6 +548,10 @@ model UploadBatch {
   vendorPayments      VendorPaymentWorkflow[]
   menuRecipeLines     MenuRecipeLine[]
   purchaseOrderLines  PurchaseOrderLine[]
+  goodsReceiptLines   GoodsReceiptLine[]
+  financeBalances     FinanceBalance[]
+  beneficiaryCounts   BeneficiaryDailyCount[]
+  validationIssues    ValidationIssue[]
 
   @@index([kitchenId, uploadDate])
   @@index([kitchenId, domain, uploadDate])
@@ -563,7 +614,10 @@ model FinanceTransaction {
   txnDate      DateTime? @map("txn_date") @db.Date
   txnType      String?   @map("txn_type")
   direction    String?
+  /// Label mentah sumber (SCRUM-42).
   category     String?
+  /// SCRUM-42: kategori Master Reference "Kategori pengeluaran"; NULL = tidak termapping (di-flag UNMAPPED_CATEGORY).
+  categoryNormalized String? @map("category_normalized")
   description  String?
   txnTotal     Decimal?  @map("txn_total") @db.Decimal(14, 2)
   reviewStatus String?   @map("review_status")
@@ -571,9 +625,21 @@ model FinanceTransaction {
   confidence   String?
 
   /// DQ PRD §7.4: petty cash dan transfer internal bukan pengeluaran eksternal
-  /// (Top 5 Supplier / Expense Mix hanya menjumlah yang true). TODO(B-DD): aturan
-  /// klasifikasi final; sementara arah KELUAR.
+  /// (Top 5 Supplier / Expense Mix hanya menjumlah yang true): arah KELUAR dan
+  /// bukan transfer internal.
   isExternalSpend Boolean @map("is_external_spend")
+
+  /// SCRUM-43: pindah dana antar rekening/kas dapur sendiri (Isi kas kecil,
+  /// transfer internal). Tidak pernah dihitung sebagai belanja.
+  isInternalTransfer Boolean @default(false) @map("is_internal_transfer")
+
+  /// SCRUM-66: transfer EFI (pembayaran insentif ke Yayasan Edufarmers). Bukan
+  /// belanja ke supplier; tampil di widget Transfer EFI, tidak di spend KPI.
+  isEfiTransfer Boolean @default(false) @map("is_efi_transfer")
+
+  /// SCRUM-78: batch published lain yang memuat kunci bisnis yang sama
+  /// (kitchen + txn_id + txn_date). NULL = baris yang berlaku. Baris lama tidak dihapus.
+  supersededByBatchId String? @map("superseded_by_batch_id") @db.Uuid
 
   lines FinanceTransactionLine[]
 
@@ -633,12 +699,19 @@ model RabDailyBudget {
   portionSegment String   @map("portion_segment")
   plannedCost    Decimal  @map("planned_cost") @db.Decimal(16, 2)
 
+  /// SCRUM-53: baris bahan tanpa Total Harga. Lebih dari 0 = planned_cost
+  /// hanya Σ yang terbaca; KPI menandainya tidak lengkap, bukan menganggap 0.
+  missingLineTotals Int @default(0) @map("missing_line_totals")
+
   /// Jumlah paket/porsi rencana hari itu (PRD §7.1 "package count"): terbesar
   /// dari "Kebutuhan Makanan Kemasan (pax)"; NULL bila tidak ada baris yang
   /// mengisinya. Bukan jumlah Penerima Manfaat: itu `beneficiaries` per baris.
   packageCount Decimal? @map("package_count") @db.Decimal(14, 2)
 
   ingredients RabIngredientBudget[]
+
+  /// SCRUM-78: kunci bisnis kitchen + tanggal + segmen.
+  supersededByBatchId String? @map("superseded_by_batch_id") @db.Uuid
 
   @@unique([uploadBatchId, budgetDate, portionSegment])
   @@index([sourceRecordId])
@@ -705,11 +778,17 @@ model VendorPaymentWorkflow {
   paymentInvoiceLink  String?   @map("payment_invoice_link")
 
   /// Rantai workflow. Semuanya NULL dari Input Maker (tidak ada buktinya di sumber).
+  /// SCRUM-48: receivedAt = barang diterima (Goods Receipt), awal hitungan SLA.
+  receivedAt       DateTime? @map("received_at")
   makerInputAt     DateTime? @map("maker_input_at")
   approvedAt       DateTime? @map("approved_at")
   paidAt           DateTime? @map("paid_at")
   paidAmount       Decimal?  @map("paid_amount") @db.Decimal(16, 2)
   paymentReference String?   @map("payment_reference")
+  slaStatus        PaymentSla @default(UNKNOWN) @map("sla_status")
+
+  /// SCRUM-78: kunci bisnis kitchen + payment_request_id.
+  supersededByBatchId String? @map("superseded_by_batch_id") @db.Uuid
 
   @@unique([uploadBatchId, paymentRequestId])
   @@index([kitchenId, requestDate])
@@ -761,10 +840,175 @@ model MenuRecipeLine {
   unitPrice        Decimal? @map("unit_price") @db.Decimal(14, 2)
   lineTotal        Decimal? @map("line_total") @db.Decimal(16, 2)
 
+  /// SCRUM-78: kunci bisnis kitchen + tanggal + segmen + menu + bahan (kunci dedup DQ-031).
+  supersededByBatchId String? @map("superseded_by_batch_id") @db.Uuid
+
   @@index([kitchenId, servingDate])
   @@index([uploadBatchId])
   @@index([sourceRecordId])
   @@map("menu_recipe_lines")
+}
+
+/// SCRUM-33/51/68: satu temuan rule DQ per baris sumber. Ditulis ulang tiap
+/// parse (satu transaksi dengan staging), jadi resolve hilang bila berkas
+/// di-parse ulang. Baris yang ditolak tetap tertelusur lewat source_record_id.
+model ValidationIssue {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+  kitchenId     BigInt      @map("kitchen_id")
+
+  /// Kode issue adapter (NO_TXN_ID, MISSING_AMOUNT, ...) dan rule DQ-xxx bila ada.
+  code           String
+  ruleId         String?       @map("rule_id")
+  severity       IssueSeverity
+  action         IssueAction
+  sourceRecordId String?       @map("source_record_id")
+  message        String
+
+  status       IssueStatus @default(OPEN)
+  note         String?
+  resolvedById BigInt?     @map("resolved_by")
+  resolvedBy   User?       @relation(fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?   @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([uploadBatchId, status, severity])
+  @@index([kitchenId, status, severity])
+  @@index([sourceRecordId])
+  @@map("validation_issues")
+}
+
+/// SCRUM-59/107: jejak pelaporan data ke SIPGN/POP/Aksis. Merujuk baris
+/// sumber lewat source_record_id dan tidak pernah dibaca KPI, jadi salinan yang
+/// dilaporkan tidak menjadi fakta kedua. Satu baris per (sistem, modul, record):
+/// kirim ulang memperbarui status, bukan menambah baris.
+model GovernmentSubmissionLog {
+  id BigInt @id @default(autoincrement())
+
+  kitchenId      BigInt           @map("kitchen_id")
+  system         GovernmentSystem
+  module         String
+  sourceRecordId String           @map("source_record_id")
+  status         SubmissionStatus
+  submittedAt    DateTime         @map("submitted_at")
+  externalRef    String?          @map("external_ref")
+  note           String?
+
+  recordedById BigInt?  @map("recorded_by")
+  recordedBy   User?    @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([system, module, sourceRecordId])
+  @@index([kitchenId, submittedAt])
+  @@index([sourceRecordId])
+  @@map("government_submission_logs")
+}
+
+/// SCRUM-50/72: penerima manfaat per dapur × tanggal × lokasi × segmen.
+/// Agregat saja: tidak ada kolom NIK/nama/telepon/alamat, jadi dashboard dan
+/// export tidak punya PII untuk dibocorkan. Belum ada writer (B-SRC-SKN).
+/// Rencana dan aktual terpisah; kosong = NULL, bukan 0.
+model BeneficiaryDailyCount {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  mappingProfileId String       @map("mapping_profile_id")
+  kitchenId        BigInt       @map("kitchen_id")
+  kitchen          Kitchen      @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  sourceRecordId   String       @map("source_record_id")
+  sourceSystem     SourceSystem @map("source_system")
+  sourceFileName   String       @map("source_file_name")
+  templateVersion  String?      @map("template_version")
+  loadedAt         DateTime     @map("loaded_at")
+
+  countDate    DateTime @map("count_date") @db.Date
+  /// Label titik salur (sekolah/posyandu), bukan data orang.
+  locationRef  String   @map("location_ref")
+  segment      String
+  plannedCount Int?     @map("planned_count")
+  actualCount  Int?     @map("actual_count")
+
+  /// SCRUM-78: kunci bisnis kitchen + tanggal + lokasi + segmen.
+  supersededByBatchId String? @map("superseded_by_batch_id") @db.Uuid
+
+  @@unique([uploadBatchId, countDate, locationRef, segment])
+  @@index([kitchenId, countDate])
+  @@map("beneficiary_daily_counts")
+}
+
+/// SCRUM-46 (opsional Phase 1): baris Goods Receipt. Belum ada writer: sumber
+/// GR Sukun belum tersedia (B-SRC-SKN). qty_match_status diturunkan adapter
+/// dari ordered vs received; flag manual sumber disimpan mentah, tidak otoritatif.
+model GoodsReceiptLine {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  mappingProfileId String       @map("mapping_profile_id")
+  kitchenId        BigInt       @map("kitchen_id")
+  kitchen          Kitchen      @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  sourceRecordId   String       @map("source_record_id")
+  sourceSystem     SourceSystem @map("source_system")
+  sourceFileName   String       @map("source_file_name")
+  templateVersion  String?      @map("template_version")
+  loadedAt         DateTime     @map("loaded_at")
+
+  receiptId     String    @map("receipt_id")
+  receiptLineId String    @map("receipt_line_id")
+  receivedAt    DateTime? @map("received_at")
+  poId          String?   @map("po_id")
+  poLineId      String?   @map("po_line_id")
+
+  itemName       String?  @map("item_name")
+  unit           String?
+  orderedQty     Decimal? @map("ordered_qty") @db.Decimal(14, 3)
+  receivedQty    Decimal? @map("received_qty") @db.Decimal(14, 3)
+  /// MATCH / SHORT / OVER; NULL bila salah satu qty kosong.
+  qtyMatchStatus String?  @map("qty_match_status")
+  sourceFlag     String?  @map("source_flag")
+
+  @@unique([uploadBatchId, receiptId, receiptLineId])
+  @@index([kitchenId, receivedAt])
+  @@index([sourceRecordId])
+  @@map("goods_receipt_lines")
+}
+
+/// SCRUM-49: saldo per dapur × tanggal × rekening. Belum ada writer: sumber
+/// saldo Sukun dan source-of-truth (OD-02) belum disetujui (B-SRC-SKN). KPI
+/// Saldo (SCRUM-65) tetap Draft sampai source dikonfigurasi.
+model FinanceBalance {
+  id BigInt @id @default(autoincrement())
+
+  uploadBatchId String      @map("upload_batch_id") @db.Uuid
+  uploadBatch   UploadBatch @relation(fields: [uploadBatchId], references: [publicId], onDelete: Cascade)
+
+  mappingProfileId String       @map("mapping_profile_id")
+  kitchenId        BigInt       @map("kitchen_id")
+  kitchen          Kitchen      @relation(fields: [kitchenId], references: [id], onDelete: Restrict)
+  sourceRecordId   String       @map("source_record_id")
+  sourceSystem     SourceSystem @map("source_system")
+  sourceFileName   String       @map("source_file_name")
+  templateVersion  String?      @map("template_version")
+  loadedAt         DateTime     @map("loaded_at")
+
+  balanceDate DateTime @map("balance_date") @db.Date
+  /// Label rekening (mis. "BRI Operasional"), bukan nomor rekening lengkap.
+  accountRef  String   @map("account_ref")
+  balance     Decimal? @db.Decimal(16, 2)
+
+  /// SCRUM-78: kunci bisnis kitchen + tanggal + rekening.
+  supersededByBatchId String? @map("superseded_by_batch_id") @db.Uuid
+
+  @@unique([uploadBatchId, balanceDate, accountRef])
+  @@index([kitchenId, balanceDate])
+  @@map("finance_balances")
 }
 
 /// SCRUM-29/45: baris List PO / Nota Pesanan. Belum ada writer: sumber PO Sukun

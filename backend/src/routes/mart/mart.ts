@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireRole } from '../../auth/guard.js';
+import { requirePermission, requireRole } from '../../auth/guard.js';
 import { validate } from '../../middleware/validate.js';
 import { wrap } from '../../lib/wrap.js';
 import { COST_ROLES } from '../../lib/visibility.js';
@@ -8,6 +8,7 @@ import {
   dailyKitchenQuery,
   dashboardQuery,
   menuCostQuery,
+  menuKpiQuery,
   menuNutritionQuery,
   summaryQuery,
 } from '../../schemas/mart.js';
@@ -19,6 +20,7 @@ import {
   listSummaries,
 } from '../../controllers/mart/mart.js';
 import { getDashboardSummary } from '../../controllers/mart/dashboard.js';
+import { getFinanceKpi, getMenuKpi } from '../../controllers/mart/kpi.js';
 
 /**
  * Pre-computed marts, all read-only. Each router is mounted separately in
@@ -49,3 +51,9 @@ summaryRouter.get('/', validate({ query: summaryQuery }), wrap(listSummaries()))
 
 export const dashboardRouter = Router();
 dashboardRouter.get('/summary', validate({ query: dashboardQuery }), wrap(getDashboardSummary()));
+
+// SCRUM-62..76, 97..116: KPIs read published canonical data only. Money is cost-cleared as a whole.
+export const kpiRouter = Router();
+kpiRouter.use(requirePermission('dashboard:view'));
+kpiRouter.get('/finance', requireRole(...COST_ROLES), validate({ query: dashboardQuery }), wrap(getFinanceKpi()));
+kpiRouter.get('/menu', validate({ query: menuKpiQuery }), wrap(getMenuKpi()));

@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 /**
  * SCRUM-20/123: seeds the Kamus Data / Aturan Cek Data / Daftar Kode tabs on
  * Data Reference so they read the same the first time an environment comes
- * up as they did as static frontend text — PM MBG edits them from there on
+ * up as they did as static frontend text — Admin edits them from there on
  * through PATCH /api/reference-entries/:id (reference:edit).
  */
 

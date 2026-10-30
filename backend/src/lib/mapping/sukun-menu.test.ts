@@ -16,7 +16,7 @@ describe('MAP-SKN-MENU-001 → menu_recipe_line (SCRUM-31/73)', () => {
     const { mapping } = await staged(fixture('sukun-menu.csv'), 'MENU');
     assert.ok(mapping);
     assert.equal(mapping.records, 21, '22 rows, one Coleslaw/Kubis duplicate');
-    assert.deepEqual(mapping.issueCounts, { MISSING_VALUE: 1, DAY_MISMATCH: 1, DUPLICATE_LINE: 1 });
+    assert.deepEqual(mapping.issueCounts, { MISSING_VALUE: 1, DAY_MISMATCH: 1, DUPLICATE_LINE: 1, URT_LOOKS_LIKE_DATE: 1 });
     assert.equal(mapping.totals.line_total, 15617007);
   });
 

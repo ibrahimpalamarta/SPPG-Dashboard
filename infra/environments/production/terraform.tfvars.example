@@ -5,4 +5,4 @@
 # Autentikasi sekarang internal (backend/docs/AUTH.md): tidak ada variabel wajib
 # lagi. Opsional:
 # frontend_api_base_url = "https://dashboard.example.go.id"  # wajib bila ACM terpasang
-# mfa_required_roles    = "SUPER_ADMIN"
+# mfa_required_roles    = "ADMIN"

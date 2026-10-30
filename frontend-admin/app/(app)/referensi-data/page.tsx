@@ -195,7 +195,7 @@ async function Kode({ canEdit }: { canEdit: boolean }) {
 
 export default async function Page({ searchParams }: PageProps<"/referensi-data">) {
   const me = await requirePage("/referensi-data");
-  // SCRUM-123: everyone may read Data Reference; only PM MBG (reference:edit) changes it.
+  // SCRUM-123: everyone may read Data Reference; only Admin (reference:edit) changes it.
   const canEdit = me.permissions.includes("reference:edit");
   const { tab: rawTab, q: rawQ } = await searchParams;
   const tab: TabId = TABS.find((t) => t.id === rawTab)?.id ?? "kamus";

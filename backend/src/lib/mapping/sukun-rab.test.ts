@@ -48,6 +48,8 @@ describe('MAP-SKN-RAB-001 → rab_daily_budget + rab_ingredient_budget (SCRUM-44
       ]),
     );
     assert.equal((out.records as RabDailyBudget[])[0]!.planned_cost, 210000);
+    // SCRUM-53: the gap is counted, so a KPI can tell 'incomplete' from 'cheap'.
+    assert.equal((out.records as RabDailyBudget[])[0]!.missing_line_totals, 1);
     assert.ok(out.issues.some((i) => i.code === 'NO_LINE_TOTAL' && i.rule === 'DQ-019'));
   });
 });

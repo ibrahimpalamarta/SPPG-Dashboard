@@ -9,7 +9,7 @@
  * the safer route for a first production account: no password ever passes
  * through a shell history or a CI log.
  *
- * Re-running on an existing account promotes it to SUPER_ADMIN, re-enables it,
+ * Re-running on an existing account promotes it to ADMIN, re-enables it,
  * and — only if you passed a password — resets the password and ends its
  * sessions. It never touches the MFA settings.
  *
@@ -44,8 +44,8 @@ async function main(): Promise<void> {
 
   const user = await prisma.user.upsert({
     where: { email: cfg.SEED_SUPERADMIN_EMAIL },
-    create: { email: cfg.SEED_SUPERADMIN_EMAIL, fullName: 'Super Admin', role: 'SUPER_ADMIN', passwordHash },
-    update: { role: 'SUPER_ADMIN', status: 'ACTIVE', failedLoginCount: 0, lockedUntil: null, ...(passwordHash && { passwordHash }) },
+    create: { email: cfg.SEED_SUPERADMIN_EMAIL, fullName: 'Super Admin', role: 'ADMIN', passwordHash },
+    update: { role: 'ADMIN', status: 'ACTIVE', failedLoginCount: 0, lockedUntil: null, ...(passwordHash && { passwordHash }) },
   });
   if (existing && passwordHash) await revokeUserSessions(user.id, prisma);
 

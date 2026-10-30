@@ -16,7 +16,7 @@ export default async function Page() {
       </div>
       {me.kitchens.length === 0 ? (
         <EmptyState title="Belum ada dapur">
-          <p>Akun Anda belum ditautkan ke dapur mana pun. Hubungi Project Manager MBG.</p>
+          <p>Akun Anda belum ditautkan ke dapur mana pun. Hubungi Admin.</p>
         </EmptyState>
       ) : (
         <UploadForm kitchens={me.kitchens} kitchenId={me.kitchens[0]?.id} />

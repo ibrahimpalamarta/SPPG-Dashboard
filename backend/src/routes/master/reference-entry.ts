@@ -10,7 +10,7 @@ export const referenceEntryRouter = Router();
 
 referenceEntryRouter.get('/', validate({ query: referenceEntryListQuery }), wrap(listReferenceEntries()));
 
-// SCRUM-20/123: Data Reference is read-only for Data Operasional; only PM MBG
+// SCRUM-20/123: Data Reference is read-only for Data Operasional; only Admin
 // (reference:edit) changes it.
 referenceEntryRouter.patch(
   '/:id',

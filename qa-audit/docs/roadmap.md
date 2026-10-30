@@ -27,3 +27,12 @@
 | Run | Tanggal | Durasi | Catatan |
 |---|---|---|---|
 | – | – | – | diisi setelah PR pertama |
+
+## Temuan dari E2E review-publish (aplikasi, jangan diubah dari qa-audit)
+| Id | Temuan | Pemilik |
+|---|---|---|
+| O-12 | Baris `PENGGAJIAN` (mis. "No Rekening Relawan", Rp26,8 jt) masuk Top 5 Supplier dan Komposisi Pengeluaran di Finance dan Overview. Dokumen pengujian D: gaji/petty cash/transfer internal bukan belanja supplier (AC-DASH-02). Test `fixme` di `review-publish.spec.ts` menunggu keputusan atau perbaikan. | backend + product |
+| O-13 | Tab Riwayat tidak punya label untuk `upload_batch.submitted`, `.returned`, `.published` (tampil string mentah). | frontend |
+| O-14 | UI Unggah hanya mengirim `replaces` saat mengulang batch NEEDS_MAPPING_UPDATE, jadi koreksi batch Published (SCRUM-96) tidak bisa dipicu dari UI. Test menyisipkan field itu ke form. | frontend |
+| O-15 | Detail batch berstatus Diganti tidak menampilkan "Dikoreksi oleh batch …" (hanya ada di `errorSummary`). | frontend |
+| O-16 | Log pengajuan pemerintah (SCRUM-59/107) belum punya UI; hanya API, token sesi di sisi server, jadi belum ada E2E. | frontend (T26) |

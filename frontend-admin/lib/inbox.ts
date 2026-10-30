@@ -20,7 +20,6 @@ export type InboxInvite = {
 };
 
 export type Inbox = {
-  reviewTasks: InboxBatch[];
   quarantinedFiles: InboxBatch[];
   expiredInvites: InboxInvite[];
 };

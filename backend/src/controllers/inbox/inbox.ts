@@ -7,11 +7,10 @@ import { memberStatus } from '../admin/user.js';
 const withKitchen = { kitchen: { select: { id: true, code: true, name: true } } } as const;
 
 /**
- * PRD §Inbox & Anggota: "Inbox: tugas review dan undangan kedaluwarsa (PM
- * MBG), tindak lanjut catatan/issue (Data Operasional)." No new workflow —
- * this only surfaces upload_batch/user rows that already exist (SCRUM-21,
- * SCRUM-117, SCRUM-139, FR-MEM-07), narrowed to whichever of the three the
- * caller's permissions and kitchen scope allow.
+ * Inbox: expired invitations (Admin), files to fix (Data Operasional). No new
+ * workflow — this only surfaces upload_batch/user rows that already exist
+ * (SCRUM-21, SCRUM-139, FR-MEM-07), narrowed to what the caller's permissions
+ * and kitchen scope allow. SCRUM-148: there are no review tasks any more.
  */
 export const getInbox = (db: Db = prisma): RequestHandler => async (req, res) => {
   const user = req.user!;
@@ -19,18 +18,12 @@ export const getInbox = (db: Db = prisma): RequestHandler => async (req, res) =>
   const scope = kitchenScope(user);
   if (!scope.ok) return; // kitchenScope(user) with no `requested` id is always ok
 
-  const [reviewTasks, quarantinedFiles, expiredInvites] = await Promise.all([
-    perms.includes('batch:review')
-      ? db.uploadBatch.findMany({
-          where: { status: 'NEEDS_REVIEW', ...kitchenWhere(scope) },
-          select: { id: true, publicId: true, domain: true, fileName: true, uploadDate: true, ...withKitchen },
-          orderBy: { uploadDate: 'asc' },
-        })
-      : [],
+  const [quarantinedFiles, expiredInvites] = await Promise.all([
+    // Files to fix: unrecognised layouts.
     perms.includes('upload:create')
       ? db.uploadBatch.findMany({
           where: { status: 'NEEDS_MAPPING_UPDATE', ...kitchenWhere(scope) },
-          select: { id: true, publicId: true, domain: true, fileName: true, uploadDate: true, errorSummary: true, notes: true, ...withKitchen },
+          select: { id: true, publicId: true, domain: true, fileName: true, uploadDate: true, status: true, errorSummary: true, notes: true, ...withKitchen },
           orderBy: { uploadDate: 'asc' },
         })
       : [],
@@ -50,7 +43,6 @@ export const getInbox = (db: Db = prisma): RequestHandler => async (req, res) =>
 
   const now = new Date();
   sendJson(res, {
-    reviewTasks,
     quarantinedFiles,
     expiredInvites: expiredInvites
       .filter((u) => memberStatus({ status: 'ACTIVE', hasPassword: false }, u.passwordResetTokens[0]?.expiresAt, now) === 'EXPIRED')

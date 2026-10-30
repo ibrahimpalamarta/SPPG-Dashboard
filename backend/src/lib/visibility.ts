@@ -7,17 +7,8 @@ import type { Role } from '../auth/roles.js';
  * The database half is the two public views (see the reshape migration). This
  * module guards the authenticated routes, which read the base tables directly.
  *
- * Ahli Gizi supports menu mapping, not finance (price basis of Harga Bahan is
- * still open, PRD OD-05), so it gets no cost access.
  */
-export const COST_ROLES: readonly Role[] = [
-  'SUPER_ADMIN',
-  'MANAGEMENT',
-  'FINANCE',
-  'KEPALA_KITCHEN',
-  'DATA_ADMIN',
-  'DATA_STEWARD',
-];
+export const COST_ROLES: readonly Role[] = ['ADMIN', 'DATA_ADMIN'];
 
 export function canSeeCost(role: Role): boolean {
   return COST_ROLES.includes(role);

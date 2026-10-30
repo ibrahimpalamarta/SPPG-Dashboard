@@ -1,4 +1,4 @@
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { BatchList } from "@/components/mapping/batch-list";
@@ -6,6 +6,7 @@ import { ColumnTable } from "@/components/mapping/column-table";
 import { FindingsPanel } from "@/components/mapping/findings-panel";
 import { HistoryList, type HistoryEntry } from "@/components/mapping/history-list";
 import { RecordsTable, type Txn } from "@/components/mapping/records-table";
+import { ReviewActions } from "@/components/mapping/review-actions";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { apiGet } from "@/lib/api";
@@ -34,7 +35,7 @@ export default async function Page({
   }
 
   if (!params.batch) {
-    return <BatchList page={Number(params.listPage) || 1} canDelete={me.permissions.includes("batch:review")} />;
+    return <BatchList page={Number(params.listPage) || 1} canDelete={me.permissions.includes("batch:publish")} />;
   }
 
   const recordsPage = Number(params.recordsPage) || 1;
@@ -78,17 +79,17 @@ export default async function Page({
             </span>
             <StatusBadge status={batch.status} errorCode={batch.errorCode} />
           </div>
-          <button
-            disabled={batch.status !== "READY"}
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-          >
-            <Send className="size-4" aria-hidden="true" />
-            Kirim ke PM
-          </button>
+          <ReviewActions
+            batchId={batch.id}
+            status={batch.status}
+            canPublish={me.permissions.includes("batch:publish")}
+          />
         </div>
         <FindingsPanel
           key={batch.publicId}
           findings={findings}
+          batchId={batch.publicId}
+          canResolve={batch.status === "NEEDS_REVIEW" && me.permissions.includes("upload:create")}
           panels={{
             [tabs[1]]: <ColumnTable result={detail.mappingResult} />,
             [tabs[3]]: (

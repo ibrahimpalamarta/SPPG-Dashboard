@@ -46,6 +46,20 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 
 **D-14 · 2026-10-23 · Registry parser = map statis.** `registerParser()` dari SCRUM-24 diganti objek `parsers` di `pipeline.ts`: lebih sedikit kode, tanpa efek samping saat import, dan tidak ada siklus import.
 
+**D-16 · 2026-10-30 · Tahap 3–7 hanya Sukun, tabel baru dimigrasi di branch.** Atas keputusan user: tiket non-Sukun (SCRUM-32/56/57/58) tetap To Do. Tabel [USULAN] Tahap 3–7 langsung dimigrasi di branch bertumpuk `feature/tahap3-…` → `tahap4-…` → `tahap5-…` → `tahap6-…` → `tahap7-…`, dengan `SCRUM-xx-schema.md` di folder tiket; review PR = persetujuan skema. Tiket yang sumbernya belum ada (B-SRC-SKN) tetap dibangun tabel/query/widget-nya tanpa mapping karangan.
+
+**D-17 · 2026-10-30 · ASUMSI izin alur review (SCRUM-51/117/95).** Tandai temuan sudah dicek dan Kirim ke PM = `upload:create` (pembuat data, Data Operasional). Kembalikan dan Publish = `batch:publish` (PM MBG, Data Steward). Pengunggah tidak boleh mem-publish batch miliknya sendiri, meskipun memegang keduanya (Data Steward). Catat pelaporan ke pemerintah = `batch:publish`. Tidak ada status enum baru: READY = "Menunggu Review PM", NEEDS_REVIEW + `errorCode RETURNED` = "Dikembalikan".
+
+**D-18 · 2026-10-30 · Kunci bisnis publish (SCRUM-78).** Finance: kitchen + `txn_id` + `txn_date` (Sukun memberi nomor `TXN-B0001` lagi tiap periode). RAB: kitchen + tanggal + segmen. Menu: kitchen + tanggal + segmen + menu + bahan. Payment: kitchen + `payment_request_id`. Baris lama ditandai `superseded_by_batch_id`, tidak dihapus. Koreksi yang mengubah tanggal memakai `replaces`, yang menutup seluruh batch lama saat koreksi dipublish.
+
+**D-19 · 2026-10-30 · Eligibility KPI (SCRUM-54).** `ELIGIBLE_REVIEW_STATUSES = ['TERKONFIRMASI']` di `backend/src/lib/publish.ts`: konstanta kode, berubah lewat deploy. KPI hanya membaca batch PUBLISHED, baris yang tidak superseded, dan (untuk finance) review status eligible.
+
+**D-20 · 2026-10-30 · ASUMSI definisi Transfer EFI (SCRUM-66).** Transaksi bertipe INSENTIF yang uraian atau penerimanya cocok `edufarmers|insentif yayasan` (mengikuti mockup: "Pembayaran Insentif Yayasan … · Yayasan Edufarmers"). Ditandai `is_efi_transfer` dan dikeluarkan dari spend; label "Belum resmi" tidak ditampilkan (deskripsi Jira SCRUM-102). Arti "transfer EFI" perlu dikonfirmasi Finance.
+
+**D-21 · 2026-10-30 · ASUMSI Top 5 Menu (SCRUM-74, OD-13).** Window = 14 hari tanggal layanan, berakhir di `dateTo` atau tanggal published terakhir. Dasar ranking = jumlah hari layanan berbeda (`basis: serving_days` di response). Dikecualikan: menu bertipe Makanan Pokok/Bumbu/Garnish dan nama yang diawali "Nasi" atau memuat "bumbu"/"garnish". Daerah = `kitchens.city_regency`.
+
+**D-22 · 2026-10-30 · KPI dua endpoint gabungan.** `GET /api/kpi/finance` (khusus COST_ROLES) dan `GET /api/kpi/menu`, mengikuti preseden `dashboard/summary` (satu request per halaman). Porsi/penerima manfaat hanya keluar untuk role biaya (SCRUM-13). Planned Cost/Portion di balik env `KPI_PLANNED_COST=true`, default mati selama B-PLAN terbuka.
+
 ## Konflik dokumen
 
 **K-01 · OD-01 Lawang (B-LWG).** PRD §0/§14: Lawang = "Phase 1 comparison", masuk setelah alur Sukun stabil. BRD §1 "Kitchen mana yang didahulukan": Lawang = "Phase 2 – rollout", didahulukan dari DNM/PCK. **Dipakai PRD**, sebagai nilai config `rollout_status`, bukan hardcode.
@@ -57,3 +71,5 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 **K-04 · Sampel vs tiket.** SCRUM-118 menyebut Input Maker **Sukun**. Di Drive ada `Input Maker .xlsx` (milik sppgkebonsarisukun, berarti Sukun) dan `Input Maker – SPPG Simalungun`. Sesi 22 Okt hanya menemukan yang SML. Dipakai yang Sukun untuk SCRUM-118.
 
 **K-05 · Layout Cashflow beda per dapur.** Sukun: 3 sheet ternormalisasi (`Transaksi_Kas` + `Rincian_Belanja` + `Insentif_Penggajian`). Donomulyo: 1 sheet "Transaksi Kas" yang menggabungkan header dan item (`id, txn_id, …, jumlah_baris, total, …`). Parser staging menerima keduanya; pembedaan layout menjadi tugas profil mapping (SCRUM-26/39), bukan parser.
+
+**K-06 · Siapa yang mem-publish (SCRUM-95 vs SCRUM-117).** Deskripsi Jira SCRUM-95: "Publish oleh Data Operasional (otomatis saat lolos cek, Pakai Usulan & Publish, atau Setujui & Publish) tanpa review Admin". SCRUM-117 dan TASKLIST T23.4: status "Menunggu Review PM" & "Dikembalikan", publish "hanya PM MBG, setelah review". Implementasi mengikuti SCRUM-117/TASKLIST (D-17). Bila SCRUM-95 yang berlaku, cukup ubah izin route `POST /upload-batches/:id/publish` dan alur tombol; logika publish/supersede tetap. **Perlu keputusan Product/PM MBG.**

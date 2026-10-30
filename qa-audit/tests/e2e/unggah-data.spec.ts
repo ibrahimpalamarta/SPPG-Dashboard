@@ -4,12 +4,14 @@ import { shot } from './evidence.js';
 import { storageState } from './roles.js';
 
 test.describe('Unggah Data', () => {
-  test.use({ storageState: storageState('data-steward') });
+  test.use({ storageState: storageState('data-operasional-skn') });
 
   test('[SCRUM-5][SCRUM-22] form unggah: pilih kitchen, jenis data, periode @smoke', async ({ page }) => {
     await page.goto('unggah-data');
     await expect(page.getByRole('heading', { name: 'Unggah Data' })).toBeVisible();
-    await expect(page.getByText('1. Pilih kitchen')).toBeVisible();
+    // SCRUM-144: Data Operasional is tied to one dapur, so the dapur is shown, not picked.
+    await expect(page.getByText(/^Dapur: SKN/)).toBeVisible();
+    await expect(page.getByRole('combobox')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Cashflow/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Input Maker/ })).toBeVisible();
     await expect(page.getByLabel(/Periode/)).toBeVisible();
@@ -42,7 +44,7 @@ test.describe('Unggah Data', () => {
 // Uploads need the S3 stub of the QA environment (scripts/env.ts). One test at a
 // time: every upload lands in the same database and the history is read back.
 test.describe.serial('Unggah Data: unggah file', () => {
-  test.use({ storageState: storageState('data-steward') });
+  test.use({ storageState: storageState('data-operasional-skn') });
 
   const fixtures = '../backend/src/lib/ingest/fixtures/';
   const cashflow = readFileSync(`${fixtures}sukun-cashflow.csv`);
@@ -53,7 +55,6 @@ test.describe.serial('Unggah Data: unggah file', () => {
   // Steps up to the chosen file, so tests can capture each step of the flow.
   async function pick(page: Page, domain: RegExp | null, name: string, buffer: Buffer, ticket?: string, formShot = false) {
     await page.goto('unggah-data');
-    await page.getByRole('combobox').selectOption(await page.getByRole('option', { name: /SKN/ }).getAttribute('value') ?? '');
     if (domain) await page.getByRole('button', { name: domain }).click();
     if (ticket && formShot) await shot(page, ticket, 1, 'pilih-kitchen-dan-jenis-data');
     await page.getByRole('button', { name: 'Lanjut pilih file' }).click();

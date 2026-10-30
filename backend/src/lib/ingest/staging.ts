@@ -54,6 +54,8 @@ export type ParseContext = {
   sourceFileName: string;
   fileHash: string;
   loadedAt: Date;
+  /** SCRUM-42: Master Reference "Kategori pengeluaran". Absent (dry run, tests) = categories are not normalised. */
+  expenseCategories?: string[];
 };
 
 /** Turns the raw sheets into staged rows for one domain. */

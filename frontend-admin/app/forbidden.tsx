@@ -7,7 +7,7 @@ export default function Forbidden() {
   return (
     <main className="flex min-h-screen items-center bg-[#f7f8fa] p-4">
       <EmptyState title="Akses ditolak">
-        <p>Anda tidak memiliki akses ke halaman ini. Hubungi Project Manager MBG bila Anda memerlukan akses.</p>
+        <p>Anda tidak memiliki akses ke halaman ini. Hubungi Admin bila Anda memerlukan akses.</p>
         <p className="flex justify-center gap-4">
           <Link href="/" className="font-medium text-emerald-700 hover:underline">
             Kembali ke dashboard

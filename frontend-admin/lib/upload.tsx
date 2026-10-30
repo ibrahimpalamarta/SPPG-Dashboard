@@ -14,7 +14,6 @@ export const STATUS = {
   PROCESSING: { label: "Processing", tone: "bg-slate-100 text-slate-700" },
   NEEDS_REVIEW: { label: "Needs Review", tone: "bg-amber-100 text-amber-800" },
   NEEDS_MAPPING_UPDATE: { label: "Needs Mapping Update", tone: "bg-amber-100 text-amber-800" },
-  READY: { label: "Ready", tone: "bg-emerald-100 text-emerald-800" },
   PUBLISHED: { label: "Published", tone: "bg-emerald-700 text-white" },
   FAILED: { label: "Failed", tone: "bg-red-100 text-red-800" },
   SUPERSEDED: { label: "Diganti", tone: "bg-slate-100 text-slate-700" },

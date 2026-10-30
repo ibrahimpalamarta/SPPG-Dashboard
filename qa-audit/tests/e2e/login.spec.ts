@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const accounts = JSON.parse(readFileSync('.auth/accounts.json', 'utf8')) as Record<string, { email: string; password: string }>;
 
 test('[SCRUM-20] login: email dan kata sandi langsung, peran dari akun @smoke', async ({ page }) => {
-  const account = accounts['data-steward']!;
+  const account = accounts['data-operasional-skn']!;
   await page.goto('login');
   await expect(page.getByRole('group', { name: 'Pilih peran' })).toHaveCount(0);
   await page.getByLabel('Email').fill(account.email);

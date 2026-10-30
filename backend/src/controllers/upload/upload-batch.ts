@@ -85,7 +85,13 @@ export const getUploadBatch = (db: Db = prisma): RequestHandler => async (req, r
     sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
-  sendJson(res, row);
+  // Validasi Data shows, per issue code, whether it is still open and why it was closed.
+  const issueStatus = await db.validationIssue.groupBy({
+    by: ['code', 'status', 'note'],
+    where: { uploadBatchId: row.publicId },
+    _count: { _all: true },
+  });
+  sendJson(res, { ...row, issueStatus: issueStatus.map(({ code, status, note, _count }) => ({ code, status, note, count: _count._all })) });
 };
 
 /** The batch in the caller's dapur, or null once a 404/403 has been sent. */
@@ -194,6 +200,13 @@ const PREVIEW_ROWS = 50;
 export const uploadKey = (publicId: string, fileName = ''): string =>
   `upload-batches/${publicId}${isCsv(fileName) ? '.csv' : '.xlsx'}`;
 
+/** SCRUM-42: Data Reference › Daftar Kode › "Kategori pengeluaran", as the PM last edited it. */
+async function expenseCategories(db: Db): Promise<string[]> {
+  const row = await db.referenceEntry.findFirst({ where: { kind: 'KODE', fields: { path: ['daftar'], equals: 'Kategori pengeluaran' } } });
+  const pilihan = (row?.fields as { pilihan?: unknown } | undefined)?.pilihan;
+  return Array.isArray(pilihan) ? pilihan.filter((p): p is string => typeof p === 'string') : [];
+}
+
 /** PRD §9 copy for a file no mapping profile recognises, plus what is missing (SCRUM-94). */
 const notRecognised = (diff: ColumnDiff[]) => {
   const missing = [...new Set(diff.flatMap((d) => d.missing))];
@@ -214,7 +227,7 @@ const notRecognised = (diff: ColumnDiff[]) => {
  *     staged rows left behind
  *   - a parsed file is NEEDS_REVIEW when a mapping profile recognises it
  *     (SCRUM-39), else NEEDS_MAPPING_UPDATE with the column diff — never
- *     READY, so nothing publishes without a reviewer
+ *     PUBLISHED, so Data Operasional always presses Setujui & Publish
  *   - `replaces` closes the quarantined batch it re-uploads: FAILED +
  *     REPLACED ("Diganti", SCRUM-124) once the new file has parsed
  *   - a storage failure marks the batch FAILED instead of leaving it PROCESSING
@@ -306,6 +319,8 @@ export const createUploadBatch =
         fileHash,
         fileSize: size,
         notes: body.notes ?? null,
+        // SCRUM-96: a correction of published data replaces it only once it is published itself.
+        replacesBatchId: replaced?.status === UploadStatus.PUBLISHED ? replaced.publicId : null,
       },
     });
     const done = { ...event, batch_id: batch.publicId };
@@ -345,7 +360,11 @@ export const createUploadBatch =
       }
 
       // Turen has no code yet (B-TUREN); its numeric id is just as stable.
-      const parsed = await parseToStaging(buffer, context(batch.publicId, kitchen.code ?? String(kitchen.id)), staging);
+      const parsed = await parseToStaging(
+        buffer,
+        { ...context(batch.publicId, kitchen.code ?? String(kitchen.id)), expenseCategories: await expenseCategories(db) },
+        staging,
+      );
       if (!parsed.ok) {
         return finish({ storageKey, status: UploadStatus.FAILED, errorCode: parsed.errorCode, errorSummary: parsed.errorSummary });
       }
@@ -400,8 +419,9 @@ export const createUploadBatch =
         metadata: { mappingProfileId: row.mappingProfileId, templateVersion: row.templateVersion },
       });
     }
-    // A re-upload that did not even parse leaves the old batch where it was.
-    if (replaced && row.status !== UploadStatus.FAILED) {
+    // A re-upload that did not even parse leaves the old batch where it was;
+    // a published one stays live until its correction is published (SCRUM-96).
+    if (replaced && replaced.status !== UploadStatus.PUBLISHED && row.status !== UploadStatus.FAILED) {
       await db.uploadBatch.update({
         where: { id: replaced.id },
         data: { status: UploadStatus.SUPERSEDED, errorCode: 'REPLACED', errorSummary: `Diganti oleh batch ${row.publicId}.` },

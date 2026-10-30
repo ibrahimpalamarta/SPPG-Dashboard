@@ -29,10 +29,15 @@ export const ERRORS = {
     status: 409,
     body: { error: 'invalid_transition', message: 'Status batch tidak bisa diubah ke status tersebut.' },
   },
-  // SCRUM-121: member administration.
-  LAST_SUPER_ADMIN: {
+  // SCRUM-51: quarantine. `details.openCritical` says how many are left.
+  BATCH_BLOCKED: {
     status: 409,
-    body: { error: 'last_super_admin', message: 'Project Manager MBG terakhir tidak bisa dinonaktifkan atau diturunkan perannya.' },
+    body: { error: 'batch_blocked', message: 'Masih ada temuan "Wajib diperbaiki" yang belum ditandai sudah dicek.' },
+  },
+  // SCRUM-121: member administration.
+  LAST_ADMIN: {
+    status: 409,
+    body: { error: 'last_admin', message: 'Admin terakhir tidak bisa dinonaktifkan atau diturunkan perannya.' },
   },
   NOT_AN_INVITATION: {
     status: 409,

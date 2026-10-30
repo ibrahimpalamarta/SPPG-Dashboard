@@ -86,9 +86,9 @@ dihapus (link ikut hilang), email bisa diundang ulang. Halaman `/admin/aktivasi/
 /api/auth/invitations/:token` (email, nama, role; link terpakai/kedaluwarsa/
 dibatalkan → `400 invalid_reset_token`), lalu `POST /api/auth/reset-password`;
 untuk password pertama endpoint itu menjawab seperti login (`{status:"ok",
-token}`) sehingga anggota langsung masuk ke Overview. PM MBG (SUPER_ADMIN
-berpassword) aktif terakhir tidak bisa dinonaktifkan/diturunkan
-(`409 last_super_admin`).
+token}`) sehingga anggota langsung masuk ke Overview. Admin
+berpassword aktif terakhir tidak bisa dinonaktifkan/diturunkan
+(`409 last_admin`).
 
 **Ganti password** — `POST /api/auth/password` (butuh password lama; sesi lain
 dicabut).
@@ -98,31 +98,30 @@ dicabut).
 `POST /api/auth/mfa/disable {password, code}`. Secret TOTP disimpan terenkripsi
 AES-256-GCM dengan `MFA_ENCRYPTION_KEY`. `MFA_REQUIRED_ROLES` memaksa MFA per
 role: sesi mereka hanya membuka rute MFA/logout/`/api/me` sampai terdaftar
-(`403 mfa_enrollment_required` selainnya). Super Admin bisa mereset MFA user yang
+(`403 mfa_enrollment_required` selainnya). Admin bisa mereset MFA user yang
 kehilangan perangkat (`POST /api/admin/users/:id/mfa-reset`).
 
 ## Role & permission
 
-Role (enum `Role`, mengikuti PRD Oktober 2026 §3): `SUPER_ADMIN` (Admin Sistem /
-PM MBG), `MANAGEMENT`, `FINANCE`, `DATA_STEWARD` (lintas dapur),
-`KEPALA_KITCHEN`, `DATA_ADMIN` (PIC/Data Admin Kitchen), `AHLI_GIZI` (discope per
-dapur lewat `user_kitchen_scopes`; tanpa scope = tidak melihat dapur mana pun).
+Role (enum `Role`, SCRUM-152): `ADMIN` (dulu PM MBG, semua dapur) dan `DATA_ADMIN`
+(Data Operasional, terikat satu dapur lewat `user_kitchen_scopes`; tanpa scope =
+tidak melihat dapur mana pun).
 
 Permission (`PERMISSIONS` di `src/auth/roles.ts`):
-`upload:create`, `upload:view`, `batch:review`, `batch:publish`, `mapping:view`,
+`upload:create`, `upload:view`, `batch:publish`, `mapping:view`,
 `mapping:propose`, `reference:view`, `reference:edit`, `dashboard:view`,
 `users:read`, `users:manage`, `settings:manage`, `audit:read`.
 
 Peta role → permission ada di tabel `role_permissions` dan diubah lewat
 `PUT /api/admin/roles/:role/permissions` (UI: **Peran & Izin**), **tanpa
 deploy**. Aturan:
-- `SUPER_ADMIN` selalu memegang semua permission kecuali `upload:create` dan `mapping:propose` (four-eyes: PM hanya mereview) dan tidak disimpan di tabel —
+- `ADMIN` selalu memegang semua permission kecuali `upload:create`, `mapping:propose`, dan `batch:publish` (Admin tidak mengunggah atau mem-publish; Data Operasional yang melakukannya) dan tidak disimpan di tabel —
   tidak bisa dicabut, jadi tidak ada skenario lockout.
 - Role baru/akun baru **tidak** otomatis mendapat hak admin. `users:*`,
-  `settings:manage`, `audit:read` awalnya hanya dimiliki `SUPER_ADMIN`.
-- **Anti-eskalasi.** Non-Super Admin dengan `users:manage` hanya bisa
+  `settings:manage`, `audit:read` awalnya hanya dimiliki `ADMIN`.
+- **Anti-eskalasi.** Non-Admin dengan `users:manage` hanya bisa
   membuat/mengubah/mereset akun ber-role yang permission-nya *seluruhnya* ia
-  miliki sendiri, tidak pernah menyentuh `SUPER_ADMIN`. Dengan `settings:manage`
+  miliki sendiri, tidak pernah menyentuh `ADMIN`. Dengan `settings:manage`
   ia hanya bisa memberi permission yang ia miliki dan tidak boleh mengedit role-nya
   sendiri. Tidak ada yang bisa mengubah role/status dirinya sendiri.
 - Perubahan role atau penonaktifan **langsung mencabut semua sesi** akun itu.
@@ -170,7 +169,7 @@ Jangan pernah mengandalkan menu/tombol frontend sebagai satu-satunya pembatas.
 | Variabel | Keterangan |
 |---|---|
 | `MFA_ENCRYPTION_KEY` | **Secret, wajib.** `openssl rand -base64 32`. Mengubahnya mendaftar-ulang semua autentikator. Di ECS: Secrets Manager (dibuat Terraform) |
-| `MFA_REQUIRED_ROLES` | Mis. `SUPER_ADMIN`. Kosong = MFA opsional |
+| `MFA_REQUIRED_ROLES` | Mis. `ADMIN`. Kosong = MFA opsional |
 | `SESSION_IDLE_MINUTES`, `SESSION_ABSOLUTE_HOURS` | 480 / 168 |
 | `LOGIN_MAX_FAILURES`, `LOGIN_LOCK_MINUTES` | 5 / 15 |
 | `AUTH_ENDPOINT_RATE_LIMIT_WINDOW_MS`, `_MAX` | limiter per-IP untuk login/MFA/reset (15 mnt / 20) |
@@ -191,10 +190,10 @@ SEED_SUPERADMIN_EMAIL=pm@example.go.id NODE_ENV=production npm run seed:superadm
 # buka  https://<host>/admin/reset-password/<token>  lalu pilih password
 ```
 
-Script idempoten (mempromosikan akun yang ada ke `SUPER_ADMIN`, mengaktifkannya,
+Script idempoten (mempromosikan akun yang ada ke `ADMIN`, mengaktifkannya,
 membuka kuncinya). Jika `SEED_SUPERADMIN_PASSWORD` diisi, password itu dipakai
 dan semua sesi akun dicabut. Tidak ada kredensial default di kode. Segera
-aktifkan MFA di **Keamanan akun** lalu pertimbangkan `MFA_REQUIRED_ROLES=SUPER_ADMIN`.
+aktifkan MFA di **Keamanan akun** lalu pertimbangkan `MFA_REQUIRED_ROLES=ADMIN`.
 
 ## Deployment & produksi
 

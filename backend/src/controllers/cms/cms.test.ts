@@ -6,7 +6,7 @@ import type { Db } from '../../db.js';
 import type { AuditEntry } from '../../auth/audit.js';
 import { ANNOUNCEMENT, createCms, updateCms } from './cms.js';
 
-const admin = { id: 1n, role: 'SUPER_ADMIN', kitchenScopes: [] } as unknown as AppUser;
+const admin = { id: 1n, role: 'ADMIN', kitchenScopes: [] } as unknown as AppUser;
 
 async function run(handler: ReturnType<typeof createCms>, req: Partial<Request>) {
   let status: number | undefined;
