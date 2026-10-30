@@ -22,7 +22,6 @@
     "@playwright/test": "1.64.0",
     "@types/node": "22.20.5",
     "embedded-postgres": "16.14.0-beta.17",
-    "sharp": "0.35.3",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "4.1.12"

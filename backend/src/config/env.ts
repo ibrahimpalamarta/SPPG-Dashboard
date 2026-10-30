@@ -112,6 +112,13 @@ const schema = z.object({
   // SCRUM-64/100: Planned Cost per Portion stays off until B-PLAN (SCRUM-123
   // "data Rencana disembunyikan" vs AC-DASH-01) is decided.
   KPI_PLANNED_COST: z.enum(['true']).optional(),
+
+  // SCRUM-150: OpenAI-compatible chat endpoint for the upload check (same
+  // variables as qa-audit's ai-review). No key or model = the check is skipped
+  // and uploads behave as before.
+  AI_API_KEY: z.string().min(1).optional(),
+  AI_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
+  AI_MODEL: z.string().min(1).optional(),
 });
 
 /**

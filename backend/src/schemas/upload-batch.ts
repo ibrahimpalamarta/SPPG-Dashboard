@@ -38,6 +38,19 @@ export const uploadBatchCreate = z.object({
   notes: z.string().max(2000).nullish(),
   /** SCRUM-124: public id of the quarantined batch this file re-uploads; it ends "Diganti". */
   replaces: z.string().uuid().optional(),
+  /** "Ubah Mapping": JSON object `sheet|column letter` → canonical field ("" = not used). */
+  columnMap: z
+    .string()
+    .optional()
+    .transform((v, ctx) => {
+      if (!v) return undefined;
+      try {
+        return z.record(z.string()).parse(JSON.parse(v));
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'must be a JSON object of strings' });
+        return z.NEVER;
+      }
+    }),
 });
 
 /**

@@ -31,7 +31,24 @@ export async function financeKpi(): Promise<FinanceKpi | null> {
   return res.data as unknown as FinanceKpi;
 }
 
-const juta = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** Mirrors backend GET /api/kpi/completeness (lib/completeness.ts): one entry per dapur in the caller's scope. */
+export type KitchenCompleteness = {
+  name: string;
+  region: string | null;
+  items: { label: string; state: "COMPLETE" | "SENT" | "MISSING" }[];
+  complete: number;
+  sent: number;
+  total: number;
+  percent: number;
+  issues: { fix: number; review: number };
+  lastPublish: { at: string; label: string } | null;
+};
+
+/** Red under half, amber until everything is in, green when complete; classes are spelled out so Tailwind keeps them. */
+export const completenessColor = (percent: number) =>
+  percent >= 100 ? { stroke: "stroke-emerald-500", bar: "bg-emerald-500" } : percent >= 50 ? { stroke: "stroke-amber-500", bar: "bg-amber-500" } : { stroke: "stroke-red-600", bar: "bg-red-600" };
+
+const juta =new Intl.NumberFormat("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const full = new Intl.NumberFormat("id-ID");
 const percent = new Intl.NumberFormat("id-ID", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
@@ -40,6 +57,13 @@ export const rp = (n: number) => (Math.abs(n) >= 1e6 ? `Rp${juta.format(n / 1e6)
 export const rpFull = (n: number) => `Rp${full.format(n)}`;
 export const pct = (share: number) => percent.format(share);
 export const dateLabel = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+
+/** Spend of the current calendar month (Jakarta) from the published daily series; `days` is how many days have spend. */
+export function monthSpend(k: FinanceKpi) {
+  const month = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }).slice(0, 7);
+  const rows = k.daily.filter(({ date }) => date.startsWith(month));
+  return { total: rows.reduce((n, { amount }) => n + amount, 0), days: rows.length };
+}
 
 /** Donut colours for the expense mix, in rank order; the unmapped slice is always slate. */
 const MIX_COLORS = ["#10b981", "#34d399", "#6ee7b7", "#a7f3d0", "#d1fae5"];

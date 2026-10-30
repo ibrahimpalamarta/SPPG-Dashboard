@@ -13,6 +13,9 @@ import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
 import { buildTemplate, type TemplateKind } from '../../lib/templates.js';
 import { canTransition } from '../../lib/upload-status.js';
+import { publishBatch } from '../../lib/publish.js';
+import { issueLabel, needsAttention } from '../../lib/validation/rules.js';
+import { checkUpload } from '../../lib/ai/upload-check.js';
 import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
 import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
 import type { ColumnDiff } from '../../lib/mapping/detect.js';
@@ -226,8 +229,10 @@ const notRecognised = (diff: ColumnDiff[]) => {
  *     FAILED and never stored; a corrupt or empty workbook is FAILED with no
  *     staged rows left behind
  *   - a parsed file is NEEDS_REVIEW when a mapping profile recognises it
- *     (SCRUM-39), else NEEDS_MAPPING_UPDATE with the column diff — never
- *     PUBLISHED, so Data Operasional always presses Setujui & Publish
+ *     (SCRUM-39), else NEEDS_MAPPING_UPDATE with the column diff. Only a
+ *     recognised file with zero findings and no duplicate is PUBLISHED on the
+ *     spot (SCRUM-150); everything else waits for Setujui & Publish
+ *   - the AI check (SCRUM-150) advises on column diff and issue codes only
  *   - `replaces` closes the quarantined batch it re-uploads: FAILED +
  *     REPLACED ("Diganti", SCRUM-124) once the new file has parsed
  *   - a storage failure marks the batch FAILED instead of leaving it PROCESSING
@@ -259,22 +264,38 @@ export const createUploadBatch =
       sourceFileName: originalname,
       fileHash,
       loadedAt: new Date(),
+      columnMap: body.columnMap,
     });
 
-    // SCRUM-6 AC1: parse and report, nothing written. Same parser as a real
-    // upload (SCRUM-36), into a throwaway repository.
+    // SCRUM-6 AC1 + SCRUM-150: read and check the file, write nothing. Same parser
+    // and profile as a real upload, into a throwaway repository; the page shows
+    // this as the "Siap diunggah" / "Perlu dicek" card before the user commits.
     if (dryRun) {
-      const parsed = await parseToStaging(buffer, context('dry-run', String(body.kitchenId)), new InMemoryStagingRepository());
+      const kitchen = await db.kitchen.findUnique({ where: { id: body.kitchenId } });
+      const parsed = await parseToStaging(
+        buffer,
+        { ...context('dry-run', kitchen?.code ?? String(body.kitchenId)), expenseCategories: await expenseCategories(db) },
+        new InMemoryStagingRepository(),
+      );
       if (!parsed.ok) {
         sendError(res, 'VALIDATION_ERROR', { fields: { file: [parsed.errorSummary] } });
         return;
       }
+      const columnDiff = parsed.detection.ok ? [] : parsed.detection.diff.filter((d) => d.missing.length || d.unexpected.length);
+      const found = parsed.mapping?.issues ?? [];
       sendJson(res, {
         fileName: originalname,
         fileHash,
         sheets: parsed.batch.sheets,
         rowCount: parsed.batch.rows.length,
         rows: parsed.batch.rows.slice(0, PREVIEW_ROWS),
+        ready: parsed.detection.ok && !needsAttention(found),
+        columnDiff,
+        columns: parsed.columns,
+        fields: parsed.fields,
+        // One line per kind of problem, not per row: a file can carry thousands.
+        issues: [...new Map(found.map((i) => [i.code, i])).values()].map((i) => ({ code: i.code, message: i.message, label: issueLabel(i), count: parsed.mapping?.issueCounts[i.code] ?? 1 })),
+        ai: await checkUpload({ columnDiff, issueCounts: parsed.mapping?.issueCounts ?? {} }),
       });
       return;
     }
@@ -395,7 +416,7 @@ export const createUploadBatch =
         templateVersion: detection.profile.version,
       });
     };
-    const row = await ingest();
+    let row = await ingest();
 
     await writeAuditLog(db, {
       userId: req.user!.id,
@@ -419,6 +440,26 @@ export const createUploadBatch =
         metadata: { mappingProfileId: row.mappingProfileId, templateVersion: row.templateVersion },
       });
     }
+    // SCRUM-150: a recognised file with no finding at all and no earlier identical
+    // upload is published right away. The rules decide this, never the AI.
+    let autoPublished = false;
+    // `mapping` is assigned inside ingest(), which flow analysis cannot see.
+    const mapped = mapping as MappingSummary | null;
+    if (row.status === UploadStatus.NEEDS_REVIEW && mapped && !needsAttention(mapped.issues) && !duplicate) {
+      const { row: published, superseded, replaced: corrected } = await publishBatch(db, row);
+      if (published) {
+        autoPublished = true;
+        row = { ...row, status: published.status, validatedAt: published.validatedAt, publishedAt: published.publishedAt };
+        await writeAuditLog(db, {
+          userId: req.user!.id,
+          action: 'upload_batch.published',
+          entity: 'upload_batches',
+          entityId: row.id,
+          metadata: { auto: true, superseded, ...(corrected && { replaced: corrected }) },
+        });
+      }
+    }
+    const ai = await checkUpload({ columnDiff, issueCounts: mapped?.issueCounts ?? {} });
     // A re-upload that did not even parse leaves the old batch where it was;
     // a published one stays live until its correction is published (SCRUM-96).
     if (replaced && replaced.status !== UploadStatus.PUBLISHED && row.status !== UploadStatus.FAILED) {
@@ -450,6 +491,8 @@ export const createUploadBatch =
         sheets,
         columnDiff,
         mapping,
+        autoPublished,
+        ai,
         ...(duplicate && {
           warning: {
             code: 'DUPLICATE_FILE',

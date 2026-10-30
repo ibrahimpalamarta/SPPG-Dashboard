@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { storageState, type RoleKey } from './roles.js';
 
-// Dua role (SCRUM-152): Admin melihat semua dapur dan hanya melihat Upload History; Data Operasional
+// Dua role (SCRUM-152): Admin melihat semua dapur dan hanya melihat Validasi Data; Data Operasional
 // terikat satu dapur, mengunggah dan mem-publish sendiri lewat Validasi Data.
-const VIEW = ['Overview', 'Finance & Cost', 'Kelengkapan Data', 'Data Reference', 'Upload History', 'Inbox'];
+const VIEW = ['Overview', 'Finance & Cost', 'Kelengkapan Data', 'Validasi Data', 'Data Reference', 'Inbox'];
 
 const CASES: { role: RoleKey; menu: string[]; hidden: string[] }[] = [
-  { role: 'admin', menu: [...VIEW, 'Anggota'], hidden: ['Unggah Data', 'Validasi Data'] },
-  { role: 'data-operasional-skn', menu: [...VIEW, 'Unggah Data', 'Validasi Data'], hidden: ['Anggota'] },
+  { role: 'admin', menu: [...VIEW, 'Anggota'], hidden: ['Unggah Data'] },
+  { role: 'data-operasional-skn', menu: [...VIEW, 'Unggah Data'], hidden: ['Anggota'] },
 ];
 
 for (const c of CASES) {
@@ -36,9 +36,7 @@ test.describe('data-operasional-skn', () => {
 test.describe('admin', () => {
   test.use({ storageState: storageState('admin') });
 
-  test('[SCRUM-148] Admin ditolak membuka Validasi Data dan Unggah Data lewat URL @smoke @rbac', async ({ page }) => {
-    for (const path of ['mapping-validasi', 'unggah-data']) {
-      expect((await page.goto(path))?.status(), path).toBe(403);
-    }
+  test('[SCRUM-148] Admin ditolak membuka Unggah Data lewat URL @smoke @rbac', async ({ page }) => {
+    expect((await page.goto('unggah-data'))?.status()).toBe(403);
   });
 });

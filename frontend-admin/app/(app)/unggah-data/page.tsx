@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
 import { requirePage } from "@/lib/guard";
+import { BatchList } from "@/components/mapping/batch-list";
 import { EmptyState } from "@/components/ui/empty-state";
 import { UploadForm } from "./upload-form";
 
 export const metadata: Metadata = { title: "Unggah Data · SPPG Internal" };
 
-export default async function Page() {
-  const me = await requirePage("/unggah-data");
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ listPage?: string; kitchenId?: string; domain?: string; status?: string }>;
+}) {
+  const [me, { listPage, ...filters }] = await Promise.all([requirePage("/unggah-data"), searchParams]);
 
   return (
-    <div className="mx-auto max-w-400 space-y-6">
+    <div className="mx-auto max-w-400 space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Unggah Data</h1>
         <p className="mt-1 text-slate-500">Unggah file Excel dari dapur. Sistem akan membaca dan mengecek isinya.</p>
@@ -19,7 +24,10 @@ export default async function Page() {
           <p>Akun Anda belum ditautkan ke dapur mana pun. Hubungi Admin.</p>
         </EmptyState>
       ) : (
-        <UploadForm kitchens={me.kitchens} kitchenId={me.kitchens[0]?.id} />
+        <>
+          <UploadForm kitchens={me.kitchens} kitchenId={me.kitchens[0]?.id} />
+          <BatchList compact page={Number(listPage) || 1} canDelete={false} filters={filters} kitchens={me.kitchens} />
+        </>
       )}
     </div>
   );

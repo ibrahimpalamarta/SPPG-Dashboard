@@ -2,6 +2,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { shot } from './evidence.js';
 import { storageState, type RoleKey } from './roles.js';
+import { pilih } from './ui.js';
 
 // Alur sesudah unggah (skenario C-F dokumen pengujian manual): Data Operasional mem-publish sendiri
 // (Setujui & Publish, SCRUM-151), Admin hanya melihat, koreksi. Satu database dipakai bersama dan tiap langkah memakai hasil
@@ -22,16 +23,15 @@ async function sebagai<T>(browser: Browser, role: RoleKey, fn: (page: Page) => P
   }
 }
 
-type Jenis = { domain: RegExp | null; profil: RegExp };
-const CASHFLOW: Jenis = { domain: null, profil: /MAP-SKN-CF-001/ };
-const MENU: Jenis = { domain: /^Master Menu/, profil: /MAP-SKN-MENU-001/ };
+type Jenis = { domain: string | null };
+const CASHFLOW: Jenis = { domain: null };
+const MENU: Jenis = { domain: 'Master Menu' };
 
 // `replaces`: UI hanya mengirim field ini saat mengulang batch NEEDS_MAPPING_UPDATE, jadi untuk
 // koreksi batch Published (SCRUM-96) field disisipkan ke form; server action dan backend tetap asli.
 async function unggah(page: Page, name: string, buffer: Buffer, jenis = CASHFLOW, replaces?: string) {
   await page.goto('unggah-data');
-  if (jenis.domain) await page.getByRole('button', { name: jenis.domain }).click();
-  await page.getByRole('button', { name: 'Lanjut pilih file' }).click();
+  if (jenis.domain) await pilih(page, 'Jenis data', jenis.domain);
   await page.locator('input[type=file]').setInputFiles({ name, mimeType: 'text/csv', buffer });
   if (replaces) {
     await page.locator('input[type=file]').evaluate((el, id) => {
@@ -43,7 +43,8 @@ async function unggah(page: Page, name: string, buffer: Buffer, jenis = CASHFLOW
     }, replaces);
   }
   await page.getByRole('button', { name: 'Unggah', exact: true }).click();
-  await expect(page.getByText(new RegExp(`Profil terdeteksi:\\s*${jenis.profil.source}`))).toBeVisible();
+  // Temuan menahan file (Perlu dicek); file tanpa temuan langsung Dipublish otomatis.
+  await expect(page.locator('section[aria-live=polite]').getByText(/Perlu dicek|Dipublish otomatis/)).toBeVisible();
 }
 
 async function bukaBatch(page: Page, name: string) {
@@ -73,7 +74,7 @@ async function unggahKirimPublish(browser: Browser, name: string, buffer: Buffer
     await bukaBatch(page, name);
     await tandaiTemuan(page);
     await page.getByRole('button', { name: 'Setujui & Publish' }).click();
-    await expect(page.getByText('Published')).toBeVisible();
+    await expect(page.getByText('Dipublish')).toBeVisible();
     return batchId(page);
   });
 }
@@ -109,7 +110,7 @@ test.describe.serial('Review dan publish', () => {
       await bukaBatch(page, FILE);
       await page.getByRole('button', { name: 'Setujui & Publish' }).click();
       await expect(page.getByRole('alert').filter({ hasText: 'Wajib diperbaiki' })).toBeVisible();
-      await expect(page.getByText('Needs Review')).toBeVisible();
+      await expect(page.getByText('Belum selesai dicek')).toBeVisible();
       await shot(page, 'SCRUM-151', 1, 'publish-ditolak-temuan-wajib');
     });
   });
@@ -119,23 +120,23 @@ test.describe.serial('Review dan publish', () => {
       await bukaBatch(page, FILE);
       await tandaiTemuan(page);
       await page.getByRole('button', { name: 'Setujui & Publish' }).click();
-      await expect(page.getByText('Published')).toBeVisible();
+      await expect(page.getByText('Dipublish')).toBeVisible();
       batchAwal = batchId(page);
       await shot(page, 'SCRUM-151', 2, 'published');
       await page.reload();
-      await expect(page.getByText('Published')).toBeVisible();
+      await expect(page.getByText('Dipublish')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Setujui & Publish' })).toHaveCount(0);
     });
   });
 
-  test('[SCRUM-137][SCRUM-148] Admin melihat file di Upload History, hanya lihat dengan Export @smoke @rbac', async ({ browser }) => {
+  test('[SCRUM-137][SCRUM-148] Admin melihat file di Validasi Data, hanya lihat tanpa Setujui & Publish @smoke @rbac', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
-      await page.goto('upload-history');
+      await page.goto('mapping-validasi');
       const baris = page.getByRole('row', { name: new RegExp(`^${FILE.replace('.', '\\.')}`) });
-      await expect(baris.getByText('Published')).toBeVisible();
-      await expect(baris.getByRole('link', { name: `Export ${FILE}` })).toBeVisible();
-      await expect(page.getByRole('link', { name: `Buka ${FILE}` })).toHaveCount(0);
-      await shot(page, 'SCRUM-148', 1, 'upload-history-admin');
+      await expect(baris.getByText('Dipublish')).toBeVisible();
+      await shot(page, 'SCRUM-148', 1, 'validasi-data-admin');
+      await bukaBatch(page, FILE);
+      await expect(page.getByRole('button', { name: 'Setujui & Publish' })).toHaveCount(0);
     });
   });
 
@@ -165,12 +166,16 @@ test.describe.serial('Review dan publish', () => {
     });
   });
 
-  test('[SCRUM-103][SCRUM-65] Overview menampilkan "Belum ada data", bukan 0, untuk Penerima Manfaat dan Saldo @smoke @kpi', async ({ browser }) => {
+  test('[SCRUM-103][SCRUM-65] Overview menampilkan "-" dan insight, bukan 0, untuk Penerima Manfaat, Saldo, dan Pengeluaran @smoke @kpi', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
       await page.goto('overview');
       const main = page.getByRole('main');
       await expect(main.getByText('Penerima Manfaat / hari')).toBeVisible();
-      await expect(main.getByText('Belum ada data', { exact: true })).toHaveCount(2);
+      // Tanpa badge: nilai "-" dan insight yang menyebut data apa yang kurang (fixture Feb 2026, bukan bulan berjalan).
+      await expect(main.getByText(/^Belum ada data penerima manfaat/)).toBeVisible();
+      await expect(main.getByText(/^Belum ada data saldo rekening/)).toBeVisible();
+      await expect(main.getByText(/^Belum ada data pengeluaran bulan ini/)).toBeVisible();
+      await expect(main.getByText('Rp0')).toHaveCount(0);
       await shot(page, 'SCRUM-103', 1, 'overview-belum-ada-data');
     });
   });
@@ -186,6 +191,40 @@ test.describe.serial('Review dan publish', () => {
       // Porsi tersalurkan tidak ada di sumber Sukun: label, bukan 0.
       await expect(main.getByText(/Belum ada data porsi tersalurkan/)).toBeVisible();
       await shot(page, 'SCRUM-74', 1, 'top-5-menu-dan-gizi');
+    });
+  });
+
+  test('[SCRUM-149] Overview: setiap kotak punya AI Insight, termasuk kartu Pengeluaran · Bulan ini @smoke @kpi', async ({ browser }) => {
+    await sebagai(browser, 'admin', async (page) => {
+      await page.goto('overview');
+      const main = page.getByRole('main');
+      await expect(main.getByText('Pengeluaran · Bulan ini')).toBeVisible();
+      // 4 kartu KPI + Top 5 Supplier + Komposisi + Top 5 Menu + Informasi Gizi + perbandingan dapur.
+      await expect(main.getByText('AI Insight', { exact: true })).toHaveCount(9);
+      await expect(main.getByText(/^Belum ada data pengeluaran bulan ini/)).toBeVisible();
+      await shot(page, 'SCRUM-149', 1, 'overview-ai-insight');
+    });
+  });
+
+  test('[SCRUM-158] AI Insight maksimal 2 kalimat dan berisi rekomendasi tindakan @smoke @kpi', async ({ browser }) => {
+    await sebagai(browser, 'admin', async (page) => {
+      await page.goto('overview');
+      const main = page.getByRole('main');
+      await expect(main.getByText('AI Insight', { exact: true })).toHaveCount(9);
+      for (const teks of await main.locator('p.leading-relaxed').allTextContents()) {
+        expect(teks.match(/[.!?](\s|$)/g)?.length, teks).toBeLessThanOrEqual(2);
+      }
+      await shot(page, 'SCRUM-158', 1, 'ai-insight-1-2-kalimat');
+    });
+  });
+
+  test('[SCRUM-159] Kelengkapan Data tidak menampilkan AI Insight @smoke @kpi', async ({ browser }) => {
+    await sebagai(browser, 'admin', async (page) => {
+      await page.goto('kesehatan-data');
+      const main = page.getByRole('main');
+      await expect(main.getByRole('heading', { level: 1, name: 'Kelengkapan Data' })).toBeVisible();
+      await expect(main.getByText(/AI Insight/)).toHaveCount(0);
+      await shot(page, 'SCRUM-159', 1, 'kelengkapan-data-tanpa-ai');
     });
   });
 
@@ -205,18 +244,18 @@ test.describe.serial('Review dan publish', () => {
     const baru = await unggahKirimPublish(browser, nama, koreksi, CASHFLOW, batchAwal);
     expect(baru).not.toBe(batchAwal);
     await sebagai(browser, 'admin', async (page) => {
-      await page.goto('upload-history');
+      await page.goto('mapping-validasi');
       await shot(page, 'SCRUM-96', 1, 'batch-lama-diganti');
       await expect(page.getByRole('row', { name: new RegExp(`^${FILE.replace('.', '\\.')}`) }).getByText('Diganti')).toBeVisible();
-      await expect(page.getByRole('row', { name: new RegExp(`^${nama.replace('.', '\\.')}`) }).getByText('Published')).toBeVisible();
+      await expect(page.getByRole('row', { name: new RegExp(`^${nama.replace('.', '\\.')}`) }).getByText('Dipublish')).toBeVisible();
       expect(await kartu(page, 'Belanja ke supplier')).toBe(belanja);
       expect(await kartu(page, 'Jumlah transaksi')).toBe(transaksi);
     });
   });
 
-  test('[SCRUM-148] Admin tidak bisa membuka Validasi Data untuk mem-publish @smoke @rbac', async ({ browser }) => {
+  test('[SCRUM-148] Admin membuka Validasi Data tapi tidak bisa mem-publish @smoke @rbac', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
-      expect((await page.goto(`mapping-validasi?batch=${batchAwal}`))?.status()).toBe(403);
+      expect((await page.goto(`mapping-validasi?batch=${batchAwal}`))?.status()).toBe(200);
       await expect(page.getByRole('button', { name: 'Setujui & Publish' })).toHaveCount(0);
     });
   });

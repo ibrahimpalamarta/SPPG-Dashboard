@@ -1,10 +1,11 @@
 "use client";
 
-import { Bell, Menu, Settings } from "lucide-react";
+import { Menu, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavLinks, UserMenu, type AppUser, type NavItem } from "@/components/layout/app-sidebar";
 import { HeaderSearch } from "@/components/layout/header-search";
+import { NotificationMenu } from "@/components/layout/notification-menu";
 
 const iconButton = "inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-emerald-300";
 
@@ -39,9 +40,7 @@ export function AppHeader({ items, user }: { items: readonly NavItem[]; user: Ap
         <Link href="/pengaturan" aria-label="Pengaturan" className={iconButton}>
           <Settings className="size-5" aria-hidden="true" />
         </Link>
-        <button type="button" disabled title="Segera hadir" aria-label="Notifikasi" className={`${iconButton} disabled:cursor-not-allowed disabled:opacity-60`}>
-          <Bell className="size-5" aria-hidden="true" />
-        </button>
+        <NotificationMenu />
       </div>
     </header>
   );

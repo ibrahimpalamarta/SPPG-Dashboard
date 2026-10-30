@@ -1,5 +1,6 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import ExcelJS from 'exceljs';
 import { parseToStaging } from './pipeline.js';
 import { InMemoryStagingRepository, sourceRecordId, type ParseContext } from './staging.js';
@@ -90,5 +91,32 @@ describe('parseToStaging (SCRUM-24)', () => {
 
     assert.deepEqual(out.ok ? null : out.errorCode, 'EMPTY_FILE');
     assert.equal(await staging.getBatch('b-1'), undefined);
+  });
+});
+
+describe('parseToStaging columnMap (Ubah Mapping)', () => {
+  const fixtureCsv = () => readFileSync(new URL('./fixtures/sukun-cashflow.csv', import.meta.url));
+  const csv = Buffer.from(fixtureCsv().toString('utf8').replace(',tanggal,', ',tgl,'));
+  const cashflow: ParseContext = { ...ctx, domain: 'CASHFLOW', sourceFileName: 'cashflow.csv' };
+
+  test('an unknown header is unmatched until the uploader points it at an SOP field', async () => {
+    const before = await parseToStaging(csv, cashflow, new InMemoryStagingRepository());
+    assert.ok(before.ok && !before.detection.ok);
+    const tgl = before.columns.find((c) => c.header === 'tgl')!;
+    assert.equal(tgl.field, null);
+    assert.ok(before.fields.some((f) => f.field === 'txn_date' && f.header === 'tanggal'));
+
+    const after = await parseToStaging(csv, { ...cashflow, columnMap: { [`${tgl.sheet}|${tgl.column}`]: 'txn_date' } }, new InMemoryStagingRepository());
+    assert.ok(after.ok && after.detection.ok);
+    assert.deepEqual(after.columns.find((c) => c.column === tgl.column), { ...tgl, field: 'txn_date' }, 'still shows the file\'s own header');
+  });
+
+  test('"" marks a matched column as not used, which makes the file unrecognised', async () => {
+    const ok = await parseToStaging(fixtureCsv(), cashflow, new InMemoryStagingRepository());
+    assert.ok(ok.ok && ok.detection.ok);
+    const id = ok.columns.find((c) => c.header === 'id')!;
+    const out = await parseToStaging(fixtureCsv(), { ...cashflow, columnMap: { [`${id.sheet}|${id.column}`]: '' } }, new InMemoryStagingRepository());
+    assert.ok(out.ok && !out.detection.ok);
+    assert.equal(out.columns.find((c) => c.column === id.column)!.field, null);
   });
 });

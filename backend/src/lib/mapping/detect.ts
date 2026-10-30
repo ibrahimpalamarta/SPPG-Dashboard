@@ -19,6 +19,10 @@ const diffSheet = (sheet: StagedSheet, profile: MappingProfile): ColumnDiff => {
   };
 };
 
+/** The profiles registered for this kitchen + domain + source. */
+export const profilesFor = (ctx: Pick<ParseContext, 'kitchenCode' | 'domain' | 'sourceSystem'>, profiles: MappingProfile[] = PROFILES) =>
+  profiles.filter((p) => p.kitchenCode === ctx.kitchenCode && p.domain === ctx.domain && p.sourceSystem === ctx.sourceSystem);
+
 /**
  * SCRUM-39. A file is recognised when exactly one profile for its kitchen +
  * domain + source covers every staged sheet (extra columns are tolerated, a
@@ -31,8 +35,7 @@ export function detectProfile(
   profiles: MappingProfile[] = PROFILES,
 ): Detection {
   const data = sheets.filter((s) => s.headerRow !== null && !s.skipped);
-  const candidates = profiles
-    .filter((p) => p.kitchenCode === ctx.kitchenCode && p.domain === ctx.domain && p.sourceSystem === ctx.sourceSystem)
+  const candidates = profilesFor(ctx, profiles)
     .map((profile) => ({ profile, diff: data.map((s) => diffSheet(s, profile)) }))
     .map((c) => ({ ...c, missing: c.diff.reduce((n, d) => n + d.missing.length, 0) }))
     .sort((a, b) => a.missing - b.missing || a.profile.id.localeCompare(b.profile.id));

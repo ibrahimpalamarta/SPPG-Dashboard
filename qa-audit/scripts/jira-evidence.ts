@@ -2,7 +2,7 @@
  * Screenshots of passing Playwright tests for one Jira ticket, used as proof in
  * the "In Review" comment (QD-34). Reads reports/raw/playwright.json.
  *
- *   jira-evidence SCRUM-20   prints { steps, passing }: step screenshots (.avif, max 3)
+ *   jira-evidence SCRUM-20   prints { steps, passing }: step screenshots (.png, max 3)
  *   saved by tests under reports/evidence/<ticket>/, and [{ title, screenshot }]
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';

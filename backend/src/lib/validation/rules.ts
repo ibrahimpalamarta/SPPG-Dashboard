@@ -49,3 +49,8 @@ export const classify = (issues: Issue[]): ClassifiedIssue[] => issues.map((i) =
 /** SCRUM-51 quarantine: unresolved CRITICAL issues keep a batch out of READY and publish. */
 export const openBlockers = (db: Pick<Db, 'validationIssue'>, uploadBatchId: string) =>
   db.validationIssue.count({ where: { uploadBatchId, severity: 'CRITICAL', status: 'OPEN' } });
+/** PRD §9.1 screen wording for an issue; Info/auto-fix never holds a file (§6.3). */
+export const issueLabel = (i: ClassifiedIssue) => (i.action === 'NORMALIZE' ? 'Dirapikan otomatis' : i.severity === 'CRITICAL' ? 'Wajib diperbaiki' : 'Perlu dicek');
+
+/** True when something besides auto-fixes is left for a person: such a file is not auto-published. */
+export const needsAttention = (issues: ClassifiedIssue[]) => issues.some((i) => i.action !== 'NORMALIZE');
