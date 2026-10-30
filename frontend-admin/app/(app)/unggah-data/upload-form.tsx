@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Check, FileText, Sparkles, Upload } from "lucide-react";
+import { Building2, Check, FileText, TriangleAlert, Upload } from "lucide-react";
 import Link from "next/link";
 import { startTransition, useActionState, useRef, useState, useTransition } from "react";
 import { checkFile, uploadFile, type CheckResult, type FileColumn, type UploadResult } from "./actions";
@@ -26,9 +26,9 @@ const DOMAIN_OPTIONS = [
 ];
 
 const LABEL_TONE: Record<string, string> = {
-  "Wajib diperbaiki": "bg-red-100 text-red-800",
-  "Perlu dicek": "bg-amber-100 text-amber-800",
-  "Dirapikan otomatis": "bg-slate-100 text-slate-700",
+  "Wajib diperbaiki": "border-red-200 bg-red-50 text-red-700",
+  "Perlu dicek": "border-amber-200 bg-amber-50 text-amber-700",
+  "Dirapikan otomatis": "border-slate-200 bg-slate-50 text-slate-600",
 };
 
 /** PRD §9.1 wording for what became of the uploaded file. */
@@ -41,16 +41,15 @@ function headline(r: Extract<UploadResult, { ok: true }>) {
 }
 
 /** FR-AI-01: the verdict on the picked file, before anything is stored. */
-function CheckChips({ ready }: { ready: boolean }) {
+function CheckChips({ check }: { check: Extract<CheckResult, { ok: true }> }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
-      <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-blue-50 px-3 text-blue-700">
-        <Sparkles className="size-3.5" aria-hidden="true" />
-        Cek otomatis
-      </span>
-      <span className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 ${ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-        {ready && <Check className="size-3.5" aria-hidden="true" />}
-        {ready ? "Siap diunggah" : "Perlu dicek"}
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="font-medium text-slate-600">Validasi otomatis</span>
+      <span className="text-slate-300" aria-hidden="true">•</span>
+      <span className="text-slate-500">{check.rowCount} baris</span>
+      <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium ${check.ready ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+        {check.ready ? <Check className="size-3" aria-hidden="true" /> : <TriangleAlert className="size-3" aria-hidden="true" />}
+        {check.ready ? "Siap diunggah" : `${check.issues.length} perlu dicek`}
       </span>
     </div>
   );
@@ -70,7 +69,7 @@ function CheckDetails({ check }: { check: Extract<CheckResult, { ok: true }> }) 
         <ul className="space-y-1.5">
           {check.issues.map((i) => (
             <li key={i.code} className="flex flex-wrap items-baseline gap-2 text-slate-800">
-              <span className={`rounded px-2 py-0.5 text-xs font-semibold ${LABEL_TONE[i.label] ?? LABEL_TONE["Perlu dicek"]}`}>{i.label}</span>
+              <span className={`rounded-md border px-2 py-0.5 text-xs font-medium ${LABEL_TONE[i.label] ?? LABEL_TONE["Perlu dicek"]}`}>{i.label}</span>
               <span>{i.message}</span>
               {i.count > 1 && <span className="text-slate-500">({i.count} baris)</span>}
             </li>
@@ -137,7 +136,7 @@ function MappingEditor({
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <CheckChips ready={check.ready} />
+        <CheckChips check={check} />
         <div className="flex gap-3">
           <button type="button" onClick={onDone} className={secondaryButton}>
             Selesai
@@ -361,7 +360,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
                 {checking ? (
                   <p className="text-sm text-slate-600">Membaca dan mengecek file…</p>
                 ) : check?.ok && !showResult && !pending ? (
-                  <CheckChips ready={check.ready} />
+                  <CheckChips check={check} />
                 ) : (
                   <span />
                 )}

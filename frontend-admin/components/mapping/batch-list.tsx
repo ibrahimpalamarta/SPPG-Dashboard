@@ -11,7 +11,7 @@ import type { Batch } from "@/lib/mapping-validasi";
 
 const PAGE_SIZE = 20;
 
-const actionButton = "inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50";
+const actionButton = "inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2 text-xs font-medium text-slate-700 hover:bg-slate-50";
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—");
 
@@ -118,7 +118,7 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
                     )}
                     {compact && b.storageKey && (
                       <a href={`/unggah-data/batch/${b.id}/file`} aria-label={`Export ${b.fileName}`} className={actionButton}>
-                        <Download className="size-4" aria-hidden="true" />
+                        <Download className="size-3.5" aria-hidden="true" />
                         Export
                       </a>
                     )}

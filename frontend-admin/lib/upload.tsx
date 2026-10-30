@@ -32,8 +32,8 @@ const BY_ERROR_CODE: Record<string, { label: string; tone: string; icon: LucideI
 export function StatusBadge({ status, errorCode }: { status: string; errorCode?: string | null }) {
   const s = (errorCode && BY_ERROR_CODE[errorCode]) || STATUS[status as keyof typeof STATUS] || { label: status, tone: "border-slate-200 bg-slate-50 text-slate-600", icon: Loader };
   return (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-sm font-medium ${s.tone}`}>
-      <s.icon className="size-3.5" aria-hidden="true" />
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium ${s.tone}`}>
+      <s.icon className="size-3" aria-hidden="true" />
       {s.label}
     </span>
   );
