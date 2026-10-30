@@ -7,13 +7,8 @@ import type { AppUser } from '../../auth/user.js';
 import { getMe } from './me.js';
 
 const PERMS: Record<Role, AppUser['permissions']> = {
-  SUPER_ADMIN: ['upload:create', 'batch:review'],
-  MANAGEMENT: [],
-  FINANCE: [],
-  KEPALA_KITCHEN: [],
-  DATA_ADMIN: ['upload:create', 'mapping:propose'],
-  AHLI_GIZI: [],
-  DATA_STEWARD: [],
+  ADMIN: ['upload:view', 'users:manage'],
+  DATA_ADMIN: ['upload:create', 'mapping:propose', 'batch:publish'],
 };
 
 const userWith = (role: Role, ...kitchenIds: bigint[]): AppUser => ({
@@ -78,6 +73,6 @@ describe('GET /api/me (SCRUM-20)', () => {
   test('exposes the permissions loaded for the request, including mapping:propose for DATA_ADMIN', async () => {
     const { body } = await run(userWith('DATA_ADMIN', 2n));
     assert.ok((body.permissions as string[]).includes('mapping:propose'));
-    assert.ok(!(body.permissions as string[]).includes('batch:review'));
+    assert.ok(!(body.permissions as string[]).includes('users:manage'));
   });
 });

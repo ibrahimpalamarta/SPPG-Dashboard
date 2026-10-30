@@ -5,8 +5,7 @@ import { canTransition } from './upload-status.js';
 describe('canTransition (SCRUM-22)', () => {
   test('the happy path is legal end to end', () => {
     assert.equal(canTransition('PROCESSING', 'NEEDS_REVIEW'), true);
-    assert.equal(canTransition('NEEDS_REVIEW', 'READY'), true);
-    assert.equal(canTransition('READY', 'PUBLISHED'), true);
+    assert.equal(canTransition('NEEDS_REVIEW', 'PUBLISHED'), true);
   });
 
   test('an unrecognised file can go back to processing once mapped', () => {
@@ -17,7 +16,7 @@ describe('canTransition (SCRUM-22)', () => {
   test('a quarantined batch, or a published one being corrected (SCRUM-96), can be superseded; it is terminal', () => {
     assert.equal(canTransition('NEEDS_MAPPING_UPDATE', 'SUPERSEDED'), true);
     assert.equal(canTransition('PUBLISHED', 'SUPERSEDED'), true);
-    assert.equal(canTransition('READY', 'SUPERSEDED'), false);
+    assert.equal(canTransition('NEEDS_REVIEW', 'SUPERSEDED'), false);
     assert.equal(canTransition('SUPERSEDED', 'PROCESSING'), false);
   });
 
@@ -27,8 +26,8 @@ describe('canTransition (SCRUM-22)', () => {
     assert.equal(canTransition('PUBLISHED', 'NEEDS_REVIEW'), false);
   });
 
-  test('review cannot be skipped', () => {
-    assert.equal(canTransition('PROCESSING', 'READY'), false);
-    assert.equal(canTransition('NEEDS_REVIEW', 'PUBLISHED'), false);
+  test('a file cannot be published before it is checked or while its layout is unrecognised', () => {
+    assert.equal(canTransition('PROCESSING', 'PUBLISHED'), false);
+    assert.equal(canTransition('NEEDS_MAPPING_UPDATE', 'PUBLISHED'), false);
   });
 });

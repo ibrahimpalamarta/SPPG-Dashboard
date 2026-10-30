@@ -78,7 +78,7 @@ describe('resolve issues (SCRUM-51)', () => {
   });
 
   test('only while the batch is still with Data Operasional', async () => {
-    const { db, calls } = fakeDb({ id: 9n, kitchenId: 3n, status: 'READY' });
+    const { db, calls } = fakeDb({ id: 9n, kitchenId: 3n, status: 'PUBLISHED' });
     const out = await run(resolveValidationIssues(db), { user: userWith('DATA_ADMIN', 3n), valid: { body } });
     assert.equal(out.status, 409);
     assert.equal(calls.update, undefined);

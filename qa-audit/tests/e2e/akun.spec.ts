@@ -10,7 +10,7 @@ const tokens = JSON.parse(readFileSync('.auth/tokens.json', 'utf8')) as Record<'
 const newPassword = () => `Qa9-${randomBytes(9).toString('base64url')}`;
 
 test('[QA-AUTH] lupa kata sandi: jawaban sama untuk email terdaftar dan tidak dikenal @smoke', async ({ page }) => {
-  for (const email of [accounts.finance!.email, 'tidak.dikenal@qa-audit.test']) {
+  for (const email of [accounts['data-operasional-skn']!.email, 'tidak.dikenal@qa-audit.test']) {
     await page.goto('lupa-kata-sandi');
     await page.getByLabel('Email').fill(email);
     await page.getByRole('button', { name: 'Kirim link reset' }).click();

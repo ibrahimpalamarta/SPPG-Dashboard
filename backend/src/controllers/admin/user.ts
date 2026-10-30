@@ -128,9 +128,9 @@ export const createUser = (db: Db = prisma, send: SendMail = sendMail): RequestH
     sendError(res, 'FORBIDDEN');
     return;
   }
-  if (KITCHEN_SCOPED_ROLES.includes(body.role) && body.kitchenIds.length === 0) {
+  if (KITCHEN_SCOPED_ROLES.includes(body.role) && body.kitchenIds.length !== 1) {
     sendError(res, 'VALIDATION_ERROR', {
-      fields: { 'body.kitchenIds': [`required when role is ${body.role}`] },
+      fields: { 'body.kitchenIds': [`exactly one dapur is required when role is ${body.role}`] },
     });
     return;
   }
@@ -179,13 +179,14 @@ export const createUser = (db: Db = prisma, send: SendMail = sendMail): RequestH
  * Invariants enforced here rather than in the schema, because they need to see
  * the resulting row rather than just the request body:
  *
- *   1. A Super Admin cannot demote or deactivate itself. Locking the last
+ *   1. An Admin cannot demote or deactivate itself. Locking the last
  *      administrator out of the backoffice needs a database round-trip to fix.
- *   2. A kitchen-scoped role (KITCHEN_SCOPED_ROLES) must end up with at least
- *      one kitchen. Without one it silently sees no data at all.
+ *   2. A kitchen-scoped role (KITCHEN_SCOPED_ROLES) must end up with exactly
+ *      one kitchen (SCRUM-144) whenever its dapur or role is changed. Without
+ *      one it silently sees no data at all.
  *   3. No privilege escalation: the actor must be allowed to manage both the
  *      account's current role and the role it is being moved to.
- *   4. SCRUM-121: the last active PM MBG (SUPER_ADMIN with a password) can be
+ *   4. SCRUM-121: the last active Admin (with a password) can be
  *      neither deactivated nor demoted.
  *
  * A role change or deactivation ends the account's sessions, so it applies at
@@ -213,22 +214,23 @@ export const updateUser = (db: Db = prisma): RequestHandler => async (req, res) 
 
   const nextRole = body.role ?? current.role;
   if (
-    current.role === Role.SUPER_ADMIN &&
+    current.role === Role.ADMIN &&
     current.status === 'ACTIVE' &&
-    (nextRole !== Role.SUPER_ADMIN || body.status === 'INACTIVE') &&
+    (nextRole !== Role.ADMIN || body.status === 'INACTIVE') &&
     (await db.user.count({
-      where: { id: { not: id }, role: Role.SUPER_ADMIN, status: 'ACTIVE', passwordHash: { not: null } },
+      where: { id: { not: id }, role: Role.ADMIN, status: 'ACTIVE', passwordHash: { not: null } },
     })) === 0
   ) {
-    sendError(res, 'LAST_SUPER_ADMIN');
+    sendError(res, 'LAST_ADMIN');
     return;
   }
 
   const currentKitchenIds = current.kitchenScopes.map((s) => s.kitchen.id);
   const nextKitchenIds = body.kitchenIds ?? currentKitchenIds;
-  if (KITCHEN_SCOPED_ROLES.includes(nextRole) && nextKitchenIds.length === 0) {
+  // Only when the dapur or role is being changed: accounts that predate the one-dapur rule stay editable (status, name).
+  if (KITCHEN_SCOPED_ROLES.includes(nextRole) && (body.kitchenIds !== undefined || nextRole !== current.role) && nextKitchenIds.length !== 1) {
     sendError(res, 'VALIDATION_ERROR', {
-      fields: { 'body.kitchenIds': [`required when role is ${nextRole}`] },
+      fields: { 'body.kitchenIds': [`exactly one dapur is required when role is ${nextRole}`] },
     });
     return;
   }
@@ -374,8 +376,8 @@ export const listRoles = (db: Db = prisma): RequestHandler => async (_req, res) 
 };
 
 /**
- * Replace a role's permissions. SUPER_ADMIN is fixed (it cannot be locked
- * out), and a non-Super Admin may neither edit its own role nor grant a
+ * Replace a role's permissions. ADMIN is fixed (it cannot be locked
+ * out), and a non-Admin may neither edit its own role nor grant a
  * permission it does not hold itself.
  */
 export const updateRolePermissions = (db: Db = prisma): RequestHandler => async (req, res) => {
@@ -383,12 +385,12 @@ export const updateRolePermissions = (db: Db = prisma): RequestHandler => async 
   const { permissions } = req.valid!.body as z.infer<typeof rolePermissionsBody>;
   const actor = req.user!;
 
-  if (role === Role.SUPER_ADMIN) {
-    sendError(res, 'FORBIDDEN', { reason: 'super admin permissions are fixed' });
+  if (role === Role.ADMIN) {
+    sendError(res, 'FORBIDDEN', { reason: 'admin permissions are fixed' });
     return;
   }
   if (
-    actor.role !== Role.SUPER_ADMIN &&
+    actor.role !== Role.ADMIN &&
     (role === actor.role || permissions.some((p) => !actor.permissions.includes(p)))
   ) {
     sendError(res, 'FORBIDDEN');

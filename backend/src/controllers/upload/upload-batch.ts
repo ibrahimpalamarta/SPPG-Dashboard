@@ -13,7 +13,6 @@ import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
 import { buildTemplate, type TemplateKind } from '../../lib/templates.js';
 import { canTransition } from '../../lib/upload-status.js';
-import { openBlockers } from '../../lib/validation/rules.js';
 import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.js';
 import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
 import type { ColumnDiff } from '../../lib/mapping/detect.js';
@@ -228,7 +227,7 @@ const notRecognised = (diff: ColumnDiff[]) => {
  *     staged rows left behind
  *   - a parsed file is NEEDS_REVIEW when a mapping profile recognises it
  *     (SCRUM-39), else NEEDS_MAPPING_UPDATE with the column diff — never
- *     READY, so nothing publishes without a reviewer
+ *     PUBLISHED, so Data Operasional always presses Setujui & Publish
  *   - `replaces` closes the quarantined batch it re-uploads: FAILED +
  *     REPLACED ("Diganti", SCRUM-124) once the new file has parsed
  *   - a storage failure marks the batch FAILED instead of leaving it PROCESSING
@@ -485,13 +484,6 @@ export const updateUploadBatch = (db: Db = prisma): RequestHandler => async (req
   if (body.status && !canTransition(current.status, body.status)) {
     sendError(res, 'INVALID_TRANSITION', { from: current.status, to: body.status });
     return;
-  }
-  if (body.status === UploadStatus.READY) {
-    const blockers = await openBlockers(db, current.publicId);
-    if (blockers > 0) {
-      sendError(res, 'BATCH_BLOCKED', { openCritical: blockers });
-      return;
-    }
   }
 
   const row = await db.uploadBatch.update({

@@ -1,5 +1,5 @@
 /**
- * QA accounts, one per PRD role (decision QD-03 in docs/decision-log.md).
+ * QA accounts, one per role (decision QD-03 in docs/decision-log.md).
  * Change the mapping here only.
  *
  * Passwords: QA_SEED_PASSWORD when set, otherwise random per run. They are
@@ -18,11 +18,8 @@ import { AUTH, writeJson } from './lib.js';
 type Account = { key: string; fullName: string; role: Role; kitchens: 'all' | string[] };
 
 const ACCOUNTS: Account[] = [
-  { key: 'management', fullName: 'QA Management', role: 'MANAGEMENT', kitchens: 'all' },
-  { key: 'finance', fullName: 'QA Finance', role: 'FINANCE', kitchens: 'all' },
-  { key: 'kepala-kitchen-skn', fullName: 'QA Kepala Kitchen SKN', role: 'KEPALA_KITCHEN', kitchens: ['SKN'] },
-  { key: 'data-steward', fullName: 'QA Data Steward', role: 'DATA_STEWARD', kitchens: 'all' },
-  { key: 'pm', fullName: 'QA PM MBG', role: 'SUPER_ADMIN', kitchens: 'all' },
+  { key: 'admin', fullName: 'QA Admin', role: 'ADMIN', kitchens: 'all' },
+  { key: 'data-operasional-skn', fullName: 'QA Data Operasional SKN', role: 'DATA_ADMIN', kitchens: ['SKN'] },
 ];
 
 // Same statement as backend/scripts/grant-public-role.ts, which cannot run as-is:
@@ -46,8 +43,8 @@ for (const a of ACCOUNTS) {
     create: { email, fullName: a.fullName, role: a.role, passwordHash },
     update: { fullName: a.fullName, role: a.role, passwordHash, status: 'ACTIVE', failedLoginCount: 0, lockedUntil: null },
   });
-  // "All kitchens" is no scope rows for a cross-kitchen role, but every row for a
-  // kitchen-scoped one, which sees nothing without them (backend/src/auth/guard.ts resolveKitchenIds).
+  // "All kitchens" is no scope rows for Admin, but every row for a kitchen-scoped role, which
+  // sees nothing without them (backend/src/auth/guard.ts resolveKitchenIds).
   const scoped =
     a.kitchens === 'all'
       ? KITCHEN_SCOPED_ROLES.includes(a.role) ? kitchens : []
@@ -62,7 +59,7 @@ for (const a of ACCOUNTS) {
 // read in QA (no SES), so the token is minted here, the same way the backend does it.
 const reset = await prisma.user.upsert({
   where: { email: 'qa.reset@qa-audit.test' },
-  create: { email: 'qa.reset@qa-audit.test', fullName: 'QA Reset', role: 'MANAGEMENT', passwordHash },
+  create: { email: 'qa.reset@qa-audit.test', fullName: 'QA Reset', role: 'ADMIN', passwordHash },
   update: { passwordHash },
 });
 const invited = await prisma.user.upsert({

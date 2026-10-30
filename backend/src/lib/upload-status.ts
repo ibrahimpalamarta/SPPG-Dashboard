@@ -8,9 +8,8 @@ import { UploadStatus } from '@prisma/client';
  */
 const TRANSITIONS: Record<UploadStatus, readonly UploadStatus[]> = {
   PROCESSING: ['NEEDS_REVIEW', 'NEEDS_MAPPING_UPDATE', 'FAILED'],
-  NEEDS_REVIEW: ['READY', 'FAILED'],
+  NEEDS_REVIEW: ['PUBLISHED', 'FAILED'],
   NEEDS_MAPPING_UPDATE: ['PROCESSING', 'FAILED', 'SUPERSEDED'],
-  READY: ['PUBLISHED', 'NEEDS_REVIEW'],
   PUBLISHED: ['SUPERSEDED'],
   FAILED: [],
   SUPERSEDED: [],

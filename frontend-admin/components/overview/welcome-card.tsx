@@ -44,7 +44,7 @@ export function WelcomeCard({ name, finance, menu }: { name: string; finance: Fi
   const items = stats(finance, menu);
   return (
     <Card className="p-6 sm:p-7">
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Overview · {name}</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Selamat Datang, {name}!</h1>
       {items.length > 0 && (
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           {items.map((stat) => (

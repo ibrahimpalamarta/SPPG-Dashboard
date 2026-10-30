@@ -35,9 +35,9 @@ export const ERRORS = {
     body: { error: 'batch_blocked', message: 'Masih ada temuan "Wajib diperbaiki" yang belum ditandai sudah dicek.' },
   },
   // SCRUM-121: member administration.
-  LAST_SUPER_ADMIN: {
+  LAST_ADMIN: {
     status: 409,
-    body: { error: 'last_super_admin', message: 'Project Manager MBG terakhir tidak bisa dinonaktifkan atau diturunkan perannya.' },
+    body: { error: 'last_admin', message: 'Admin terakhir tidak bisa dinonaktifkan atau diturunkan perannya.' },
   },
   NOT_AN_INVITATION: {
     status: 409,

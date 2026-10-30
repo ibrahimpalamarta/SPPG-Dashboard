@@ -140,10 +140,10 @@ describe('listUploadBatches (SCRUM-7)', () => {
     assert.equal(out.body?.error, 'forbidden_kitchen');
   });
 
-  test('a SUPER_ADMIN is not kitchen-filtered', async () => {
+  test('a ADMIN is not kitchen-filtered', async () => {
     const { db, calls } = fakeDb();
     await run(listUploadBatches(db), {
-      user: userWith('SUPER_ADMIN'),
+      user: userWith('ADMIN'),
       valid: { query: { page: 1, pageSize: 25 } },
     });
 
@@ -193,7 +193,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     // Staging only: nothing canonical rides along any more.
     assert.equal('menuPlans' in created, false);
 
-    // Kitchen 3 has no code and so no profile (SCRUM-39): quarantined, never READY.
+    // Kitchen 3 has no code and so no profile (SCRUM-39): quarantined, never PUBLISHED.
     const final = calls.updates.at(-1) as Record<string, unknown>;
     assert.equal(final.status, 'NEEDS_MAPPING_UPDATE');
     assert.equal(final.errorCode, 'PROFILE_NOT_DETECTED');
@@ -300,7 +300,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
 
     const out = await run(createUploadBatch(db, put, new InMemoryStagingRepository()), {
       ...(await withFile()),
-      user: userWith('SUPER_ADMIN'),
+      user: userWith('ADMIN'),
     });
 
     assert.equal(out.status, 400);
@@ -412,7 +412,7 @@ describe('Validasi Data records/history (B-MAPOUT)', () => {
   test('404 when the batch does not exist', async () => {
     for (const handler of handlers) {
       const { db } = fakeDb();
-      assert.equal((await run(handler(db), req('SUPER_ADMIN', null))).status, 404);
+      assert.equal((await run(handler(db), req('ADMIN', null))).status, 404);
     }
   });
 
@@ -444,8 +444,8 @@ describe('updateUploadBatch (SCRUM-22)', () => {
   test('404 when the batch does not exist', async () => {
     const { db } = fakeDb();
     const out = await run(updateUploadBatch(db), {
-      user: userWith('SUPER_ADMIN'),
-      valid: { params: { id: 9n }, body: { status: 'READY' } },
+      user: userWith('ADMIN'),
+      valid: { params: { id: 9n }, body: { status: 'FAILED' } },
     });
 
     assert.equal(out.status, 404);
@@ -455,7 +455,7 @@ describe('updateUploadBatch (SCRUM-22)', () => {
     const { db } = fakeDb({ findUnique: async () => ({ id: 9n, kitchenId: 4n, status: 'NEEDS_REVIEW' }) });
     const out = await run(updateUploadBatch(db), {
       user: userWith('DATA_ADMIN', 3n),
-      valid: { params: { id: 9n }, body: { status: 'READY' } },
+      valid: { params: { id: 9n }, body: { status: 'FAILED' } },
     });
 
     assert.equal(out.status, 403);
@@ -466,8 +466,8 @@ describe('updateUploadBatch (SCRUM-22)', () => {
       findUnique: async () => ({ id: 9n, kitchenId: 3n, status: 'FAILED' }),
     });
     const out = await run(updateUploadBatch(db), {
-      user: userWith('SUPER_ADMIN'),
-      valid: { params: { id: 9n }, body: { status: 'READY' } },
+      user: userWith('ADMIN'),
+      valid: { params: { id: 9n }, body: { status: 'FAILED' } },
     });
 
     assert.equal(out.status, 409);
@@ -480,35 +480,11 @@ describe('updateUploadBatch (SCRUM-22)', () => {
       findUnique: async () => ({ id: 9n, kitchenId: 3n, status: 'NEEDS_REVIEW' }),
     });
     const out = await run(updateUploadBatch(db), {
-      user: userWith('SUPER_ADMIN'),
+      user: userWith('ADMIN'),
       valid: { params: { id: 9n }, body: { status: 'FAILED', notes: 'kolom BDD kosong' } },
     });
 
     assert.equal(out.status, 200);
     assert.deepEqual(calls.updates, [{ status: 'FAILED', notes: 'kolom BDD kosong' }]);
-  });
-
-  test('open CRITICAL issues keep the batch out of READY (SCRUM-51 quarantine)', async () => {
-    const { db, calls } = fakeDb({ findUnique: async () => ({ id: 9n, publicId: 'pub-1', kitchenId: 3n, status: 'NEEDS_REVIEW' }) }, {}, 2);
-    const out = await run(updateUploadBatch(db), {
-      user: userWith('SUPER_ADMIN'),
-      valid: { params: { id: 9n }, body: { status: 'READY' } },
-    });
-
-    assert.equal(out.status, 409);
-    assert.equal(out.body?.error, 'batch_blocked');
-    assert.deepEqual(out.body?.details, { openCritical: 2 });
-    assert.equal(calls.updates.length, 0);
-  });
-
-  test('READY once every CRITICAL issue is resolved', async () => {
-    const { db, calls } = fakeDb({ findUnique: async () => ({ id: 9n, publicId: 'pub-1', kitchenId: 3n, status: 'NEEDS_REVIEW' }) });
-    const out = await run(updateUploadBatch(db), {
-      user: userWith('SUPER_ADMIN'),
-      valid: { params: { id: 9n }, body: { status: 'READY' } },
-    });
-
-    assert.equal(out.status, 200);
-    assert.deepEqual(calls.updates, [{ status: 'READY' }]);
   });
 });

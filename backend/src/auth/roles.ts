@@ -1,17 +1,9 @@
-/** PRD Oktober 2026 §3 + US-15. SUPER_ADMIN = Admin Sistem / PM MBG. */
-export const ROLES = [
-  'SUPER_ADMIN',
-  'MANAGEMENT',
-  'FINANCE',
-  'KEPALA_KITCHEN',
-  'DATA_ADMIN',
-  'AHLI_GIZI',
-  'DATA_STEWARD',
-] as const;
+/** SCRUM-152: two roles. ADMIN (formerly PM MBG) manages; DATA_ADMIN is Data Operasional, tied to one dapur. */
+export const ROLES = ['ADMIN', 'DATA_ADMIN'] as const;
 export type Role = (typeof ROLES)[number];
 
-/** Roles whose scope is "kitchen sendiri": no scope rows means no kitchens, never all. */
-export const KITCHEN_SCOPED_ROLES: readonly Role[] = ['KEPALA_KITCHEN', 'DATA_ADMIN', 'AHLI_GIZI'];
+/** Roles whose scope is "dapur sendiri": no scope rows means no kitchens, never all. */
+export const KITCHEN_SCOPED_ROLES: readonly Role[] = ['DATA_ADMIN'];
 
 /**
  * The catalogue of things a route can demand. Which role holds which lives in
@@ -23,13 +15,12 @@ export const KITCHEN_SCOPED_ROLES: readonly Role[] = ['KEPALA_KITCHEN', 'DATA_AD
  *   settings:manage             peta role -> permission
  *   audit:read                  audit trail
  *
- * SUPER_ADMIN (Project Manager MBG) always holds all of them except
- * MAKER_PERMISSIONS and is not stored in the table.
+ * ADMIN always holds all of them except MAKER_PERMISSIONS and is not stored
+ * in the table.
  */
 export const PERMISSIONS = [
   'upload:create',
   'upload:view',
-  'batch:review',
   'batch:publish',
   'mapping:view',
   'mapping:propose',
@@ -43,5 +34,5 @@ export const PERMISSIONS = [
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-/** Four-eyes (PRD AC-ROLE-02): the reviewer never holds the maker's permissions. */
-export const MAKER_PERMISSIONS: readonly Permission[] = ['upload:create', 'mapping:propose'];
+/** SCRUM-148: Admin neither uploads nor publishes files; Data Operasional does both for its own dapur. */
+export const MAKER_PERMISSIONS: readonly Permission[] = ['upload:create', 'mapping:propose', 'batch:publish'];

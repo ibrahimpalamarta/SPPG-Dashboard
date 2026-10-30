@@ -1,8 +1,8 @@
-import { ArrowRight, Bell, Building2, Send } from "lucide-react";
+import { ArrowRight, Bell, Building2 } from "lucide-react";
 import { StatusLabel } from "@/components/kelengkapan/status-label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { deliveries, detail } from "@/lib/mock/kelengkapan-data";
+import { detail } from "@/lib/mock/kelengkapan-data";
 
 const actionButton =
   "inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600";
@@ -58,29 +58,6 @@ export function KitchenDetail() {
             ))}
           </tbody>
         </table>
-      </div>
-    </Card>
-  );
-}
-
-export function SipgnStatus() {
-  return (
-    <Card className="p-6">
-      <h2 className="flex items-center gap-3 text-base font-semibold text-slate-900">
-        <Send className="size-5 text-emerald-600" aria-hidden="true" />
-        Status kirim ke SIPGN/BGN
-      </h2>
-      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {deliveries.map(({ title, code, note, status }) => (
-          <div key={title} className="rounded-xl border border-slate-200 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <p className="font-semibold text-slate-800">{title}</p>
-            </div>
-            <p className="text-xs text-slate-500">Kitchen {code}</p>
-            <p className="mt-2 text-sm text-slate-500">{note}</p>
-            <div className="mt-3"><StatusLabel tone={status.tone}>{status.label}</StatusLabel></div>
-          </div>
-        ))}
       </div>
     </Card>
   );

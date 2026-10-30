@@ -4,8 +4,8 @@ import { validate } from '../../middleware/validate.js';
 import { singleFile } from '../../middleware/upload.js';
 import { wrap } from '../../lib/wrap.js';
 import { idParam } from '../../schemas/common.js';
-import { batchReturn, templateParam } from '../../schemas/upload-batch.js';
-import { publishUploadBatch, returnUploadBatch, submitUploadBatch } from '../../controllers/upload/review.js';
+import { templateParam } from '../../schemas/upload-batch.js';
+import { publishUploadBatch } from '../../controllers/upload/review.js';
 import {
   uploadBatchCreate,
   uploadBatchCreateQuery,
@@ -36,10 +36,10 @@ uploadBatchRouter.get('/:id', validate({ params: idParam }), wrap(getUploadBatch
 uploadBatchRouter.get('/:id/file', validate({ params: idParam }), wrap(downloadUploadBatchFile()));
 uploadBatchRouter.get('/:id/records', validate({ params: idParam, query: pageQuery }), wrap(listUploadBatchRecords()));
 uploadBatchRouter.get('/:id/history', validate({ params: idParam }), wrap(listUploadBatchHistory()));
-uploadBatchRouter.delete('/:id', requirePermission('batch:review'), validate({ params: idParam }), wrap(deleteUploadBatch()));
+uploadBatchRouter.delete('/:id', requirePermission('batch:publish'), validate({ params: idParam }), wrap(deleteUploadBatch()));
 
-// SCRUM-20: uploading needs upload:create; changing a batch's verdict is a
-// review (batch:review, PM only).
+// SCRUM-20: uploading needs upload:create; changing or publishing a batch needs
+// batch:publish (Data Operasional, own dapur only).
 // multer runs before validate() because it is what populates req.body for a
 // multipart request — there is nothing to validate until it has parsed the form.
 uploadBatchRouter.post(
@@ -49,13 +49,11 @@ uploadBatchRouter.post(
   validate({ body: uploadBatchCreate, query: uploadBatchCreateQuery }),
   wrap(createUploadBatch()),
 );
-// SCRUM-117/95: Data Operasional (the maker) submits; PM MBG returns or publishes.
-uploadBatchRouter.post('/:id/submit', requirePermission('upload:create'), validate({ params: idParam }), wrap(submitUploadBatch()));
-uploadBatchRouter.post('/:id/return', requirePermission('batch:publish'), validate({ params: idParam, body: batchReturn }), wrap(returnUploadBatch()));
+// SCRUM-148: no review step; Data Operasional publishes its own batch.
 uploadBatchRouter.post('/:id/publish', requirePermission('batch:publish'), validate({ params: idParam }), wrap(publishUploadBatch()));
 uploadBatchRouter.patch(
   '/:id',
-  requirePermission('batch:review'),
+  requirePermission('batch:publish'),
   validate({ params: idParam, body: uploadBatchUpdate }),
   wrap(updateUploadBatch()),
 );

@@ -4,7 +4,7 @@ import { shot } from './evidence.js';
 import { storageState } from './roles.js';
 
 test.describe('Unggah Data', () => {
-  test.use({ storageState: storageState('data-steward') });
+  test.use({ storageState: storageState('data-operasional-skn') });
 
   test('[SCRUM-5][SCRUM-22] form unggah: pilih kitchen, jenis data, periode @smoke', async ({ page }) => {
     await page.goto('unggah-data');
@@ -42,7 +42,7 @@ test.describe('Unggah Data', () => {
 // Uploads need the S3 stub of the QA environment (scripts/env.ts). One test at a
 // time: every upload lands in the same database and the history is read back.
 test.describe.serial('Unggah Data: unggah file', () => {
-  test.use({ storageState: storageState('data-steward') });
+  test.use({ storageState: storageState('data-operasional-skn') });
 
   const fixtures = '../backend/src/lib/ingest/fixtures/';
   const cashflow = readFileSync(`${fixtures}sukun-cashflow.csv`);

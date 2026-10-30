@@ -16,7 +16,7 @@ export const kitchenRouter = Router();
 kitchenRouter.get('/', validate({ query: kitchenListQuery }), wrap(listKitchens()));
 kitchenRouter.get('/:id', validate({ params: idParam }), wrap(getKitchen()));
 
-// SCRUM-20/123: Data Reference is read-only for Data Operasional; only PM MBG
+// SCRUM-20/123: Data Reference is read-only for Data Operasional; only Admin
 // (reference:edit) changes it.
 kitchenRouter.post(
   '/',

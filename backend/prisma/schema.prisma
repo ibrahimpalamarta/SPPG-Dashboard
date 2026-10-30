@@ -23,15 +23,10 @@ datasource db {
 
 /// Authorization roles, enforced from users.role. Which permissions a role holds
 /// lives in role_permissions and is edited through the admin API.
-/// Daftar role mengikuti PRD Oktober 2026 §3.
+/// SCRUM-152: dua role. ADMIN (dulu PM MBG) dan DATA_ADMIN (Data Operasional).
 enum Role {
-  SUPER_ADMIN
-  MANAGEMENT
-  FINANCE
-  KEPALA_KITCHEN
+  ADMIN
   DATA_ADMIN
-  AHLI_GIZI
-  DATA_STEWARD
 }
 
 /// Status keaktifan akun maupun dapur - ERD memakai ENUM(active,inactive)
@@ -59,7 +54,6 @@ enum UploadStatus {
   PROCESSING
   NEEDS_REVIEW
   NEEDS_MAPPING_UPDATE
-  READY
   PUBLISHED
   FAILED
   /// Berkas diganti unggah ulang (SCRUM-124).

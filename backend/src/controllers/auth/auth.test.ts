@@ -130,8 +130,8 @@ describe('login', () => {
   test('wrong password, unknown email, disabled and password-less accounts share one response', async () => {
     const { db, users } = await fakeDb();
     users.push(
-      { id: 2n, email: 'off@example.com', role: 'MANAGEMENT', status: 'INACTIVE', passwordHash: users[0]!.passwordHash, failedLoginCount: 0, lockedUntil: null },
-      { id: 3n, email: 'new@example.com', role: 'MANAGEMENT', status: 'ACTIVE', passwordHash: null, failedLoginCount: 0, lockedUntil: null },
+      { id: 2n, email: 'off@example.com', role: 'DATA_ADMIN', status: 'INACTIVE', passwordHash: users[0]!.passwordHash, failedLoginCount: 0, lockedUntil: null },
+      { id: 3n, email: 'new@example.com', role: 'DATA_ADMIN', status: 'ACTIVE', passwordHash: null, failedLoginCount: 0, lockedUntil: null },
     );
     const attempts = [
       { email: 'pic@example.com', password: 'wrong-password-1A' },

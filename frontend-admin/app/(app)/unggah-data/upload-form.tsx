@@ -66,16 +66,23 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
         </ol>
 
         <div hidden={current !== 1} className="space-y-6">
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-semibold text-slate-800">1. Pilih kitchen</legend>
-            <select value={kitchen} onChange={(e) => setKitchen(e.target.value)} className={`${field} max-w-md`}>
-              {kitchens.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.code ? `${k.code} · ${k.name}` : k.name}
-                </option>
-              ))}
-            </select>
-          </fieldset>
+          {kitchens.length > 1 ? (
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-semibold text-slate-800">1. Pilih kitchen</legend>
+              <select value={kitchen} onChange={(e) => setKitchen(e.target.value)} className={`${field} max-w-md`}>
+                {kitchens.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.code ? `${k.code} · ${k.name}` : k.name}
+                  </option>
+                ))}
+              </select>
+            </fieldset>
+          ) : (
+            // SCRUM-144: Data Operasional is tied to one dapur, so there is nothing to pick.
+            <p className="text-sm font-semibold text-slate-800">
+              Dapur: {kitchens[0]!.code ? `${kitchens[0]!.code} · ${kitchens[0]!.name}` : kitchens[0]!.name}
+            </p>
+          )}
 
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold text-slate-800">2. Pilih jenis data</legend>

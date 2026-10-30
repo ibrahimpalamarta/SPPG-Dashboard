@@ -28,8 +28,8 @@ import {
   type CmsResource,
 } from '../../controllers/cms/cms.js';
 
-/** SCRUM-14: the PRD Oktober has no CMS role, so content is Super Admin only. */
-const cmsRoles: RequestHandler = requireRole('SUPER_ADMIN');
+/** SCRUM-14: there is no CMS role, so content is Admin only. */
+const cmsRoles: RequestHandler = requireRole('ADMIN');
 
 function cmsRouter(resource: CmsResource, schemas: {
   list: ZodTypeAny;

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ClipboardCheck, FileWarning, MailWarning, type LucideIcon } from "lucide-react";
+import { FileWarning, MailWarning, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { apiGet } from "@/lib/api";
@@ -44,10 +44,10 @@ export default async function Page() {
   await requirePage("/inbox");
   const inbox = await apiGet<Inbox>("/inbox");
 
-  if (inbox.reviewTasks.length === 0 && inbox.quarantinedFiles.length === 0 && inbox.expiredInvites.length === 0) {
+  if (inbox.quarantinedFiles.length === 0 && inbox.expiredInvites.length === 0) {
     return (
       <EmptyState title="Belum ada tugas">
-        <p>Batch yang menunggu review PM atau dikembalikan untuk diperbaiki akan muncul di sini.</p>
+        <p>File yang perlu diperbaiki atau undangan yang kedaluwarsa akan muncul di sini.</p>
       </EmptyState>
     );
   }
@@ -59,16 +59,8 @@ export default async function Page() {
         <p className="mt-2 text-slate-500">Tugas yang menunggu tindakan Anda.</p>
       </div>
 
-      {inbox.reviewTasks.length > 0 && (
-        <Section icon={ClipboardCheck} title="Menunggu Review PM">
-          {inbox.reviewTasks.map((b) => (
-            <Row key={b.publicId} href={`/mapping-validasi?batch=${b.publicId}`} title={b.fileName} subtitle={kitchenLabel(b)} time={b.uploadDate} />
-          ))}
-        </Section>
-      )}
-
       {inbox.quarantinedFiles.length > 0 && (
-        <Section icon={FileWarning} title="File ditahan atau dikembalikan">
+        <Section icon={FileWarning} title="File perlu diperbaiki">
           {inbox.quarantinedFiles.map((b) => (
             <Row
               key={b.publicId}
