@@ -46,6 +46,14 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 
 **D-14 · 2026-10-23 · Registry parser = map statis.** `registerParser()` dari SCRUM-24 diganti objek `parsers` di `pipeline.ts`: lebih sedikit kode, tanpa efek samping saat import, dan tidak ada siklus import.
 
+**D-16 · 2026-10-30 · Tahap 3–7 hanya Sukun, tabel baru dimigrasi di branch.** Atas keputusan user: tiket non-Sukun (SCRUM-32/56/57/58) tetap To Do. Tabel [USULAN] Tahap 3–7 langsung dimigrasi di branch bertumpuk `feature/tahap3-…` → `tahap4-…` → `tahap5-…` → `tahap6-…` → `tahap7-…`, dengan `SCRUM-xx-schema.md` di folder tiket; review PR = persetujuan skema. Tiket yang sumbernya belum ada (B-SRC-SKN) tetap dibangun tabel/query/widget-nya tanpa mapping karangan.
+
+**D-17 · 2026-10-30 · ASUMSI izin alur review (SCRUM-51/117/95).** Tandai temuan sudah dicek dan Kirim ke PM = `upload:create` (pembuat data, Data Operasional). Kembalikan dan Publish = `batch:publish` (PM MBG, Data Steward). Pengunggah tidak boleh mem-publish batch miliknya sendiri, meskipun memegang keduanya (Data Steward). Catat pelaporan ke pemerintah = `batch:publish`. Tidak ada status enum baru: READY = "Menunggu Review PM", NEEDS_REVIEW + `errorCode RETURNED` = "Dikembalikan".
+
+**D-18 · 2026-10-30 · Kunci bisnis publish (SCRUM-78).** Finance: kitchen + `txn_id` + `txn_date` (Sukun memberi nomor `TXN-B0001` lagi tiap periode). RAB: kitchen + tanggal + segmen. Menu: kitchen + tanggal + segmen + menu + bahan. Payment: kitchen + `payment_request_id`. Baris lama ditandai `superseded_by_batch_id`, tidak dihapus. Koreksi yang mengubah tanggal memakai `replaces`, yang menutup seluruh batch lama saat koreksi dipublish.
+
+**D-19 · 2026-10-30 · Eligibility KPI (SCRUM-54).** `ELIGIBLE_REVIEW_STATUSES = ['TERKONFIRMASI']` di `backend/src/lib/publish.ts`: konstanta kode, berubah lewat deploy. KPI hanya membaca batch PUBLISHED, baris yang tidak superseded, dan (untuk finance) review status eligible.
+
 ## Konflik dokumen
 
 **K-01 · OD-01 Lawang (B-LWG).** PRD §0/§14: Lawang = "Phase 1 comparison", masuk setelah alur Sukun stabil. BRD §1 "Kitchen mana yang didahulukan": Lawang = "Phase 2 – rollout", didahulukan dari DNM/PCK. **Dipakai PRD**, sebagai nilai config `rollout_status`, bukan hardcode.

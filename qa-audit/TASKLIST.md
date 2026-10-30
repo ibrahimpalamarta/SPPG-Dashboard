@@ -62,7 +62,7 @@ Setiap tiket dianggap selesai bila semua poin di kolom *Selesai bila* lulus, dan
 | T20 | Validation framework + severity & quarantine | 33, 51 | IN_PROGRESS (siap review) |
 | T21 | Finance DQ: kategori, transfer internal, SLA D0/D+1, rekonsiliasi Ringkasan_Transaksi | 34, 42, 43, 48, 84, 119 (127 duplikat) | IN_PROGRESS (siap review) |
 | T22 | Menu DQ lintas template dapur | 85, 120 (128 duplikat) | IN_PROGRESS (Sukun siap review) |
-| T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | BLOCKED (B-SRC-SKN) |
+| T23 | Review/approval PM, eligibility, publish idempoten, supersede | 117, 54, 78, 95, 96 | IN_PROGRESS (siap review; B-ROLE) |
 | **Tahap 6 — KPI & Dashboard** ||||
 | T24 | Widget Finance: Top 5 Supplier, Expense Mix, Planned Cost/Portion, Saldo, EFI Transfer | 62, 97, 63, 99, 64, 100, 65, 101, 66, 102 | BLOCKED (B-SRC-SKN) |
 | T25 | Widget Menu/Gizi/Beneficiary + validasi total tersalurkan | 74, 115, 76, 116, 103, 129 | TODO |
@@ -256,11 +256,11 @@ tidak menggandakan fakta; batch koreksi menggantikan yang lama dan histori tetap
 #### T23 — Review & publish · Butuh: T20 · Status: TODO
 | Urut | Jira | Judul | Status kode | Uji | Selesai bila |
 |---|---|---|---|---|---|
-| T23.1 | SCRUM-117 | Review & approval workflow PM | TODO | U, UI | Status Menunggu Review PM & Dikembalikan; catatan wajib; tugas muncul di Inbox; tercatat di audit |
-| T23.2 | SCRUM-54 | [DATA-021] Production eligibility by review_status | TODO | U | Rule bisa dikonfigurasi (baseline: TERKONFIRMASI saja); status karantina dikecualikan tapi tetap terlihat; keputusan terdokumentasi |
-| T23.3 | SCRUM-78 | [DATA-045] Publish idempoten + supersede lineage | TODO | U | Publish pakai business key deterministik; batch koreksi menandai record lama superseded; lineage lama tetap bisa di-query |
-| T23.4 | SCRUM-95 | Publish canonical batch | TODO | U, UI | Hanya PM MBG, setelah review, tanpa blocker; idempoten; lineage terjaga |
-| T23.5 | SCRUM-96 | Correction/supersede flow | TODO | U, UI | Batch koreksi menggantikan yang lama tanpa kehilangan histori |
+| T23.1 | SCRUM-117 | Review & approval workflow PM | IN_PROGRESS (siap review) | U, UI | Status Menunggu Review PM & Dikembalikan; catatan wajib; tugas muncul di Inbox; tercatat di audit |
+| T23.2 | SCRUM-54 | [DATA-021] Production eligibility by review_status | IN_PROGRESS (siap review) | U | Rule bisa dikonfigurasi (baseline: TERKONFIRMASI saja); status karantina dikecualikan tapi tetap terlihat; keputusan terdokumentasi |
+| T23.3 | SCRUM-78 | [DATA-045] Publish idempoten + supersede lineage | IN_PROGRESS (siap review) | U | Publish pakai business key deterministik; batch koreksi menandai record lama superseded; lineage lama tetap bisa di-query |
+| T23.4 | SCRUM-95 | Publish canonical batch | IN_PROGRESS (siap review) | U, UI | Hanya PM MBG, setelah review, tanpa blocker; idempoten; lineage terjaga |
+| T23.5 | SCRUM-96 | Correction/supersede flow | IN_PROGRESS (siap review) | U, UI | Batch koreksi menggantikan yang lama tanpa kehilangan histori |
 
 ### Tahap 6 — KPI & Dashboard
 
@@ -300,8 +300,8 @@ Urutan di tiap task: **semantic query dulu (backend), lalu widget (UI).**
 | T26.2 | SCRUM-105 | Source trace drilldown | TODO | UI | KPI → canonical → mapping profile → file/record source |
 | T26.3 | SCRUM-61 | [DATA-028] Mapping/template change log | TODO | U | Log mencatat profil, versi lama/baru, effective_from, deskripsi, owner; upload versi tidak kompatibel diblokir |
 | T26.4 | SCRUM-106 | Audit & change log | TODO | U, UI | Upload, mapping, publish, koreksi manual, perubahan versi tercatat |
-| T26.5 | SCRUM-59 | [DATA-026] government_submission_log + dedup | TODO | U | Submission merujuk source_record_id; sistem/modul/status tersimpan; KPI mengecualikan salinan submission |
-| T26.6 | SCRUM-107 | Government submission lineage | TODO | U | Submission SIPGN/POP/Aksis tertaut ke source_record_id, tanpa fakta ganda |
+| T26.5 | SCRUM-59 | [DATA-026] government_submission_log + dedup | IN_PROGRESS (siap review) | U | Submission merujuk source_record_id; sistem/modul/status tersimpan; KPI mengecualikan salinan submission |
+| T26.6 | SCRUM-107 | Government submission lineage | IN_PROGRESS (siap review; UI di T26) | U | Submission SIPGN/POP/Aksis tertaut ke source_record_id, tanpa fakta ganda |
 | T26.7 | SCRUM-67 | [DATA-034] Expected source checklist + completeness | TODO | U | Checklist per dapur/fase; status submitted/missing/error/accepted; source di luar scope dikecualikan; missing ≠ 0 |
 | T26.8 | SCRUM-68 | [DATA-035] Validation queue | IN_PROGRESS (siap review) | U, UI | Filter dapur/batch/rule/severity; link ke source record; auto-fix terlihat; item bisa diproses ulang |
 | T26.9 | SCRUM-104 | Data Health overview | TODO | UI | Kelengkapan, data hilang, error, jumlah issue, publish terakhir per dapur/domain |

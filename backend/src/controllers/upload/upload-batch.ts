@@ -320,6 +320,8 @@ export const createUploadBatch =
         fileHash,
         fileSize: size,
         notes: body.notes ?? null,
+        // SCRUM-96: a correction of published data replaces it only once it is published itself.
+        replacesBatchId: replaced?.status === UploadStatus.PUBLISHED ? replaced.publicId : null,
       },
     });
     const done = { ...event, batch_id: batch.publicId };
@@ -418,8 +420,9 @@ export const createUploadBatch =
         metadata: { mappingProfileId: row.mappingProfileId, templateVersion: row.templateVersion },
       });
     }
-    // A re-upload that did not even parse leaves the old batch where it was.
-    if (replaced && row.status !== UploadStatus.FAILED) {
+    // A re-upload that did not even parse leaves the old batch where it was;
+    // a published one stays live until its correction is published (SCRUM-96).
+    if (replaced && replaced.status !== UploadStatus.PUBLISHED && row.status !== UploadStatus.FAILED) {
       await db.uploadBatch.update({
         where: { id: replaced.id },
         data: { status: UploadStatus.SUPERSEDED, errorCode: 'REPLACED', errorSummary: `Diganti oleh batch ${row.publicId}.` },

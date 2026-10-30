@@ -371,12 +371,22 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
   });
 
   test('replaces must name an open batch of the same kitchen and domain', async () => {
-    for (const old of [null, { id: 7n, kitchenId: 4n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'MENU', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'CASHFLOW', status: 'PUBLISHED' }]) {
+    for (const old of [null, { id: 7n, kitchenId: 4n, domain: 'CASHFLOW', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'MENU', status: 'NEEDS_MAPPING_UPDATE' }, { id: 7n, kitchenId: 3n, domain: 'CASHFLOW', status: 'READY' }]) {
       const { db, calls } = fakeDb({ findUnique: async () => old }, skn);
       const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: '11111111-1111-4111-8111-111111111111' }));
       assert.equal(out.status, 400, JSON.stringify(old, (_k, v) => (typeof v === 'bigint' ? String(v) : v)));
       assert.equal(calls.created, undefined);
     }
+  });
+
+  test('a correction of a published batch leaves it published until the correction is (SCRUM-96)', async () => {
+    const old = { id: 7n, publicId: '11111111-1111-4111-8111-111111111111', kitchenId: 3n, domain: 'CASHFLOW', status: 'PUBLISHED' };
+    const { db, calls } = fakeDb({ findUnique: async () => old }, skn);
+    const out = await run(createUploadBatch(db, fakePut().put, new InMemoryStagingRepository()), sukun(fixture('sukun-cashflow.csv'), 'CASHFLOW', { replaces: old.publicId }));
+    assert.equal(out.status, 201);
+    assert.equal((calls.created as { replacesBatchId: string }).replacesBatchId, old.publicId);
+    assert.ok(!calls.updates.some((u) => (u as { status?: string }).status === 'SUPERSEDED'));
+    assert.ok(!calls.audits.includes('upload_batch.replaced'));
   });
 
   test('a DATA_ADMIN cannot upload for another dapur', async () => {

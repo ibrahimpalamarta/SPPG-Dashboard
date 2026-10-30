@@ -58,4 +58,6 @@ export type Db = Pick<
   | 'galleryImage'
   | 'referenceEntry'
   | 'validationIssue'
+  | 'stagingRow'
+  | 'governmentSubmissionLog'
 >;
