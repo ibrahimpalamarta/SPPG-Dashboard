@@ -23,12 +23,12 @@ const RECORDS_PAGE_SIZE = 20;
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ batch?: string; listPage?: string; recordsPage?: string; kitchenId?: string; domain?: string; status?: string; dev?: string }>;
+  searchParams: Promise<{ batch?: string; listPage?: string; recordsPage?: string; kitchenId?: string; domain?: string; status?: string }>;
 }) {
-  const [me, { batch: batchId, listPage, recordsPage: recordsPageParam, dev, ...filters }] = await Promise.all([requirePage("/mapping-validasi"), searchParams]);
+  const [me, { batch: batchId, listPage, recordsPage: recordsPageParam, ...filters }] = await Promise.all([requirePage("/mapping-validasi"), searchParams]);
 
   if (!batchId) {
-    return <BatchList page={Number(listPage) || 1} canDelete={me.permissions.includes("batch:publish")} dev={dev === "1"} filters={filters} kitchens={me.kitchens} />;
+    return <BatchList page={Number(listPage) || 1} canDelete={me.permissions.includes("batch:publish")} filters={filters} kitchens={me.kitchens} />;
   }
 
   const recordsPage = Number(recordsPageParam) || 1;

@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { apiFetch, apiSend } from "@/lib/api";
+import { DEV_MODE_COOKIE } from "@/lib/dev-mode";
 
 export type ColumnDiff = { sheet: string; missing: string[]; unexpected: string[] };
 
@@ -53,6 +55,12 @@ async function forceDelete(path: string): Promise<string | null> {
   revalidatePath("/mapping-validasi");
   revalidatePath("/overview");
   return null;
+}
+
+export async function setDevMode(on: boolean): Promise<void> {
+  (await cookies()).set(DEV_MODE_COOKIE, on ? "1" : "", { path: "/", maxAge: on ? 60 * 60 * 24 * 30 : 0 });
+  revalidatePath("/unggah-data");
+  revalidatePath("/mapping-validasi");
 }
 
 export async function deleteBatch(id: string): Promise<string | null> {
