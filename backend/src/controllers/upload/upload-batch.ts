@@ -20,8 +20,10 @@ import { WorkbookError, assertReadable, isCsv } from '../../lib/ingest/workbook.
 import { parseToStaging, type MappingSummary } from '../../lib/ingest/pipeline.js';
 import type { ColumnDiff } from '../../lib/mapping/detect.js';
 import { InMemoryStagingRepository, PrismaStagingRepository, type StagedSheet, type StagingRepository } from '../../lib/ingest/staging.js';
+import { env } from '../../config/env.js';
 import type {
   uploadBatchCreate,
+  uploadBatchDeleteQuery,
   uploadBatchCreateQuery,
   uploadBatchListQuery,
   uploadBatchUpdate,
@@ -159,10 +161,26 @@ export const downloadUploadBatchFile = (db: Db = prisma, get: GetObject = getObj
   res.send(await get(row.storageKey));
 };
 
+type DeleteQuery = z.infer<typeof uploadBatchDeleteQuery>;
+
+/** Dev clean-up: `force` (deleting PUBLISHED) is only honoured outside production. */
+const forced = (q: DeleteQuery) => q.force && env.NODE_ENV !== 'production';
+
+async function removeBatch(db: Db, remove: DeleteObject, userId: bigint, row: { id: bigint; fileName: string; kitchenId: bigint; domain: string; status: string; storageKey: string | null }) {
+  await db.uploadBatch.delete({ where: { id: row.id } });
+  if (row.storageKey) await remove(row.storageKey);
+  await writeAuditLog(db, {
+    userId,
+    action: 'upload_batch.deleted',
+    entity: 'upload_batches',
+    entityId: row.id,
+    metadata: { fileName: row.fileName, kitchenId: String(row.kitchenId), domain: row.domain, status: row.status },
+  });
+}
+
 /**
- * Dev clean-up: hard-deletes a batch, its staging rows and menu plans (FK
- * cascade) and the stored original. PUBLISHED is refused — canonical data was
- * built from it and does not cascade.
+ * Dev clean-up: hard-deletes a batch, its staging rows, menu plans and canonical
+ * rows (FK cascade) and the stored original. PUBLISHED is refused unless forced.
  */
 export const deleteUploadBatch = (db: Db = prisma, remove: DeleteObject = deleteObject): RequestHandler => async (req, res) => {
   const { id } = req.valid!.params as { id: bigint };
@@ -175,20 +193,28 @@ export const deleteUploadBatch = (db: Db = prisma, remove: DeleteObject = delete
     sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
-  if (row.status === UploadStatus.PUBLISHED) {
+  if (row.status === UploadStatus.PUBLISHED && !forced(req.valid!.query as DeleteQuery)) {
     sendError(res, 'CONFLICT', { message: 'Batch yang sudah dipublish tidak bisa dihapus.' });
     return;
   }
 
-  await db.uploadBatch.delete({ where: { id } });
-  if (row.storageKey) await remove(row.storageKey);
-  await writeAuditLog(db, {
-    userId: req.user!.id,
-    action: 'upload_batch.deleted',
-    entity: 'upload_batches',
-    entityId: row.id,
-    metadata: { fileName: row.fileName, kitchenId: String(row.kitchenId), domain: row.domain, status: row.status },
-  });
+  await removeBatch(db, remove, req.user!.id, row);
+  res.status(204).end();
+};
+
+/** Dev clean-up: deletes every batch in the caller's dapur scope. Needs `force`, and never runs in production. */
+export const deleteAllUploadBatches = (db: Db = prisma, remove: DeleteObject = deleteObject): RequestHandler => async (req, res) => {
+  if (!forced(req.valid!.query as DeleteQuery)) {
+    sendError(res, 'CONFLICT', { message: 'Hapus semua hanya tersedia di mode development.' });
+    return;
+  }
+  const scope = kitchenScope(req.user!);
+  if (!scope.ok) {
+    sendError(res, 'FORBIDDEN_KITCHEN');
+    return;
+  }
+  const rows = await db.uploadBatch.findMany({ where: kitchenWhere(scope) });
+  for (const row of rows) await removeBatch(db, remove, req.user!.id, row);
   res.status(204).end();
 };
 

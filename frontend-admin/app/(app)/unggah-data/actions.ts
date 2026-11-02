@@ -43,16 +43,20 @@ export type UploadResult =
     }
   | { ok: false; message: string };
 
-/** Returns an error message, or null once the batch is gone. */
-export async function deleteBatch(id: string): Promise<string | null> {
-  const res = await apiSend(`/upload-batches/${encodeURIComponent(id)}`, "DELETE");
-  if (res.status === 403) return "Anda tidak memiliki akses untuk menghapus batch ini.";
-  if (res.status === 409) return "Batch yang sudah dipublish tidak bisa dihapus.";
+/** Dev-mode delete (`force`: PUBLISHED too). Returns an error message, or null once it is gone. */
+async function forceDelete(path: string): Promise<string | null> {
+  const res = await apiSend(`${path}force=true`, "DELETE");
+  if (res.status === 403) return "Anda tidak memiliki akses untuk menghapus.";
+  if (res.status === 409) return typeof res.data.message === "string" ? res.data.message : "Penghapusan ditolak.";
   if (!res.ok && res.status !== 404) return "Gagal menghapus. Coba lagi beberapa saat lagi.";
   revalidatePath("/unggah-data");
   revalidatePath("/mapping-validasi");
+  revalidatePath("/overview");
   return null;
 }
+
+export const deleteBatch = (id: string) => forceDelete(`/upload-batches/${encodeURIComponent(id)}?`);
+export const deleteAllBatches = () => forceDelete("/upload-batches?");
 
 /** The backend's verdict on a rejected upload or check, in Indonesian. */
 function failure(status: number, body: { message?: string; details?: { fields?: Record<string, string[]> } }) {

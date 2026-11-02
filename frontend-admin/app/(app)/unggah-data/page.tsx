@@ -9,9 +9,9 @@ export const metadata: Metadata = { title: "Unggah Data · SPPG Internal" };
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ listPage?: string; kitchenId?: string; domain?: string; status?: string }>;
+  searchParams: Promise<{ listPage?: string; kitchenId?: string; domain?: string; status?: string; dev?: string }>;
 }) {
-  const [me, { listPage, ...filters }] = await Promise.all([requirePage("/unggah-data"), searchParams]);
+  const [me, { listPage, dev, ...filters }] = await Promise.all([requirePage("/unggah-data"), searchParams]);
 
   return (
     <div className="mx-auto max-w-400 space-y-8">
@@ -26,7 +26,7 @@ export default async function Page({
       ) : (
         <>
           <UploadForm kitchens={me.kitchens} kitchenId={me.kitchens[0]?.id} />
-          <BatchList compact page={Number(listPage) || 1} canDelete={false} filters={filters} kitchens={me.kitchens} />
+          <BatchList compact page={Number(listPage) || 1} canDelete={me.permissions.includes("batch:publish")} dev={dev === "1"} filters={filters} kitchens={me.kitchens} />
         </>
       )}
     </div>
