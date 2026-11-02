@@ -2,7 +2,7 @@ import { StatusLabel } from "@/components/kelengkapan/status-label";
 import { Badge } from "@/components/ui/badge";
 import { columns, legend, matrix } from "@/lib/mock/kelengkapan-data";
 
-export function StatusMatrix() {
+export function StatusMatrix({ selected, onSelect }: { selected: string | null; onSelect: (code: string) => void }) {
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -25,13 +25,24 @@ export function StatusMatrix() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {matrix.map(({ code, name, note, cells, active, phase }) => (
-              <tr key={code} className={active ? "bg-emerald-50/60" : "hover:bg-slate-50"}>
+            {matrix.map(({ code, name, note, cells, phase }) => (
+              <tr key={code} className={code === selected ? "bg-emerald-50/60" : "hover:bg-slate-50"}>
                 <td className="px-4 py-3">
-                  <p className="flex items-center gap-2 font-semibold text-slate-800">
-                    {code} · {name}
-                    {phase && <Badge tone="slate">{phase}</Badge>}
-                  </p>
+                  {phase ? (
+                    <p className="flex items-center gap-2 font-semibold text-slate-800">
+                      {code} · {name}
+                      <Badge tone="slate">{phase}</Badge>
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onSelect(code)}
+                      aria-pressed={code === selected}
+                      className="text-left font-semibold text-slate-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                    >
+                      {code} · {name}
+                    </button>
+                  )}
                   <p className="text-xs text-slate-500">{note}</p>
                 </td>
                 {phase ? (
@@ -41,7 +52,7 @@ export function StatusMatrix() {
                 ) : (
                   cells.map(({ label, tone }, index) => (
                     <td key={columns[index]} className="px-3 py-3 text-center">
-                      <StatusLabel tone={tone}>{label}</StatusLabel>
+                      <StatusLabel tone={tone} hideText>{label}</StatusLabel>
                     </td>
                   ))
                 )}
