@@ -23,7 +23,7 @@ test.describe('Unggah Data', () => {
   });
 
   test('[SCRUM-25] riwayat unggahan menampilkan profil mapping, validasi, dan publish @smoke', async ({ page }) => {
-    // The full history lives on Validasi Data; the status badge carries validation and publish, the mapping profile is in the opened file.
+    // The full history lives on Upload History; the status badge carries validation and publish, the mapping profile is in the opened file.
     await page.goto('mapping-validasi');
     for (const col of ['File', 'Dapur', 'Jenis data', 'Diunggah', 'Status']) await expect(page.getByRole('columnheader', { name: col })).toBeVisible();
   });

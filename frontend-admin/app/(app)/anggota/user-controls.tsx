@@ -33,7 +33,7 @@ function Result({ state }: { state: UserActionState }) {
 
 const ROLE_OPTIONS: { role: Role; description: string }[] = [
   { role: "DATA_ADMIN", description: "Satu dapur: unggah file, cek validasi, dan Setujui & Publish sendiri." },
-  { role: "ADMIN", description: "Semua dapur: mengelola anggota, hak akses, Data Reference, dan melihat Validasi Data." },
+  { role: "ADMIN", description: "Semua dapur: mengelola anggota, hak akses, Data Reference, dan melihat Upload History." },
 ];
 
 /** Mirrors backend KITCHEN_SCOPED_ROLES: Data Operasional is tied to exactly one dapur. */

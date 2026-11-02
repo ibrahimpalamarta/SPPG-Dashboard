@@ -24,7 +24,7 @@ const avatarTone = (name: string) => AVATAR_TONES[name.charCodeAt(0) % AVATAR_TO
 type BatchFilters = { kitchenId?: string; domain?: string; status?: string };
 
 /**
- * The file list. By default it is Validasi Data (SCRUM-137/148): every attempt, filterable, where a file is opened
+ * The file list. By default it is Upload History (SCRUM-137/148): every attempt, filterable, where a file is opened
  * to be checked and published. `compact` is the history shown under the upload form: Export instead of Open,
  * no filters, and its pages stay on Unggah Data.
  */
@@ -41,7 +41,7 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
         <h2 className="text-xl font-bold tracking-tight text-slate-900">Upload History</h2>
       ) : (
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Validasi Data</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Upload History</h1>
           <p className="mt-1 text-slate-500">Semua file yang pernah diunggah.</p>
         </div>
       )}
