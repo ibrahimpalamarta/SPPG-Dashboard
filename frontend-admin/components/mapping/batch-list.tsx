@@ -35,12 +35,13 @@ const DEV_TOOLS = process.env.NODE_ENV !== "production";
 export async function BatchList({ page, canDelete, dev = false, compact = false, filters = {}, kitchens = [] }: { page: number; canDelete: boolean; dev?: boolean; compact?: boolean; filters?: BatchFilters; kitchens?: Kitchen[] }) {
   const base = compact ? "/unggah-data" : "/mapping-validasi";
   const showDev = canDelete && DEV_TOOLS;
-  const devOn = showDev && dev;
+  const devOn = showDev && dev && !compact;
   const query = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][]);
   const devQuery = new URLSearchParams(query);
   if (!devOn) devQuery.set("dev", "1");
+  // The compact history on Unggah Data only points to the switch on Upload History.
   const devToggle = showDev && (
-    <Link href={`${base}?${devQuery}`} role="switch" aria-checked={devOn} className="flex items-center gap-2 text-sm text-slate-600">
+    <Link href={compact ? "/mapping-validasi" : `${base}?${devQuery}`} role="switch" aria-checked={devOn} className="flex items-center gap-2 text-sm text-slate-600">
       Mode development
       <span className={`flex h-5 w-9 items-center rounded-full px-0.5 transition-colors ${devOn ? "bg-red-500" : "bg-slate-300"}`}>
         <span className={`size-4 rounded-full bg-white transition-transform ${devOn ? "translate-x-4" : ""}`} />
