@@ -25,6 +25,13 @@ describe('kitchenCompleteness', () => {
     assert.deepEqual(c.lastPublish, { at: '2026-11-05', label: 'Pembayaran Supplier' });
   });
 
+  test('reports optional data and per-item publish time without touching the score', () => {
+    const c = kitchenCompleteness({ batches: [batch('MENU', 'PUBLISHED', 6), batch('GOODS_RECEIPT', 'FAILED'), batch('CASHFLOW', 'PUBLISHED', 3)], liveLabels: new Set() });
+    assert.deepEqual([c.complete, c.issues], [1, { fix: 0, review: 0 }]);
+    assert.deepEqual(c.optional.map((o) => [o.label, o.state, o.issue]), [['Master Menu', 'COMPLETE', null], ['Penerimaan Barang', 'MISSING', 'FIX']]);
+    assert.equal(c.items[0].publishedAt, '2026-11-03T00:00:00.000Z');
+  });
+
   test('ignores superseded batches', () => {
     const c = kitchenCompleteness({ batches: [batch('RAB', 'SUPERSEDED')], liveLabels: new Set() });
     assert.equal(c.sent, 0);
