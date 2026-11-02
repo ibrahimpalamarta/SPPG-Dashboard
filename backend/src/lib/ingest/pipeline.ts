@@ -42,9 +42,9 @@ export type MappingSummary = {
 };
 
 /** A canonical field of the SOP and the header the template writes it under. */
-export type SopField = { field: string; header: string };
+type SopField = { field: string; header: string };
 
-export type PipelineResult =
+type PipelineResult =
   | { ok: true; batch: StagedBatch; detection: Detection; mapping: MappingSummary | null; columns: MappedColumn[]; fields: SopField[] }
   | { ok: false; errorCode: string; errorSummary: string };
 

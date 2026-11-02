@@ -30,9 +30,9 @@ const SUPERSEDE = [
   ['finance_balances', ['balance_date', 'account_ref']],
 ] as const;
 
-export type SupersedeCounts = Record<(typeof SUPERSEDE)[number][0], number>;
+type SupersedeCounts = Record<(typeof SUPERSEDE)[number][0], number>;
 
-export async function supersedePublished(tx: Pick<Prisma.TransactionClient, '$executeRaw'>, uploadBatchId: string): Promise<SupersedeCounts> {
+async function supersedePublished(tx: Pick<Prisma.TransactionClient, '$executeRaw'>, uploadBatchId: string): Promise<SupersedeCounts> {
   const counts = {} as SupersedeCounts;
   for (const [table, keys] of SUPERSEDE) {
     const sameKey = Prisma.join(

@@ -226,7 +226,7 @@ const PREVIEW_ROWS = 50;
  * name (SCRUM-22 security note): one object per attempt, nothing user-supplied
  * in the path.
  */
-export const uploadKey = (publicId: string, fileName = ''): string =>
+const uploadKey = (publicId: string, fileName = ''): string =>
   `upload-batches/${publicId}${isCsv(fileName) ? '.csv' : '.xlsx'}`;
 
 /** SCRUM-42: Data Reference › Daftar Kode › "Kategori pengeluaran", as the PM last edited it. */

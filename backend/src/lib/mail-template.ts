@@ -4,7 +4,7 @@
  * since mail clients ignore most of the rest. Returns both parts so the plain
  * text stays the fallback.
  */
-export type MailContent = {
+type MailContent = {
   title: string;
   intro: string;
   /** Free text from a person (the inviter's message); shown as a quote. */
