@@ -163,8 +163,8 @@ export const downloadUploadBatchFile = (db: Db = prisma, get: GetObject = getObj
 
 type DeleteQuery = z.infer<typeof uploadBatchDeleteQuery>;
 
-/** Dev clean-up: `force` (deleting PUBLISHED) is only honoured outside production. */
-const forced = (q: DeleteQuery) => q.force && env.NODE_ENV !== 'production';
+/** Dev clean-up: `force` (deleting PUBLISHED) is only honoured outside production, or where ALLOW_DEV_DELETE is set (staging). */
+const forced = (q: DeleteQuery) => q.force && (env.NODE_ENV !== 'production' || env.ALLOW_DEV_DELETE === 'true');
 
 async function removeBatch(db: Db, remove: DeleteObject, userId: bigint, row: { id: bigint; fileName: string; kitchenId: bigint; domain: string; status: string; storageKey: string | null }) {
   await db.uploadBatch.delete({ where: { id: row.id } });

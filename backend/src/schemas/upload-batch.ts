@@ -69,7 +69,7 @@ export const uploadBatchCreateQuery = z.object({
     .transform((v) => v === 'true'),
 });
 
-/** Dev clean-up only: `?force=true` also deletes PUBLISHED batches (refused when NODE_ENV is production). */
+/** Dev clean-up only: `?force=true` also deletes PUBLISHED batches (refused when NODE_ENV is production unless ALLOW_DEV_DELETE is set). */
 export const uploadBatchDeleteQuery = z.object({
   force: z
     .enum(['true', 'false'])

@@ -28,6 +28,9 @@ const schema = z.object({
   // Staging-only opt-out of the production check below, until the sppg_public
   // role is provisioned there. Never set in the production environment.
   ALLOW_SHARED_PUBLIC_DB: z.enum(['true']).optional(),
+  // Staging-only: lets Upload History's dev mode force-delete PUBLISHED batches under NODE_ENV=production.
+  // Never set in the production environment.
+  ALLOW_DEV_DELETE: z.enum(['true']).optional(),
 
   // S3 assets bucket (Terraform output `bucket_name`). Credentials come from
   // the ECS task role — the app configures nothing beyond bucket and region.

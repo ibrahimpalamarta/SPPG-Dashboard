@@ -374,9 +374,11 @@ resource "aws_ecs_task_definition" "frontend_admin" {
       # Not a secret. Over plain HTTP the ALB listener forwards /api/* straight
       # to the backend; once a certificate is attached HTTP redirects to HTTPS,
       # so set frontend_api_base_url to the certificate's domain.
-      environment = [
-        { name = "API_BASE_URL", value = var.frontend_api_base_url != "" ? var.frontend_api_base_url : "http://${aws_lb.this.dns_name}" },
-      ]
+      environment = concat(
+        [{ name = "API_BASE_URL", value = var.frontend_api_base_url != "" ? var.frontend_api_base_url : "http://${aws_lb.this.dns_name}" }],
+        # Shows Upload History's dev-mode delete; the backend needs it too. Production never gets it.
+        var.env == "staging" ? [{ name = "ALLOW_DEV_DELETE", value = "true" }] : [],
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -469,6 +471,8 @@ resource "aws_ecs_task_definition" "backend" {
         # Staging has no sppg_public role while the public dashboard is parked;
         # see ALLOW_SHARED_PUBLIC_DB in backend env.ts. Production never gets it.
         var.env == "staging" ? [{ name = "ALLOW_SHARED_PUBLIC_DB", value = "true" }] : [],
+        # Dev-mode force delete in Upload History while staging is still being tested. Production never gets it.
+        var.env == "staging" ? [{ name = "ALLOW_DEV_DELETE", value = "true" }] : [],
       )
       # DATABASE_URL_PUBLIC is appended only once the key exists in the secret,
       # so enabling SCRUM-13's restricted role is a deliberate second step and
