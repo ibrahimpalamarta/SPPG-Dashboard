@@ -447,7 +447,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="flex items-center gap-2 text-base font-semibold text-slate-800">
                     {resultTone(result) === "ok" ? <CircleCheck className="size-5" aria-hidden="true" /> : <CircleX className="size-5" aria-hidden="true" />}
-                    {resultTone(result) === "ok" ? "File berhasil dibaca" : resultTone(result) === "review" ? "File perlu dicek" : "File belum bisa diproses"}
+                    {resultTone(result) === "ok" ? "File berhasil dibaca" : resultTone(result) === "review" ? "File sudah dibaca" : "File belum bisa diproses"}
                   </p>
                   <span className={`inline-flex items-center gap-1 rounded-md border px-3 py-1 text-xs font-medium ${RESULT_TONE[resultTone(result)].badge}`}>
                     {result.autoPublished && <Check className="size-3" aria-hidden="true" />}
@@ -467,7 +467,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
                     {result.autoPublished && (
                       <>
                         <Check className="size-4" aria-hidden="true" />
-                        Dipublish otomatis.
+                        Sudah dipublish.
                       </>
                     )}
                   </p>
