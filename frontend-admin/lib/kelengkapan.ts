@@ -2,8 +2,8 @@ import { BookOpen, Building2, CircleCheck, CircleX, Coins, FileText, Gauge, Pack
 import type { Tone } from "@/components/ui/badge";
 import type { CompletenessItem, KitchenCompleteness } from "@/lib/kpi";
 
-export type Status = { label: string; tone: Tone };
-export type Cell = { label: string; status: Status; issue?: Status; publishedAt: string | null; action?: "Buka" };
+type Status = { label: string; tone: Tone };
+type Cell = { label: string; status: Status; issue?: Status; publishedAt: string | null; action?: "Buka" };
 type Stat = { icon: LucideIcon; label: string; value: string; valueClass?: string };
 
 const s = (label: string, tone: Tone): Status => ({ label, tone });
