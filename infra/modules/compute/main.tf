@@ -343,7 +343,7 @@ resource "aws_iam_role_policy" "ecs_task_assets" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
+      Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
       Resource = [var.assets_bucket_arn, "${var.assets_bucket_arn}/*"]
     }]
   })
