@@ -1,6 +1,6 @@
 import type { PaymentSla } from '@prisma/client';
 
-export type PaymentTimes = { receivedAt: Date | null; makerInputAt: Date | null; approvedAt: Date | null; paidAt: Date | null };
+type PaymentTimes = { receivedAt: Date | null; makerInputAt: Date | null; approvedAt: Date | null; paidAt: Date | null };
 
 const DAY_MS = 864e5;
 /** SLA days are WIB calendar days: 23:00 received, 08:00 paid is D+1. */

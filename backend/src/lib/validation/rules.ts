@@ -9,7 +9,7 @@ type RuleMeta = { severity: IssueSeverity; action: IssueAction };
  * (08_Data_Quality_Rules). CRITICAL holds the whole batch out of READY and
  * publish until someone resolves it with a note; the rest is shown for review.
  */
-export const RULES: Record<string, RuleMeta> = {
+const RULES: Record<string, RuleMeta> = {
   // Finance (SCRUM-34)
   NO_TXN_ID: { severity: 'CRITICAL', action: 'REJECT' },
   TOTAL_INCONSISTENT: { severity: 'CRITICAL', action: 'REVIEW' },
@@ -40,7 +40,7 @@ export const RULES: Record<string, RuleMeta> = {
 };
 
 /** A code nobody registered yet is reviewed, never silently waved through. */
-export const ruleOf = (code: string): RuleMeta => RULES[code] ?? { severity: 'HIGH', action: 'REVIEW' };
+const ruleOf = (code: string): RuleMeta => RULES[code] ?? { severity: 'HIGH', action: 'REVIEW' };
 
 export type ClassifiedIssue = Issue & RuleMeta;
 

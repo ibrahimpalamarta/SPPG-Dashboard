@@ -14,9 +14,9 @@ const advice = z.object({
   columns: z.array(z.object({ header: z.string(), readAs: z.string().nullable(), reason: z.string() })).max(30),
   issues: z.array(z.object({ code: z.string(), advice: z.string() })).max(30),
 });
-export type UploadAdvice = z.infer<typeof advice>;
+type UploadAdvice = z.infer<typeof advice>;
 
-export type Ask = (system: string, prompt: string) => Promise<string>;
+type Ask = (system: string, prompt: string) => Promise<string>;
 
 const SYSTEM = `Kamu asisten pengecekan file unggahan untuk dashboard SPPG. Input: perbedaan nama kolom file dengan format yang dikenal, dan kode masalah validasi beserta jumlahnya. Tidak ada isi sel.
 Balas HANYA JSON: {"columns":[{"header":"...","readAs":"..."|null,"reason":"..."}],"issues":[{"code":"...","advice":"..."}]}
@@ -25,7 +25,7 @@ Balas HANYA JSON: {"columns":[{"header":"...","readAs":"..."|null,"reason":"..."
 Bahasa Indonesia.`;
 
 /** The model call, kept apart so tests can feed an answer without a network. */
-export const askModel: Ask = async (system, prompt) => {
+const askModel: Ask = async (system, prompt) => {
   const res = await fetch(`${env.AI_BASE_URL.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { authorization: `Bearer ${env.AI_API_KEY}`, 'content-type': 'application/json' },

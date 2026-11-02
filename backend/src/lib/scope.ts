@@ -10,7 +10,7 @@ import type { AppUser } from '../auth/user.js';
  * them. A `kitchenId` from the query string only ever *narrows* the result —
  * it can never widen it past the caller's own scope.
  */
-export type ScopeResult =
+type ScopeResult =
   | { ok: true; kitchenIds?: bigint[] }
   | { ok: false };
 

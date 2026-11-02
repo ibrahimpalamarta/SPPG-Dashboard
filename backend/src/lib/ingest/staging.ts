@@ -67,7 +67,7 @@ export type DomainParser = (sheets: RawSheet[], ctx: ParseContext) => Pick<Stage
  * Says why a sheet must not be staged, or null to stage it. Gets the header
  * texts so a rule can look at columns instead of trusting sheet names.
  */
-export type SheetRule = (sheet: RawSheet, headers: string[]) => string | null;
+type SheetRule = (sheet: RawSheet, headers: string[]) => string | null;
 
 /** Lowercase, letters and digits only: "Transaksi_Kas", "transaksi kas" and
  * "TRANSAKSI-KAS" compare equal (FR-MAP-03: local differences are tolerated). */

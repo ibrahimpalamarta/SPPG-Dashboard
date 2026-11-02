@@ -9,7 +9,7 @@ export const pageQuery = z.object({
 
 export type PageQuery = z.infer<typeof pageQuery>;
 
-export interface Paginated<T> {
+interface Paginated<T> {
   data: T[];
   meta: { page: number; pageSize: number; total: number; totalPages: number };
 }

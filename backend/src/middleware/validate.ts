@@ -4,7 +4,7 @@ import { sendError } from './error-handler.js';
 
 /** Parsed, typed copies of the request parts. Never read `req.query` directly
  * in a controller — the coercions live in the schema, not in the handler. */
-export interface ValidatedRequest {
+interface ValidatedRequest {
   body?: unknown;
   query?: unknown;
   params?: unknown;
