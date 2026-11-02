@@ -37,8 +37,8 @@ const ROLE_CARDS: { role: Role; description: string; chips: string[] }[] = [
   },
   {
     role: "ADMIN",
-    description: "Melihat semua dapur, mengelola anggota, Data Reference, dan Validasi Data (hanya lihat).",
-    chips: ["Semua dapur", "Kelola anggota", "Data Reference", "Validasi Data"],
+    description: "Melihat semua dapur, mengelola anggota, Data Reference, dan Upload History (hanya lihat).",
+    chips: ["Semua dapur", "Kelola anggota", "Data Reference", "Upload History"],
   },
 ];
 

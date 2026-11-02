@@ -14,7 +14,7 @@ export function AppHeader({ items, user }: { items: readonly NavItem[]; user: Ap
   const title = items.find((n) => n.href === pathname)?.label ?? (pathname === "/keamanan" ? "Keamanan akun" : pathname === "/pengaturan" ? "Pengaturan" : undefined);
 
   return (
-    <header className="flex min-h-16 items-center gap-4 border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8">
+    <header className="relative z-30 flex min-h-16 items-center gap-4 border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8">
       {/* Desktop-first: below lg the sidebar collapses into this native disclosure. */}
       <details className="relative lg:hidden">
         <summary className="inline-flex size-9 cursor-pointer list-none items-center justify-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Buka navigasi">

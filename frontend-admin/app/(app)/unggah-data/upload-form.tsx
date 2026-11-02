@@ -1,8 +1,8 @@
 "use client";
 
-import { Building2, Check, FileText, TriangleAlert, Upload } from "lucide-react";
+import { ArrowRight, Building2, Check, CircleCheck, CircleX, Download, FileText, TriangleAlert, Upload } from "lucide-react";
 import Link from "next/link";
-import { startTransition, useActionState, useRef, useState, useTransition } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { checkFile, uploadFile, type CheckResult, type FileColumn, type UploadResult } from "./actions";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -39,6 +39,13 @@ function headline(r: Extract<UploadResult, { ok: true }>) {
   if (r.status === "NEEDS_MAPPING_UPDATE") return "Format berbeda";
   return "File belum dipublish";
 }
+
+const RESULT_TONE = {
+  ok: { card: "border-emerald-200 bg-emerald-50/40", badge: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  review: { card: "border-amber-200 bg-amber-50/40", badge: "border-amber-200 bg-amber-50 text-amber-700" },
+  fail: { card: "border-red-200 bg-red-50/40", badge: "border-red-200 bg-red-50 text-red-700" },
+};
+const resultTone = (r: Extract<UploadResult, { ok: true }>) => (r.autoPublished ? "ok" : r.status === "NEEDS_REVIEW" ? "review" : "fail");
 
 /** FR-AI-01: the verdict on the picked file, before anything is stored. */
 function CheckChips({ check }: { check: Extract<CheckResult, { ok: true }> }) {
@@ -111,6 +118,45 @@ function CheckDetails({ check }: { check: Extract<CheckResult, { ok: true }> }) 
         </div>
       )}
     </section>
+  );
+}
+
+const STEPS = ["File diterima", "AI mengenali format file", "Membaca isi file", "AI mencocokkan kolom", "AI mengecek isi data"];
+
+/** The upload is one request, so the steps advance on a timer; the last one keeps spinning until the result arrives. */
+function UploadProgress({ children }: { children?: ReactNode }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((s) => Math.min(s + 1, STEPS.length - 1)), 1500);
+    return () => clearInterval(id);
+  }, []);
+  // With a result every step is done, whatever the verdict on the file.
+  const step = children ? STEPS.length : tick;
+  return (
+    <div role="status" className="grid gap-6 rounded-xl border border-slate-200 p-5 md:grid-cols-[minmax(0,1fr)_2fr]">
+      <ul className="space-y-3 text-sm">
+        {STEPS.map((label, i) => (
+          <li key={label} className={`flex items-center gap-3 ${i > step ? "text-slate-400" : "text-slate-800"}`}>
+            {i < step ? (
+              <span className="grid size-6 place-items-center rounded-full bg-emerald-700 text-white">
+                <Check className="size-3.5" aria-hidden="true" />
+              </span>
+            ) : (
+              <span className={`size-6 rounded-full border-2 ${i === step ? "animate-spin border-sky-600 border-t-transparent" : "border-slate-200"}`} aria-hidden="true" />
+            )}
+            {label}
+          </li>
+        ))}
+      </ul>
+      {children ?? (
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-5" aria-hidden="true">
+          <div className="h-4 w-2/5 animate-pulse rounded-full bg-slate-200" />
+          <div className="h-4 w-4/5 animate-pulse rounded-full bg-slate-200" />
+          <div className="h-4 w-3/5 animate-pulse rounded-full bg-slate-200" />
+          <p className="pt-2 text-sm text-slate-500">Sedang diproses...</p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -204,6 +250,8 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   const fileRef = useRef<HTMLInputElement>(null);
   const showResult = result?.ok && !retry;
   const mapping = check?.ok && editing ? check : null;
+  // Progress and verdict take the place of the inputs.
+  const overlay = pending || showResult;
 
   /** Reads the picked file again with the form as it will be sent; `over` carries a value the state has not flushed yet. */
   const runCheck = (over: Record<string, string> = {}) => {
@@ -252,6 +300,8 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
       {retry && result?.ok && result.status === "NEEDS_MAPPING_UPDATE" && <input type="hidden" name="replaces" value={result.batchId} />}
 
       <Card className="space-y-5 p-6">
+        {/* Hidden, not unmounted: the file input must keep its file if the upload fails. */}
+        <div className={overlay ? "hidden" : "space-y-5"}>
         <div className="grid gap-4 sm:grid-cols-3">
           {kitchens.length > 1 ? (
             <div className="space-y-2 text-sm">
@@ -382,6 +432,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
             </div>
           )
         )}
+        </div>
 
         {result && !result.ok && (
           <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -389,31 +440,85 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
           </p>
         )}
 
-        {showResult && (
-          <section aria-live="polite" className="space-y-3 text-sm">
-            <p className={`rounded-md p-3 font-medium ${result.autoPublished ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{headline(result)}</p>
-            {result.errorSummary && <p className="text-slate-700">{result.errorSummary}</p>}
-            {result.warning && <p className="rounded-md bg-amber-50 p-3 text-amber-800">{result.warning}</p>}
-            <div className="flex flex-wrap items-center gap-4">
-              {result.status !== "NEEDS_REVIEW" && result.status !== "PUBLISHED" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRetry(true);
-                    clearFile();
-                  }}
-                  className={primaryButton}
-                >
-                  Unggah Ulang File
-                </button>
-              )}
-              {result.status === "NEEDS_REVIEW" && (
-                <Link href="/mapping-validasi" className="inline-block font-medium text-emerald-700 hover:underline">
-                  Ke Validasi Data
-                </Link>
-              )}
-            </div>
-          </section>
+        {overlay && (
+          <UploadProgress>
+            {showResult && (
+              <section aria-live="polite" className={`space-y-3 rounded-xl border p-5 text-sm ${RESULT_TONE[resultTone(result)].card}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                    {resultTone(result) === "ok" ? <CircleCheck className="size-5" aria-hidden="true" /> : <CircleX className="size-5" aria-hidden="true" />}
+                    {resultTone(result) === "ok" ? "File berhasil dibaca" : resultTone(result) === "review" ? "File sudah dibaca" : "File belum bisa diproses"}
+                  </p>
+                  <span className={`inline-flex items-center gap-1 rounded-md border px-3 py-1 text-xs font-medium ${RESULT_TONE[resultTone(result)].badge}`}>
+                    {result.autoPublished && <Check className="size-3" aria-hidden="true" />}
+                    {headline(result)}
+                  </span>
+                </div>
+                {result.autoPublished && (
+                  <p className="text-slate-600">
+                    {file?.name}
+                    {check?.ok && ` · ${check.rowCount.toLocaleString("id-ID")} baris terbaca`}. Tidak ada masalah, file langsung dipublish. Data sudah tampil di dashboard.
+                  </p>
+                )}
+                {result.errorSummary && <p className="text-slate-600">{result.errorSummary}</p>}
+                {result.warning && <p className="rounded-md bg-amber-50 p-3 text-amber-800">{result.warning}</p>}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="flex items-center gap-1.5 text-slate-500">
+                    {result.autoPublished && (
+                      <>
+                        <Check className="size-4" aria-hidden="true" />
+                        Sudah dipublish.
+                      </>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                  {result.status === "PUBLISHED" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRetry(true);
+                          clearFile();
+                        }}
+                        className={secondaryButton}
+                      >
+                        Unggah file lain
+                      </button>
+                      <Link href="/overview" className={primaryButton}>
+                        Lihat di Overview
+                        <ArrowRight className="size-4" aria-hidden="true" />
+                      </Link>
+                    </>
+                  )}
+                  {TEMPLATES[domain] && result.status !== "PUBLISHED" && (
+                    <a href={`unggah-data/template/${TEMPLATES[domain]}`} download className={secondaryButton}>
+                      <Download className="size-4" aria-hidden="true" />
+                      Download Template
+                    </a>
+                  )}
+                  {result.status !== "NEEDS_REVIEW" && result.status !== "PUBLISHED" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRetry(true);
+                        clearFile();
+                      }}
+                      className={primaryButton}
+                    >
+                      <Upload className="size-4" aria-hidden="true" />
+                      Unggah Ulang File
+                    </button>
+                  )}
+                  {result.status === "NEEDS_REVIEW" && (
+                    <Link href="/mapping-validasi" className={primaryButton}>
+                      Ke Upload History
+                    </Link>
+                  )}
+                  </div>
+                </div>
+              </section>
+            )}
+          </UploadProgress>
         )}
       </Card>
     </form>
