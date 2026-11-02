@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-export const referenceEntryKind = z.enum(['KAMUS', 'ATURAN', 'KODE']);
-export type ReferenceEntryKind = z.infer<typeof referenceEntryKind>;
+const referenceEntryKind = z.enum(['KAMUS', 'ATURAN', 'KODE']);
+type ReferenceEntryKind = z.infer<typeof referenceEntryKind>;
 
 export const referenceEntryListQuery = z.object({ kind: referenceEntryKind });
 
@@ -23,7 +23,7 @@ export const referenceEntryUpdate = z
   .partial()
   .strict();
 
-export type ReferenceEntryUpdate = z.infer<typeof referenceEntryUpdate>;
+type ReferenceEntryUpdate = z.infer<typeof referenceEntryUpdate>;
 
 export const EDITABLE_FIELDS: Record<ReferenceEntryKind, (keyof ReferenceEntryUpdate)[]> = {
   KAMUS: ['artinya', 'contoh', 'aturan'],

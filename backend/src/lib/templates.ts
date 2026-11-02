@@ -5,7 +5,7 @@ import { PROFILES } from './mapping/profiles.js';
 export const TEMPLATE_KINDS = ['cashflow', 'menu'] as const;
 export type TemplateKind = (typeof TEMPLATE_KINDS)[number];
 
-export const TEMPLATE_VERSION = 'v1';
+const TEMPLATE_VERSION = 'v1';
 
 type Spec = { profileId: string; dataSheet: string; sheets: string[]; refs: Record<string, string[]> };
 

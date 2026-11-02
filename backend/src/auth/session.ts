@@ -7,7 +7,7 @@ const MIN = 60_000;
 /** `lastSeenAt` is only rewritten when it is this stale — one write per minute, not per request. */
 const TOUCH_AFTER_MS = MIN;
 
-export interface SessionMeta {
+interface SessionMeta {
   ip?: string;
   userAgent?: string;
 }

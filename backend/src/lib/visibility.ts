@@ -31,7 +31,7 @@ function omit<T extends object>(row: T, fields: readonly string[]): Partial<T> {
  * row on its way out, so a query can stay a plain `findMany` and there is one
  * obvious place to audit.
  */
-export function forRole<T extends object>(row: T, role: Role, fields: readonly string[]): Partial<T> {
+function forRole<T extends object>(row: T, role: Role, fields: readonly string[]): Partial<T> {
   return canSeeCost(role) ? row : omit(row, fields);
 }
 

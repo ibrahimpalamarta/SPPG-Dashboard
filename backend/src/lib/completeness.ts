@@ -1,7 +1,7 @@
 import type { UploadDomain, UploadStatus } from '@prisma/client';
 
 /** SCRUM-104: the six data a dapur must deliver. Beneficiary counts and balances have no upload domain yet, so only published rows count for them. */
-export const REQUIRED = [
+const REQUIRED = [
   { label: 'Cashflow', domains: ['CASHFLOW'] },
   { label: 'RAB', domains: ['RAB'] },
   { label: 'Purchase Order', domains: ['PO'] },
@@ -11,22 +11,22 @@ export const REQUIRED = [
 ] as const satisfies readonly { label: string; domains: readonly UploadDomain[] }[];
 
 /** Not part of the six, so they never move percent or issues: shown on the Kelengkapan Data page only. */
-export const OPTIONAL = [
+const OPTIONAL = [
   { label: 'Master Menu', domains: ['MENU'] },
   { label: 'Penerimaan Barang', domains: ['GOODS_RECEIPT'] },
 ] as const satisfies readonly { label: string; domains: readonly UploadDomain[] }[];
 
-export type ItemState = 'COMPLETE' | 'SENT' | 'MISSING';
+type ItemState = 'COMPLETE' | 'SENT' | 'MISSING';
 
 export type BatchRow = { domain: UploadDomain; status: UploadStatus; uploadDate: Date; publishedAt: Date | null };
 
 /** Item labels that have published rows without an upload batch behind them (beneficiaries, balances). */
-export type CompletenessInput = { batches: BatchRow[]; liveLabels: ReadonlySet<string> };
+type CompletenessInput = { batches: BatchRow[]; liveLabels: ReadonlySet<string> };
 
 /** `issue`: the newest batch needs a fix (failed / format changed) or is waiting for a check. */
-export type Item = { label: string; state: ItemState; publishedAt: string | null; issue: 'FIX' | 'REVIEW' | null };
+type Item = { label: string; state: ItemState; publishedAt: string | null; issue: 'FIX' | 'REVIEW' | null };
 
-export type KitchenCompleteness = {
+type KitchenCompleteness = {
   items: Item[];
   optional: Item[];
   complete: number;

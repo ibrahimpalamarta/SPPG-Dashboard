@@ -63,7 +63,7 @@ function readCell(cell: ExcelJS.Cell): RawCell {
 }
 
 /** Magic-byte check, so a renamed file is refused before it is stored or parsed. */
-export function assertXlsxContainer(buffer: Buffer): void {
+function assertXlsxContainer(buffer: Buffer): void {
   // A password-protected .xlsx is not a zip at all: Office wraps it in an
   // OLE compound file, the same container as legacy .xls.
   if (startsWith(buffer, [0xd0, 0xcf, 0x11, 0xe0])) {
@@ -77,7 +77,7 @@ export function assertXlsxContainer(buffer: Buffer): void {
 export const isCsv = (fileName: string) => extname(fileName).toLowerCase() === '.csv';
 
 /** A text file has no NUL bytes; a renamed .xlsx/.xls or an image does. */
-export function assertCsvText(buffer: Buffer): void {
+function assertCsvText(buffer: Buffer): void {
   if (buffer.length === 0 || buffer.includes(0)) {
     throw new WorkbookError('CORRUPT_FILE', 'File CSV kosong atau bukan teks. Ekspor ulang sebagai CSV lalu upload lagi.');
   }
@@ -153,7 +153,7 @@ const isBlank = (c: RawCell | undefined) => !c || c.value === null || String(c.v
 /** A row with nothing but whitespace in it carries no data. */
 export const isBlankRow = (row: RawRow) => Object.values(row.cells).every(isBlank);
 
-export type HeaderOptions = {
+type HeaderOptions = {
   /** Only the top of the sheet is searched; titles and notes sit above the header. */
   scanRows: number;
   /** Fewest text cells for a row to count as a header. */

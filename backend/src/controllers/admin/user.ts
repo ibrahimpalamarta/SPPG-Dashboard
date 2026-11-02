@@ -60,7 +60,7 @@ async function sendInvite(send: SendMail, to: string | null, token: string, mess
  * newest link is still open, expired otherwise. Cancelling an invitation
  * deactivates the account, so it reads as INACTIVE.
  */
-export type MemberStatus = 'ACTIVE' | 'PENDING' | 'EXPIRED' | 'INACTIVE';
+type MemberStatus = 'ACTIVE' | 'PENDING' | 'EXPIRED' | 'INACTIVE';
 
 export function memberStatus(
   u: { status: 'ACTIVE' | 'INACTIVE'; hasPassword: boolean },

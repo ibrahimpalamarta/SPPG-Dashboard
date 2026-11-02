@@ -10,7 +10,7 @@
  * both, never a guessed stage.
  */
 export const ROLLOUT_STATUSES = ['PILOT_PHASE_1', 'PHASE_1_COMPARISON', 'PHASE_2A', 'PHASE_2B'] as const;
-export type RolloutStatus = (typeof ROLLOUT_STATUSES)[number];
+type RolloutStatus = (typeof ROLLOUT_STATUSES)[number];
 
 const KITCHEN_ROLLOUT: Record<string, { bucket: 1 | 2; rolloutStatus: RolloutStatus }> = {
   SKN: { bucket: 1, rolloutStatus: 'PILOT_PHASE_1' },

@@ -91,7 +91,7 @@ export function financeKpi(rows: FinanceRow[]) {
   };
 }
 
-export type RabRow = { plannedCost: number; packageCount: number | null; missingLineTotals: number };
+type RabRow = { plannedCost: number; packageCount: number | null; missingLineTotals: number };
 
 /** SCRUM-64: planned (RAB) cost ÷ planned packages. Labelled plan, versioned, never actual spend. */
 export function plannedCostPerPortion(rows: RabRow[]) {
@@ -176,7 +176,7 @@ export function nutritionBySegment(rows: MenuRow[]) {
   });
 }
 
-export type BeneficiaryRow = { countDate: Date; segment: string; plannedCount: number | null; actualCount: number | null };
+type BeneficiaryRow = { countDate: Date; segment: string; plannedCount: number | null; actualCount: number | null };
 
 /**
  * SCRUM-50/103/129: delivered portions per segment from the aggregate
