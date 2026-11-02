@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { storageState, type RoleKey } from './roles.js';
 
-// Dua role (SCRUM-152): Admin melihat semua dapur dan hanya melihat Validasi Data; Data Operasional
-// terikat satu dapur, mengunggah dan mem-publish sendiri lewat Validasi Data.
-const VIEW = ['Overview', 'Finance & Cost', 'Kelengkapan Data', 'Validasi Data', 'Data Reference', 'Inbox'];
+// Dua role (SCRUM-152): Admin melihat semua dapur dan hanya melihat Upload History; Data Operasional
+// terikat satu dapur, mengunggah dan mem-publish sendiri lewat Upload History.
+const VIEW = ['Overview', 'Finance & Cost', 'Kelengkapan Data', 'Upload History', 'Data Reference', 'Inbox'];
 
 const CASES: { role: RoleKey; menu: string[]; hidden: string[] }[] = [
   { role: 'admin', menu: [...VIEW, 'Anggota'], hidden: ['Unggah Data'] },

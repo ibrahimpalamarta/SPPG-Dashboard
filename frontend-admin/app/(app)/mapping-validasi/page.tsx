@@ -14,7 +14,7 @@ import { requirePage } from "@/lib/guard";
 import { batchFindings, tabs, type Batch, type BatchDetail } from "@/lib/mapping-validasi";
 import { DOMAINS, StatusBadge } from "@/lib/upload";
 
-export const metadata: Metadata = { title: "Validasi Data · SPPG Internal" };
+export const metadata: Metadata = { title: "Upload History · SPPG Internal" };
 
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
 

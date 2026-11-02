@@ -129,7 +129,7 @@ test.describe.serial('Review dan publish', () => {
     });
   });
 
-  test('[SCRUM-137][SCRUM-148] Admin melihat file di Validasi Data, hanya lihat tanpa Setujui & Publish @smoke @rbac', async ({ browser }) => {
+  test('[SCRUM-137][SCRUM-148] Admin melihat file di Upload History, hanya lihat tanpa Setujui & Publish @smoke @rbac', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
       await page.goto('mapping-validasi');
       const baris = page.getByRole('row', { name: new RegExp(`^${FILE.replace('.', '\\.')}`) });
@@ -253,7 +253,7 @@ test.describe.serial('Review dan publish', () => {
     });
   });
 
-  test('[SCRUM-148] Admin membuka Validasi Data tapi tidak bisa mem-publish @smoke @rbac', async ({ browser }) => {
+  test('[SCRUM-148] Admin membuka Upload History tapi tidak bisa mem-publish @smoke @rbac', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
       expect((await page.goto(`mapping-validasi?batch=${batchAwal}`))?.status()).toBe(200);
       await expect(page.getByRole('button', { name: 'Setujui & Publish' })).toHaveCount(0);

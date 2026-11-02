@@ -409,7 +409,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
               )}
               {result.status === "NEEDS_REVIEW" && (
                 <Link href="/mapping-validasi" className="inline-block font-medium text-emerald-700 hover:underline">
-                  Ke Validasi Data
+                  Ke Upload History
                 </Link>
               )}
             </div>
