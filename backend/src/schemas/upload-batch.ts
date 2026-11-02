@@ -69,6 +69,14 @@ export const uploadBatchCreateQuery = z.object({
     .transform((v) => v === 'true'),
 });
 
+/** Dev clean-up only: `?force=true` also deletes PUBLISHED batches (refused when NODE_ENV is production). */
+export const uploadBatchDeleteQuery = z.object({
+  force: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
+});
+
 /**
  * SCRUM-22: the states Data Operasional may set by hand; PROCESSING /
  * NEEDS_MAPPING_UPDATE are set by the pipeline and PUBLISHED by the publish

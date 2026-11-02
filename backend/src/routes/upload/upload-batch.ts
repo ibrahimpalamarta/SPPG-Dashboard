@@ -9,11 +9,13 @@ import { publishUploadBatch } from '../../controllers/upload/review.js';
 import {
   uploadBatchCreate,
   uploadBatchCreateQuery,
+  uploadBatchDeleteQuery,
   uploadBatchListQuery,
   uploadBatchUpdate,
 } from '../../schemas/upload-batch.js';
 import {
   createUploadBatch,
+  deleteAllUploadBatches,
   deleteUploadBatch,
   downloadUploadBatchFile,
   getUploadBatch,
@@ -36,7 +38,8 @@ uploadBatchRouter.get('/:id', validate({ params: idParam }), wrap(getUploadBatch
 uploadBatchRouter.get('/:id/file', validate({ params: idParam }), wrap(downloadUploadBatchFile()));
 uploadBatchRouter.get('/:id/records', validate({ params: idParam, query: pageQuery }), wrap(listUploadBatchRecords()));
 uploadBatchRouter.get('/:id/history', validate({ params: idParam }), wrap(listUploadBatchHistory()));
-uploadBatchRouter.delete('/:id', requirePermission('batch:publish'), validate({ params: idParam }), wrap(deleteUploadBatch()));
+uploadBatchRouter.delete('/', requirePermission('batch:publish'), validate({ query: uploadBatchDeleteQuery }), wrap(deleteAllUploadBatches()));
+uploadBatchRouter.delete('/:id', requirePermission('batch:publish'), validate({ params: idParam, query: uploadBatchDeleteQuery }), wrap(deleteUploadBatch()));
 
 // SCRUM-20: uploading needs upload:create; changing or publishing a batch needs
 // batch:publish (Data Operasional, own dapur only).
