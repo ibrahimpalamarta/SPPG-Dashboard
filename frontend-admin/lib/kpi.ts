@@ -1,4 +1,5 @@
 import { apiSend } from "@/lib/api";
+import type { Kitchen } from "@/lib/me";
 
 /** Mirrors backend GET /api/kpi/finance (controllers/mart/kpi.ts). Published, non-superseded, TERKONFIRMASI data only. */
 export type FinanceKpi = {
@@ -32,10 +33,15 @@ export async function financeKpi(): Promise<FinanceKpi | null> {
 }
 
 /** Mirrors backend GET /api/kpi/completeness (lib/completeness.ts): one entry per dapur in the caller's scope. */
+export type CompletenessItem = { label: string; state: "COMPLETE" | "SENT" | "MISSING"; publishedAt: string | null; issue: "FIX" | "REVIEW" | null };
+
 export type KitchenCompleteness = {
   name: string;
   region: string | null;
-  items: { label: string; state: "COMPLETE" | "SENT" | "MISSING" }[];
+  rolloutStatus: Kitchen["rolloutStatus"];
+  items: CompletenessItem[];
+  /** Master Menu and Penerimaan Barang: shown on Kelengkapan Data, never part of the score. */
+  optional: CompletenessItem[];
   complete: number;
   sent: number;
   total: number;

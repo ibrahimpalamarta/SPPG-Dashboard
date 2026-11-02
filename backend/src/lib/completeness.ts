@@ -10,6 +10,12 @@ export const REQUIRED = [
   { label: 'Saldo Rekening', domains: [] },
 ] as const satisfies readonly { label: string; domains: readonly UploadDomain[] }[];
 
+/** Not part of the six, so they never move percent or issues: shown on the Kelengkapan Data page only. */
+export const OPTIONAL = [
+  { label: 'Master Menu', domains: ['MENU'] },
+  { label: 'Penerimaan Barang', domains: ['GOODS_RECEIPT'] },
+] as const satisfies readonly { label: string; domains: readonly UploadDomain[] }[];
+
 export type ItemState = 'COMPLETE' | 'SENT' | 'MISSING';
 
 export type BatchRow = { domain: UploadDomain; status: UploadStatus; uploadDate: Date; publishedAt: Date | null };
@@ -17,13 +23,17 @@ export type BatchRow = { domain: UploadDomain; status: UploadStatus; uploadDate:
 /** Item labels that have published rows without an upload batch behind them (beneficiaries, balances). */
 export type CompletenessInput = { batches: BatchRow[]; liveLabels: ReadonlySet<string> };
 
+/** `issue`: the newest batch needs a fix (failed / format changed) or is waiting for a check. */
+export type Item = { label: string; state: ItemState; publishedAt: string | null; issue: 'FIX' | 'REVIEW' | null };
+
 export type KitchenCompleteness = {
-  items: { label: string; state: ItemState }[];
+  items: Item[];
+  optional: Item[];
   complete: number;
   sent: number;
   total: number;
   percent: number;
-  /** Items stuck on a batch that needs a fix (failed / format changed) vs. one waiting for a check. */
+  /** Items stuck on a batch that needs a fix vs. one waiting for a check. */
   issues: { fix: number; review: number };
   lastPublish: { at: string; label: string } | null;
 };
@@ -32,41 +42,36 @@ export type KitchenCompleteness = {
  * COMPLETE = published, SENT = delivered but not published yet, MISSING = nothing usable.
  * An item is "stuck" only while it has no published batch, judged by its newest batch.
  */
-export function kitchenCompleteness({ batches, liveLabels }: CompletenessInput): KitchenCompleteness {
-  const issues = { fix: 0, review: 0 };
-  // Assigned inside the map callback, which TS cannot see; the cast keeps the union.
-  let lastPublish = null as { at: Date; label: string } | null;
+function item({ batches, liveLabels }: CompletenessInput, { label, domains }: { label: string; domains: readonly UploadDomain[] }): Item {
+  const own = batches
+    .filter((b) => domains.includes(b.domain) && b.status !== 'SUPERSEDED')
+    .sort((a, b) => b.uploadDate.getTime() - a.uploadDate.getTime());
+  const published = own.filter((b) => b.status === 'PUBLISHED');
+  const publishedAt = published.reduce<Date | null>((latest, p) => (p.publishedAt && (!latest || p.publishedAt > latest) ? p.publishedAt : latest), null)?.toISOString() ?? null;
 
-  const items = REQUIRED.map(({ label, domains }) => {
-    const own = batches
-      .filter((b) => (domains as readonly UploadDomain[]).includes(b.domain) && b.status !== 'SUPERSEDED')
-      .sort((a, b) => b.uploadDate.getTime() - a.uploadDate.getTime());
-    const published = own.filter((b) => b.status === 'PUBLISHED');
+  if (published.length || liveLabels.has(label)) return { label, state: 'COMPLETE', publishedAt, issue: null };
 
-    for (const p of published) {
-      if (p.publishedAt && (!lastPublish || p.publishedAt > lastPublish.at)) lastPublish = { at: p.publishedAt, label };
-    }
-    if (published.length || liveLabels.has(label)) return { label, state: 'COMPLETE' as const };
+  const newest = own[0];
+  if (!newest) return { label, state: 'MISSING', publishedAt, issue: null };
+  if (newest.status === 'FAILED' || newest.status === 'NEEDS_MAPPING_UPDATE') return { label, state: 'MISSING', publishedAt, issue: 'FIX' };
+  return { label, state: 'SENT', publishedAt, issue: newest.status === 'NEEDS_REVIEW' ? 'REVIEW' : null };
+}
 
-    const newest = own[0];
-    if (!newest) return { label, state: 'MISSING' as const };
-    if (newest.status === 'FAILED' || newest.status === 'NEEDS_MAPPING_UPDATE') {
-      issues.fix++;
-      return { label, state: 'MISSING' as const };
-    }
-    if (newest.status === 'NEEDS_REVIEW') issues.review++;
-    return { label, state: 'SENT' as const };
-  });
+export function kitchenCompleteness(input: CompletenessInput): KitchenCompleteness {
+  const items = REQUIRED.map((r) => item(input, r));
+  const optional = OPTIONAL.map((o) => item(input, o));
+  const last = items.reduce<Item | null>((latest, i) => (i.publishedAt && (!latest || i.publishedAt > latest.publishedAt!) ? i : latest), null);
 
   const complete = items.filter((i) => i.state === 'COMPLETE').length;
   const sent = complete + items.filter((i) => i.state === 'SENT').length;
   return {
     items,
+    optional,
     complete,
     sent,
     total: items.length,
     percent: Math.round((complete / items.length) * 100),
-    issues,
-    lastPublish: lastPublish && { at: lastPublish.at.toISOString().slice(0, 10), label: lastPublish.label },
+    issues: { fix: items.filter((i) => i.issue === 'FIX').length, review: items.filter((i) => i.issue === 'REVIEW').length },
+    lastPublish: last && { at: last.publishedAt!.slice(0, 10), label: last.label },
   };
 }

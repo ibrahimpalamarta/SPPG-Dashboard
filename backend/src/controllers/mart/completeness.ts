@@ -5,6 +5,7 @@ import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
 import { kitchenScope, kitchenWhere } from '../../lib/scope.js';
 import { kitchenCompleteness, type BatchRow } from '../../lib/completeness.js';
+import { withRollout } from '../../lib/kitchen-rollout.js';
 import type { completenessQuery } from '../../schemas/mart.js';
 
 /**
@@ -25,7 +26,7 @@ export const getCompleteness = (db: Db = prisma): RequestHandler => async (req, 
     db.kitchen.findMany({
       where: { status: 'ACTIVE', ...(scope.kitchenIds && { id: { in: scope.kitchenIds } }) },
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, cityRegency: true },
+      select: { id: true, code: true, name: true, cityRegency: true },
     }),
     db.uploadBatch.findMany({ where, select: { kitchenId: true, domain: true, status: true, uploadDate: true, publishedAt: true } }),
     db.beneficiaryDailyCount.groupBy({ by: ['kitchenId'], where: live }),
@@ -41,6 +42,7 @@ export const getCompleteness = (db: Db = prisma): RequestHandler => async (req, 
     kitchens: kitchens.map((k) => ({
       name: k.name,
       region: k.cityRegency,
+      rolloutStatus: withRollout(k).rolloutStatus,
       ...kitchenCompleteness({
         batches: byKitchen.get(k.id) ?? [],
         liveLabels: new Set([...(hasBeneficiaries.has(k.id) ? ['Jumlah Penerima Manfaat'] : []), ...(hasBalances.has(k.id) ? ['Saldo Rekening'] : [])]),

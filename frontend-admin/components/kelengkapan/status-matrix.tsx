@@ -1,8 +1,9 @@
 import { StatusLabel } from "@/components/kelengkapan/status-label";
 import { Badge } from "@/components/ui/badge";
-import { columns, legend, matrix } from "@/lib/mock/kelengkapan-data";
+import { byRollout, cellsOf, columns, legend, noteOf, phaseOf } from "@/lib/kelengkapan";
+import type { KitchenCompleteness } from "@/lib/kpi";
 
-export function StatusMatrix({ selected, onSelect }: { selected: string | null; onSelect: (code: string) => void }) {
+export function StatusMatrix({ kitchens, selected, onSelect }: { kitchens: KitchenCompleteness[]; selected: string | null; onSelect: (name: string) => void }) {
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -25,39 +26,42 @@ export function StatusMatrix({ selected, onSelect }: { selected: string | null; 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {matrix.map(({ code, name, note, cells, phase }) => (
-              <tr key={code} className={code === selected ? "bg-emerald-50/60" : "hover:bg-slate-50"}>
-                <td className="px-4 py-3">
-                  {phase ? (
-                    <p className="flex items-center gap-2 font-semibold text-slate-800">
-                      {code} · {name}
-                      <Badge tone="slate">{phase}</Badge>
-                    </p>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onSelect(code)}
-                      aria-pressed={code === selected}
-                      className="text-left font-semibold text-slate-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
-                    >
-                      {code} · {name}
-                    </button>
-                  )}
-                  <p className="text-xs text-slate-500">{note}</p>
-                </td>
-                {phase ? (
-                  <td colSpan={columns.length} className="px-3 py-3 text-center text-xs text-slate-400">
-                    Akan tersedia pada {phase}
+            {byRollout(kitchens).map((kitchen) => {
+              const phase = phaseOf(kitchen);
+              return (
+                <tr key={kitchen.name} className={kitchen.name === selected ? "bg-emerald-50/60" : "hover:bg-slate-50"}>
+                  <td className="px-4 py-3">
+                    {phase ? (
+                      <p className="flex items-center gap-2 font-semibold text-slate-800">
+                        {kitchen.name}
+                        <Badge tone="slate">{phase}</Badge>
+                      </p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onSelect(kitchen.name)}
+                        aria-pressed={kitchen.name === selected}
+                        className="text-left font-semibold text-slate-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                      >
+                        {kitchen.name}
+                      </button>
+                    )}
+                    <p className="text-xs text-slate-500">{noteOf(kitchen)}</p>
                   </td>
-                ) : (
-                  cells.map(({ label, tone }, index) => (
-                    <td key={columns[index]} className="px-3 py-3 text-center">
-                      <StatusLabel tone={tone} hideText>{label}</StatusLabel>
+                  {phase ? (
+                    <td colSpan={columns.length} className="px-3 py-3 text-center text-xs text-slate-400">
+                      Akan tersedia pada {phase}
                     </td>
-                  ))
-                )}
-              </tr>
-            ))}
+                  ) : (
+                    cellsOf(kitchen).map(({ label, status }) => (
+                      <td key={label} className="px-3 py-3 text-center">
+                        <StatusLabel tone={status.tone} hideText>{status.label}</StatusLabel>
+                      </td>
+                    ))
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
