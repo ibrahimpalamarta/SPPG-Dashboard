@@ -55,8 +55,13 @@ async function forceDelete(path: string): Promise<string | null> {
   return null;
 }
 
-export const deleteBatch = (id: string) => forceDelete(`/upload-batches/${encodeURIComponent(id)}?`);
-export const deleteAllBatches = () => forceDelete("/upload-batches?");
+export async function deleteBatch(id: string): Promise<string | null> {
+  return forceDelete(`/upload-batches/${encodeURIComponent(id)}?`);
+}
+
+export async function deleteAllBatches(): Promise<string | null> {
+  return forceDelete("/upload-batches?");
+}
 
 /** The backend's verdict on a rejected upload or check, in Indonesian. */
 function failure(status: number, body: { message?: string; details?: { fields?: Record<string, string[]> } }) {
