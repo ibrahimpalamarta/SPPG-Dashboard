@@ -24,8 +24,8 @@ const avatarTone = (name: string) => AVATAR_TONES[name.charCodeAt(0) % AVATAR_TO
 
 type BatchFilters = { kitchenId?: string; domain?: string; status?: string };
 
-// The backend refuses forced deletes in production too; this only hides the switch.
-const DEV_TOOLS = process.env.NODE_ENV !== "production";
+// The backend refuses forced deletes in production too; this only hides the switch. Staging opts in with ALLOW_DEV_DELETE.
+const DEV_TOOLS = process.env.NODE_ENV !== "production" || process.env.ALLOW_DEV_DELETE === "true";
 
 /**
  * The file list. By default it is Upload History (SCRUM-137/148): every attempt, filterable, where a file is opened
