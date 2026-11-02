@@ -3,8 +3,9 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { MorphSelect } from "@/components/ui/morph-select";
 import { Pager } from "@/components/ui/pager";
-import { DeleteBatchButton } from "@/components/mapping/delete-batch-button";
+import { DeleteAllBatchesButton, DeleteBatchButton, DevModeSwitch } from "@/components/mapping/delete-batch-button";
 import { apiGet } from "@/lib/api";
+import { isDevMode } from "@/lib/dev-mode";
 import { DOMAINS, STATUS, StatusBadge } from "@/lib/upload";
 import type { Kitchen } from "@/lib/me";
 import type { Batch } from "@/lib/mapping-validasi";
@@ -23,13 +24,19 @@ const avatarTone = (name: string) => AVATAR_TONES[name.charCodeAt(0) % AVATAR_TO
 
 type BatchFilters = { kitchenId?: string; domain?: string; status?: string };
 
+// The backend refuses forced deletes in production too; this only hides the switch.
+const DEV_TOOLS = process.env.NODE_ENV !== "production";
+
 /**
  * The file list. By default it is Upload History (SCRUM-137/148): every attempt, filterable, where a file is opened
  * to be checked and published. `compact` is the history shown under the upload form: Export instead of Open,
- * no filters, and its pages stay on Unggah Data.
+ * no filters, and its pages stay on Unggah Data. Development mode (a switch in the header, kept in a cookie) adds Hapus per row
+ * and Hapus semua file, which also remove PUBLISHED batches so testing can restart from an empty Overview.
  */
 export async function BatchList({ page, canDelete, compact = false, filters = {}, kitchens = [] }: { page: number; canDelete: boolean; compact?: boolean; filters?: BatchFilters; kitchens?: Kitchen[] }) {
   const base = compact ? "/unggah-data" : "/mapping-validasi";
+  const showDev = canDelete && DEV_TOOLS;
+  const devOn = showDev && (await isDevMode());
   const query = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][]);
   const { data, meta } = await apiGet<{ data: Batch[]; meta: { page: number; totalPages: number } }>(
     `/upload-batches?${new URLSearchParams({ pageSize: String(PAGE_SIZE), page: String(page), ...Object.fromEntries(query) })}`,
@@ -37,14 +44,20 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
 
   return (
     <div className="mx-auto max-w-400 space-y-4">
-      {compact ? (
-        <h2 className="text-xl font-bold tracking-tight text-slate-900">Upload History</h2>
-      ) : (
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Upload History</h1>
-          <p className="mt-1 text-slate-500">Semua file yang pernah diunggah.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        {compact ? (
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">Upload History</h2>
+        ) : (
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Upload History</h1>
+            <p className="mt-1 text-slate-500">Semua file yang pernah diunggah.</p>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-4">
+          {devOn && data.length > 0 && <DeleteAllBatchesButton />}
+          {showDev && <DevModeSwitch on={devOn} />}
         </div>
-      )}
+      </div>
       {!compact && (
         <form className="flex flex-wrap items-center gap-2" action={base}>
           {kitchens.length > 1 && (
@@ -122,7 +135,7 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
                         Export
                       </a>
                     )}
-                    {canDelete && <DeleteBatchButton id={b.id} fileName={b.fileName} />}
+                    {devOn && <DeleteBatchButton id={b.id} fileName={b.fileName} />}
                   </div>
                 </td>
               </tr>

@@ -26,7 +26,7 @@ export default async function Page({
       ) : (
         <>
           <UploadForm kitchens={me.kitchens} kitchenId={me.kitchens[0]?.id} />
-          <BatchList compact page={Number(listPage) || 1} canDelete={false} filters={filters} kitchens={me.kitchens} />
+          <BatchList compact page={Number(listPage) || 1} canDelete={me.permissions.includes("batch:publish")} filters={filters} kitchens={me.kitchens} />
         </>
       )}
     </div>

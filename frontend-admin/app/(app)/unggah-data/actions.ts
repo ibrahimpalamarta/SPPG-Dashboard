@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { apiFetch, apiSend } from "@/lib/api";
+import { DEV_MODE_COOKIE } from "@/lib/dev-mode";
 
 export type ColumnDiff = { sheet: string; missing: string[]; unexpected: string[] };
 
@@ -43,15 +45,30 @@ export type UploadResult =
     }
   | { ok: false; message: string };
 
-/** Returns an error message, or null once the batch is gone. */
-export async function deleteBatch(id: string): Promise<string | null> {
-  const res = await apiSend(`/upload-batches/${encodeURIComponent(id)}`, "DELETE");
-  if (res.status === 403) return "Anda tidak memiliki akses untuk menghapus batch ini.";
-  if (res.status === 409) return "Batch yang sudah dipublish tidak bisa dihapus.";
+/** Dev-mode delete (`force`: PUBLISHED too). Returns an error message, or null once it is gone. */
+async function forceDelete(path: string): Promise<string | null> {
+  const res = await apiSend(`${path}force=true`, "DELETE");
+  if (res.status === 403) return "Anda tidak memiliki akses untuk menghapus.";
+  if (res.status === 409) return typeof res.data.message === "string" ? res.data.message : "Penghapusan ditolak.";
   if (!res.ok && res.status !== 404) return "Gagal menghapus. Coba lagi beberapa saat lagi.";
   revalidatePath("/unggah-data");
   revalidatePath("/mapping-validasi");
+  revalidatePath("/overview");
   return null;
+}
+
+export async function setDevMode(on: boolean): Promise<void> {
+  (await cookies()).set(DEV_MODE_COOKIE, on ? "1" : "", { path: "/", maxAge: on ? 60 * 60 * 24 * 30 : 0 });
+  revalidatePath("/unggah-data");
+  revalidatePath("/mapping-validasi");
+}
+
+export async function deleteBatch(id: string): Promise<string | null> {
+  return forceDelete(`/upload-batches/${encodeURIComponent(id)}?`);
+}
+
+export async function deleteAllBatches(): Promise<string | null> {
+  return forceDelete("/upload-batches?");
 }
 
 /** The backend's verdict on a rejected upload or check, in Indonesian. */
