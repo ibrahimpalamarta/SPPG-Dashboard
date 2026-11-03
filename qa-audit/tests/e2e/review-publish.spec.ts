@@ -171,7 +171,7 @@ test.describe.serial('Review dan publish', () => {
 
   test('[SCRUM-103][SCRUM-65] Overview menampilkan "-" dan insight, bukan 0, untuk Penerima Manfaat, Saldo, dan Pengeluaran @smoke @kpi', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
-      await page.goto('overview');
+      await page.goto('overview?periode=monthly');
       const main = page.getByRole('main');
       await expect(main.getByText('Penerima Manfaat / hari')).toBeVisible();
       // Tanpa badge: nilai "-" dan insight yang menyebut data apa yang kurang (fixture Feb 2026, bukan bulan berjalan).
@@ -199,7 +199,7 @@ test.describe.serial('Review dan publish', () => {
 
   test('[SCRUM-149] Overview: setiap kotak punya AI Insight, termasuk kartu Pengeluaran · Bulan ini @smoke @kpi', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
-      await page.goto('overview');
+      await page.goto('overview?periode=monthly');
       const main = page.getByRole('main');
       await expect(main.getByText('Pengeluaran · Bulan ini')).toBeVisible();
       // 4 kartu KPI + Top 5 Supplier + Komposisi + Top 5 Menu + Informasi Gizi + perbandingan dapur.
