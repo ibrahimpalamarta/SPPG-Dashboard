@@ -11,7 +11,7 @@ export async function KitchenTable({ kitchens }: { kitchens: KitchenCompleteness
   const [t, lang] = await Promise.all([getT(), getLang()]);
   const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString(dateLocale(lang), { day: "2-digit", month: "short" });
   return (
-    <Card className="p-6">
+    <Card className="flex flex-col p-6">
       <h3 className="flex items-center gap-3 text-base font-semibold text-slate-900">
         <HeartPulse className="size-5 text-emerald-600" aria-hidden="true" />
         {t("Kelengkapan Data per Kitchen")}
@@ -58,7 +58,7 @@ export async function KitchenTable({ kitchens }: { kitchens: KitchenCompleteness
           </tbody>
         </table>
       </div>
-      <InsightBox>{kitchenInsight(t, kitchens)}</InsightBox>
+      <div className="mt-auto"><InsightBox>{kitchenInsight(t, kitchens)}</InsightBox></div>
     </Card>
   );
 }

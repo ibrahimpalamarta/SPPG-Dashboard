@@ -1,4 +1,4 @@
-import { ChevronRight, Check, Gauge, Minus } from "lucide-react";
+import { Check, Gauge, Minus } from "lucide-react";
 import { getT } from "@/lib/lang-server";
 import { Card } from "@/components/ui/card";
 import { SourceLink } from "@/components/ui/source-link";
@@ -17,7 +17,7 @@ export async function SknCompleteness({ kitchen }: { kitchen: KitchenCompletenes
           <Gauge className="size-5" aria-hidden="true" />
         </span>
         <button className="flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800">
-          {t("Lihat Detail")} <ChevronRight className="size-4" aria-hidden="true" />
+          {t("Lihat Detail")}
         </button>
       </div>
 
@@ -62,7 +62,7 @@ export async function SknCompleteness({ kitchen }: { kitchen: KitchenCompletenes
       </ul>
 
       <div className="mt-auto flex justify-end border-t border-slate-100 pt-4">
-        <SourceLink />
+        <SourceLink trace={{ kpi: "completeness", query: new URLSearchParams({ kitchenId: kitchen.id }).toString(), title: `${t("Kelengkapan Data")} · ${name}`, headline: `${percent}%` }} />
       </div>
     </Card>
   );

@@ -319,6 +319,7 @@ export const createUploadBatch =
         columnDiff,
         columns: parsed.columns,
         fields: parsed.fields,
+        dateRange: parsed.mapping?.dateRange ?? null,
         // One line per kind of problem, not per row: a file can carry thousands.
         issues: [...new Map(found.map((i) => [i.code, i])).values()].map((i) => ({ code: i.code, message: i.message, label: issueLabel(i), count: parsed.mapping?.issueCounts[i.code] ?? 1 })),
         ai: await checkUpload({ columnDiff, issueCounts: parsed.mapping?.issueCounts ?? {} }),

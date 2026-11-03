@@ -22,7 +22,7 @@ const NUTRIENTS = [
  * total, plus nutrition per portion per segment. Planned portions are not
  * shown here. Missing is shown as missing, never 0.
  */
-export async function NutritionInfo({ menu }: { menu: MenuKpi }) {
+export async function NutritionInfo({ menu, sourceQuery }: { menu: MenuKpi; sourceQuery: string }) {
   const t = await getT();
   const orMissing = (n: number | null) => (n === null ? t("Belum ada data") : count.format(n));
   const { nutrition, portions } = menu;
@@ -35,7 +35,7 @@ export async function NutritionInfo({ menu }: { menu: MenuKpi }) {
           <HeartPulse className="size-5 text-emerald-600" aria-hidden="true" />
           {t("Informasi Gizi")}
         </h3>
-        <SourceLink />
+        <SourceLink trace={{ kpi: "nutrition", query: sourceQuery, title: t("Informasi Gizi"), headline: t("Gizi rata-rata per porsi") }} />
       </div>
 
       {portions && (

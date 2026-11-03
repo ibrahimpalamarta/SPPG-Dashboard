@@ -9,9 +9,15 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type PeriodParams = { periode?: string; dari?: string; sampai?: string };
 
-/** Calendar periods in Jakarta time, ending today; custom needs both dates in order, otherwise it is unbounded. */
-export function resolvePeriod({ periode, dari = "", sampai = "" }: PeriodParams) {
-  const mode: PeriodMode = periode === "weekly" || periode === "daily" || periode === "custom" ? periode : "monthly";
+/** Earliest and latest date of the published data in scope (GET /api/kpi/data-range). */
+export type DataRange = { from: string; to: string };
+
+/**
+ * Calendar periods in Jakarta time, ending today. The default, and "custom" without valid dates, is the date
+ * range of the uploaded data (`data`); with no data it is the current month, or unbounded for custom.
+ */
+export function resolvePeriod({ periode, dari = "", sampai = "" }: PeriodParams, data?: DataRange | null) {
+  const mode: PeriodMode = periode === "weekly" || periode === "daily" || periode === "monthly" || periode === "custom" ? periode : data ? "custom" : "monthly";
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
   const monday = new Date(`${today}T00:00:00Z`);
   monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
@@ -25,8 +31,10 @@ export function resolvePeriod({ periode, dari = "", sampai = "" }: PeriodParams)
           ? { dateFrom: today, dateTo: today }
           : ISO_DATE.test(dari) && ISO_DATE.test(sampai) && dari <= sampai
             ? { dateFrom: dari, dateTo: sampai }
-            : {};
-  return { mode, dari, sampai, label: PERIOD_LABEL[mode], range };
+            : data
+              ? { dateFrom: data.from, dateTo: data.to }
+              : {};
+  return { mode, label: PERIOD_LABEL[mode], range };
 }
 
 export const REGION_PREFIX = "daerah:";

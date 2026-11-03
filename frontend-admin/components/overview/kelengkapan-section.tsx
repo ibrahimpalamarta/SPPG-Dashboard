@@ -1,4 +1,3 @@
-import { ChevronRight } from "lucide-react";
 import { getT } from "@/lib/lang-server";
 import { KitchenTable } from "@/components/overview/kitchen-table";
 import { Section } from "@/components/overview/section";
@@ -13,8 +12,8 @@ export async function KelengkapanSection({ kitchens }: { kitchens: KitchenComple
     <Section
       title={t("Kelengkapan Data")}
       action={
-        <button className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900">
-          {t("Buka Kelengkapan Data")} <ChevronRight className="size-4" aria-hidden="true" />
+        <button className="flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800">
+          {t("Buka Kelengkapan Data")}
         </button>
       }
     >

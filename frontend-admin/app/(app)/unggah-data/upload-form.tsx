@@ -4,11 +4,11 @@ import { ArrowRight, Building2, Check, CircleCheck, CircleX, Download, FileText,
 import Link from "next/link";
 import { startTransition, useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { checkFile, uploadFile, type CheckResult, type FileColumn, type UploadResult } from "./actions";
-import { useT } from "@/components/i18n-provider";
+import { useLang, useT } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { MorphSelect } from "@/components/ui/morph-select";
-import type { T } from "@/lib/lang";
+import { dateLocale, type T } from "@/lib/lang";
 import type { Kitchen } from "@/lib/me";
 
 const field = "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20";
@@ -255,6 +255,10 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   const [file, setFile] = useState<{ name: string; size: number } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const locale = dateLocale(useLang());
+  const day = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
+  const found = check?.ok ? check.dateRange : null;
+  const range = !found ? "" : found.from === found.to ? day(found.from) : `${day(found.from)} – ${day(found.to)}`;
   const showResult = result?.ok && !retry;
   const mapping = check?.ok && editing ? check : null;
   // Progress and verdict take the place of the inputs.
@@ -352,10 +356,8 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
           </div>
 
           <label className="block space-y-2 text-sm">
-            <span className="font-semibold text-slate-800">
-              {t("Bulan")} <span className="font-normal text-slate-500">({t("opsional")})</span>
-            </span>
-            <input type="month" name="period" className={field} />
+            <span className="font-semibold text-slate-800">{t("Bulan")}</span>
+            <input type="text" disabled value={range} placeholder={t("Mengikuti tanggal di dalam file")} className={`${field} disabled:bg-slate-50 disabled:text-slate-500`} />
           </label>
         </div>
 

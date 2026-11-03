@@ -32,6 +32,8 @@ export type CheckResult =
       columns: FileColumn[];
       fields: SopField[];
       ai: UploadAdvice | null;
+      /** Earliest and latest date inside the file (it can span several months); null when it has none. */
+      dateRange: { from: string; to: string } | null;
     }
   | { ok: false; message: string };
 
@@ -91,7 +93,7 @@ export async function checkFile(form: FormData): Promise<CheckResult> {
   const res = await apiFetch("/upload-batches?dryRun=true", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return failure(t, res.status, body);
-  return { ok: true, ready: body.ready, issues: body.issues, columnDiff: body.columnDiff, rowCount: body.rowCount, columns: body.columns, fields: body.fields, ai: body.ai };
+  return { ok: true, ready: body.ready, issues: body.issues, columnDiff: body.columnDiff, rowCount: body.rowCount, columns: body.columns, fields: body.fields, ai: body.ai, dateRange: body.dateRange };
 }
 
 /**

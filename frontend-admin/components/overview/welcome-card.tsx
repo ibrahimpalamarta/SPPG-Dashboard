@@ -8,6 +8,7 @@ import type { T } from "@/lib/lang";
 import { efiInsight, periodSpendInsight, portionsInsight, runwayInsight } from "@/lib/insight";
 import { dateLabel, periodSpend, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
 import type { Kitchen } from "@/lib/me";
+import type { resolvePeriod } from "@/lib/overview-filter";
 
 const count = new Intl.NumberFormat("id-ID");
 
@@ -55,16 +56,16 @@ function stats(t: T, finance: FinanceKpi | null, menu: MenuKpi, period: string):
   return out;
 }
 
-export async function WelcomeCard({ name, kitchens, scope, period, finance, menu }: { name: string; kitchens: Kitchen[]; scope: string; period: string; finance: FinanceKpi | null; menu: MenuKpi }) {
+export async function WelcomeCard({ name, kitchens, scope, period, finance, menu }: { name: string; kitchens: Kitchen[]; scope: string; period: ReturnType<typeof resolvePeriod>; finance: FinanceKpi | null; menu: MenuKpi }) {
   const t = await getT();
-  const items = stats(t, finance, menu, t(period));
+  const items = stats(t, finance, menu, t(period.label));
   return (
     <Card className="p-6 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Selamat Datang, {name}!", { name })}</h1>
         <div className="flex flex-wrap items-center gap-3">
           <KitchenFilter kitchens={kitchens} selected={scope} />
-          <PeriodFilter />
+          <PeriodFilter mode={period.mode} range={period.range} />
         </div>
       </div>
       {items.length > 0 && (
