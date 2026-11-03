@@ -60,6 +60,16 @@ Branch lokal SCRUM-20/22 sudah memigrasi `user_kitchen_scopes`, `kitchens.code`,
 
 **D-22 · 2026-10-30 · KPI dua endpoint gabungan.** `GET /api/kpi/finance` (khusus COST_ROLES) dan `GET /api/kpi/menu`, mengikuti preseden `dashboard/summary` (satu request per halaman). Porsi/penerima manfaat hanya keluar untuk role biaya (SCRUM-13). Planned Cost/Portion di balik env `KPI_PLANNED_COST=true`, default mati selama B-PLAN terbuka.
 
+**D-23 · 2026-11-02 · Catatan pengerjaan terbaru (UI Unggah/Overview).**
+1. Input dropdown memakai gaya morphing (`components/ui/morph-select.tsx`), dipakai di Unggah Data, Upload History, dan Anggota.
+2. Insight di Overview disiapkan memakai model AI NVIDIA Nemotron Super. Teks insight per box tetap berformat temuan + angka + aksi (SCRUM-158/149), angka hanya dari data yang sudah dipublish.
+3. Ada berkas uji untuk tiap jenis data (fixture anonim Sukun: cashflow, menu, dst.), dipakai test backend dan e2e.
+4. Unggahan otomatis dipublish setelah review AI selesai dan aturan validasi lolos. Keputusan publish tetap ditentukan aturan deterministik, AI hanya memberi saran (SCRUM-150).
+5. Halaman Unggah Data menampilkan progres per langkah dan kartu hasil menggantikan input unggah; teks verdict tidak diulang di kartu hasil.
+6. Menu "Validasi Data" digabung dengan Upload History lalu dinamai **Upload History** (menu dan halaman).
+7. Header aplikasi dinaikkan di atas konten halaman supaya dropdown notifikasi menutupi select periode Overview; dropdown notifikasi punya tautan "lihat selengkapnya" ke Inbox.
+8. Header Overview punya chip dapur dan select periode (sementara hardcoded); kartu statistik diurutkan ulang dan badge "Belum ada data" dihapus.
+
 ## Konflik dokumen
 
 **K-01 · OD-01 Lawang (B-LWG).** PRD §0/§14: Lawang = "Phase 1 comparison", masuk setelah alur Sukun stabil. BRD §1 "Kitchen mana yang didahulukan": Lawang = "Phase 2 – rollout", didahulukan dari DNM/PCK. **Dipakai PRD**, sebagai nilai config `rollout_status`, bukan hardcode.

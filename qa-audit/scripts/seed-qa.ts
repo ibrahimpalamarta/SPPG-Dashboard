@@ -20,6 +20,8 @@ type Account = { key: string; fullName: string; role: Role; kitchens: 'all' | st
 const ACCOUNTS: Account[] = [
   { key: 'admin', fullName: 'QA Admin', role: 'ADMIN', kitchens: 'all' },
   { key: 'data-operasional-skn', fullName: 'QA Data Operasional SKN', role: 'DATA_ADMIN', kitchens: ['SKN'] },
+  // Second dapur: the other side of every kitchen-isolation check (tests/e2e/isolasi.spec.ts).
+  { key: 'data-operasional-lwg', fullName: 'QA Data Operasional LWG', role: 'DATA_ADMIN', kitchens: ['LWG'] },
 ];
 
 // Same statement as backend/scripts/grant-public-role.ts, which cannot run as-is:

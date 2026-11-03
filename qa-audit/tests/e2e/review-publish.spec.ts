@@ -162,7 +162,7 @@ test.describe.serial('Review dan publish', () => {
   // PRD dokumen pengujian D: gaji, petty cash, dan transfer internal bukan belanja supplier. Saat
   // ini "No Rekening Relawan" (PENGGAJIAN, Rp26,8 jt) masuk Top 5 Supplier dan Komposisi
   // Pengeluaran. Temuan aplikasi, dicatat di docs/roadmap.md; test ini menunggu perbaikannya.
-  test.fixme('[SCRUM-62][SCRUM-63] baris PENGGAJIAN tidak masuk Top 5 Supplier @kpi', async ({ browser }) => {
+  test.fixme('[AC-DASH-02][SCRUM-62][SCRUM-63] baris PENGGAJIAN tidak masuk Top 5 Supplier @smoke @kpi', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
       await page.goto(`finance?${SEMUA_PERIODE}`);
       await expect(page.getByRole('main').getByText('No Rekening Relawan')).toHaveCount(0);

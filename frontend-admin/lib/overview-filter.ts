@@ -1,9 +1,9 @@
 import type { Kitchen } from "@/lib/me";
 
 /** SCRUM-142: what the Overview and Finance filters put in the URL, and how it becomes backend query params. */
-export type PeriodMode = "monthly" | "weekly" | "daily" | "custom";
+type PeriodMode = "monthly" | "weekly" | "daily" | "custom";
 
-export const PERIOD_LABEL: Record<PeriodMode, string> = { monthly: "Bulan ini", weekly: "Minggu ini", daily: "Hari ini", custom: "Periode ini" };
+const PERIOD_LABEL: Record<PeriodMode, string> = { monthly: "Bulan ini", weekly: "Minggu ini", daily: "Hari ini", custom: "Periode ini" };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 

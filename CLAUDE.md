@@ -25,6 +25,13 @@ Instruksi ini berlaku untuk semua sesi Claude Code di repo ini. Ikuti secara ket
 - Gunakan plugin `/ponytail` untuk task coding di repo ini agar penggunaan token hemat dan output code tetap ramping.
 - Prioritaskan `/ponytail` di atas pendekatan default kalau task-nya coding (bukan diskusi/brainstorming).
 
+## Sinkronisasi Jira (tiket SCRUM)
+Setiap fitur/perbaikan yang dikerjakan berdasarkan tiket langsung diperbarui di Jira, tanpa menunggu diminta:
+- **Mulai mengerjakan:** pindahkan tiket dari To Do ke In Progress (transition id 21).
+- **Selesai dengan keyakinan 100%:** lint/type-check/test lolos dan semua AC tiket terpenuhi. Tambahkan komentar Bahasa Indonesia (yang dikerjakan, link PR, cara menguji, blocker tersisa), sertakan screenshot Playwright lewat `npm run evidence -- SCRUM-xx` di `qa-audit/` bila ada UI test yang lolos (jangan memalsukan bukti), lalu pindahkan ke In Review (transition id 31).
+- **Belum 100% yakin:** tetap di In Progress dan tulis alasannya di komentar.
+- **Tidak pernah Done:** user yang menutup tiket setelah review. Hanya ubah tiket yang sedang dikerjakan, jangan tiket lain.
+
 ## Git Workflow
 - **Jangan pernah push langsung ke `develop` atau `main`.**
 - Setiap fitur/perbaikan dikerjakan di branch baru dari `develop`, dengan format:

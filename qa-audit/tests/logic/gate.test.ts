@@ -46,6 +46,13 @@ describe('gate', () => {
     expect(run({ outcomes: { logic: 'failure' } }).verdict).not.toBe('pass');
   });
 
+  it('[QA-GATE] e2e gagal karena test Warning (a11y) dilaporkan, bukan infra-error', () => {
+    const a11y: Finding = { severity: 'Warning', tool: 'playwright', rule: 'test-failed', message: 'a11y admin › overview' };
+    const e = run({ findings: [a11y], outcomes: { e2e: 'failure' } });
+    expect(e.findings.some((f) => f.rule === 'e2e-failed')).toBe(false);
+    expect(e.verdict).toBe('pass');
+  });
+
   it('[QA-GATE] CI build gagal membuat verdict fail', () => {
     expect(run({ outcomes: { ci: 'failure' } }).verdict).toBe('fail');
   });
@@ -61,6 +68,18 @@ describe('gate', () => {
       'AC-DASH-04': 'Menunggu keputusan',
       'AC-UP-01': 'Belum ada test',
       'OD-02': 'Menunggu keputusan',
+    });
+  });
+
+  it('[QA-GATE] test membuktikan requirement lewat ref SCRUM, bukan lewat ref requirement lain', () => {
+    const v = run({
+      requirements: [{ ...req('AC-UP-02'), refs: ['SCRUM-35'] }, { ...req('P1-033'), refs: ['P1-001'] }, { ...req('P1-001'), refs: [] }],
+      tests: [tc('[P1-001][SCRUM-35] ok', 'passed')],
+    });
+    expect(Object.fromEntries(v.requirements.map((r) => [r.id, r.status]))).toEqual({
+      'AC-UP-02': 'Lulus',
+      'P1-033': 'Belum ada test',
+      'P1-001': 'Lulus',
     });
   });
 
