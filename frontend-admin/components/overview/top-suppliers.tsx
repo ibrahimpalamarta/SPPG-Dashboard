@@ -10,7 +10,7 @@ export async function TopSuppliers({ suppliers, insight }: { suppliers: FinanceK
   return (
     <Panel title={t("Top 5 Supplier")} icon={BarChart3} insight={insight}>
       {suppliers.length === 0 ? (
-        <p className="text-sm text-slate-500">{t("Belum ada data belanja yang dipublish.")}</p>
+        <p className="flex h-full min-h-32 items-center justify-center text-center text-sm text-slate-500">{t("Belum ada data belanja yang dipublish.")}</p>
       ) : (
         <div className="flex flex-col gap-5">
           {suppliers.map(({ name, amount }, index) => (

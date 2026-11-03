@@ -62,7 +62,7 @@ export async function SknCompleteness({ kitchen }: { kitchen: KitchenCompletenes
       </ul>
 
       <div className="mt-auto flex justify-end border-t border-slate-100 pt-4">
-        <SourceLink className="text-slate-500 hover:text-slate-800" />
+        <SourceLink />
       </div>
     </Card>
   );
