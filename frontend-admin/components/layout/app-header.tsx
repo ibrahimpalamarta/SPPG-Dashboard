@@ -29,7 +29,7 @@ export function AppHeader({ items, user }: { items: readonly NavItem[]; user: Ap
       </details>
 
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-slate-400">Dashboard</span>
+        <span className="text-slate-600">Dashboard</span>
         <span className="text-slate-300" aria-hidden="true">/</span>
         <span className="font-medium text-slate-800">{title}</span>
       </div>

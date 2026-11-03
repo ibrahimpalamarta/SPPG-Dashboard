@@ -53,7 +53,7 @@ export function AuthCard({ title, children }: { title: string; children: ReactNo
           <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-700 text-sm font-bold text-white" aria-hidden="true">SI</div>
           <div>
             <h1 className="text-base font-semibold text-slate-800">{title}</h1>
-            <p className="text-xs text-slate-400">SPPG Internal</p>
+            <p className="text-xs text-slate-600">SPPG Internal</p>
           </div>
         </div>
         {children}

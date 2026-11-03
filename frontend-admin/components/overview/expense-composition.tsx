@@ -21,7 +21,7 @@ export function ExpenseDonut({ slices, total }: { slices: Slice[]; total: number
             <span className="size-3 rounded-sm" style={{ backgroundColor: color }} />
             <span className={`flex-1 ${unmapped ? "text-amber-700" : "text-slate-600"}`}>{label}</span>
             <strong className="text-slate-800">{rp(amount)}</strong>
-            <span className="w-12 text-right text-slate-400">{percentFormat.format(percent)}%</span>
+            <span className="w-12 text-right text-slate-600">{percentFormat.format(percent)}%</span>
           </div>
         ))}
       </div>

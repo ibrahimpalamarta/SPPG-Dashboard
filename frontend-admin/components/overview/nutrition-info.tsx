@@ -87,7 +87,7 @@ export function NutritionInfo({ menu }: { menu: MenuKpi }) {
                     <th className="px-4 py-3 text-sm font-semibold text-slate-800">{label}</th>
                     {nutrition.map(({ segment, perPortion }) => (
                       <td key={segment} className="px-4 py-3 text-sm font-semibold text-slate-800">
-                        {perPortion[key] === null ? <span className="font-normal text-slate-400">Belum ada data</span> : <>{decimal.format(perPortion[key])} <span className="font-normal text-slate-400">{unit}</span></>}
+                        {perPortion[key] === null ? <span className="font-normal text-slate-600">Belum ada data</span> : <>{decimal.format(perPortion[key])} <span className="font-normal text-slate-600">{unit}</span></>}
                       </td>
                     ))}
                   </tr>
