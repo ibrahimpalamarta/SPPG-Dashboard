@@ -40,9 +40,11 @@ export const akgComplianceQuery = pageQuery.extend({
 
 export const summaryQuery = refineDateRange(pageQuery.extend(dateRangeFields));
 
-/** Bounds for the internal dashboard rollup. */
+const region = z.string().trim().min(1).max(100).optional();
+
+/** Bounds for the internal dashboard rollup; SCRUM-142: also narrowed to one region (kitchens.city_regency). */
 export const dashboardQuery = refineDateRange(
-  z.object({ ...dateRangeFields, kitchenId: optionalBigInt }),
+  z.object({ ...dateRangeFields, kitchenId: optionalBigInt, region }),
 );
 
 /** SCRUM-104: completeness per dapur, optionally narrowed to one. */
@@ -50,5 +52,5 @@ export const completenessQuery = z.object({ kitchenId: optionalBigInt });
 
 /** SCRUM-115: menu KPIs also filter by region (kitchens.city_regency). */
 export const menuKpiQuery = refineDateRange(
-  z.object({ ...dateRangeFields, kitchenId: optionalBigInt, region: z.string().trim().min(1).max(100).optional() }),
+  z.object({ ...dateRangeFields, kitchenId: optionalBigInt, region }),
 );

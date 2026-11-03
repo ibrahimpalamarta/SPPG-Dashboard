@@ -8,16 +8,25 @@ import { apiGet } from "@/lib/api";
 import { requirePage } from "@/lib/guard";
 import { expenseInsight, supplierInsight } from "@/lib/insight";
 import { financeKpi, mixSlices, type KitchenCompleteness, type MenuKpi } from "@/lib/kpi";
+import { kpiQuery, resolvePeriod, resolveScope, type PeriodParams } from "@/lib/overview-filter";
 
 export const metadata: Metadata = { title: "Overview · SPPG Internal" };
 
-export default async function OverviewPage() {
+export default async function OverviewPage({ searchParams }: { searchParams: Promise<PeriodParams & { dapur?: string }> }) {
   const me = await requirePage("/overview");
+  const params = await searchParams;
+  const scope = resolveScope(me.kitchens, params.dapur);
+  const period = resolvePeriod(params);
+  const query = kpiQuery(period, scope);
   // SCRUM-97..116: published data only; finance is null for roles without cost clearance.
-  const [finance, menu, completeness] = await Promise.all([financeKpi(), apiGet<MenuKpi>("/kpi/menu"), apiGet<{ kitchens: KitchenCompleteness[] }>("/kpi/completeness")]);
+  const [finance, menu, completeness] = await Promise.all([
+    financeKpi(query),
+    apiGet<MenuKpi>(`/kpi/menu${query}`),
+    apiGet<{ kitchens: KitchenCompleteness[] }>("/kpi/completeness"),
+  ]);
   return (
     <div className="mx-auto max-w-400 space-y-5">
-      <WelcomeCard name={me.fullName ?? me.email ?? "Pengguna"} finance={finance} menu={menu} />
+      <WelcomeCard name={me.fullName ?? me.email ?? "Pengguna"} kitchens={me.kitchens} scope={scope.value} period={period.label} finance={finance} menu={menu} />
       {finance && (
         <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <TopSuppliers suppliers={finance.topSuppliers} insight={supplierInsight(finance)} />

@@ -7,14 +7,16 @@ import { StatStrip } from "@/components/finance/stat-strip";
 import { ExpenseBreakdown, TopSuppliers } from "@/components/finance/supplier-expense";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PeriodFilter } from "@/components/ui/period-filter";
 import { requirePage } from "@/lib/guard";
 import { financeKpi, mixSlices, rpFull } from "@/lib/kpi";
+import { kpiQuery, resolvePeriod, type PeriodParams } from "@/lib/overview-filter";
 
 export const metadata: Metadata = { title: "Finance & Cost · SPPG Internal" };
 
-export default async function FinancePage() {
+export default async function FinancePage({ searchParams }: { searchParams: Promise<PeriodParams> }) {
   await requirePage("/finance");
-  const finance = await financeKpi();
+  const finance = await financeKpi(kpiQuery(resolvePeriod(await searchParams)));
   if (!finance) {
     return (
       <EmptyState title="Tidak ada akses">
@@ -26,7 +28,10 @@ export default async function FinancePage() {
   return (
     <div className="mx-auto max-w-400">
       <Card className="space-y-5 p-6 sm:p-8">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Finance &amp; Cost</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Finance &amp; Cost</h1>
+          <PeriodFilter />
+        </div>
 
         <StatStrip spend={finance.spend} />
         <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">

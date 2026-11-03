@@ -80,8 +80,11 @@ async function unggahKirimPublish(browser: Browser, name: string, buffer: Buffer
 }
 
 // Nilai kartu di Finance (mis. "Jumlah transaksi" -> "9"), dibaca dari teks halaman.
+// Fixture bertanggal Feb 2026; default Monthly hanya memuat bulan berjalan, jadi rentang custom lebar dipilih lewat URL (SCRUM-142).
+const SEMUA_PERIODE = 'periode=custom&dari=2020-01-01&sampai=2099-12-31';
+
 async function kartu(page: Page, label: string) {
-  await page.goto('finance');
+  await page.goto(`finance?${SEMUA_PERIODE}`);
   const teks = (await page.getByRole('main').innerText()).split('\n').map((l) => l.trim()).filter(Boolean);
   return teks[teks.indexOf(label) + 1] ?? '';
 }
@@ -161,7 +164,7 @@ test.describe.serial('Review dan publish', () => {
   // Pengeluaran. Temuan aplikasi, dicatat di docs/roadmap.md; test ini menunggu perbaikannya.
   test.fixme('[AC-DASH-02][SCRUM-62][SCRUM-63] baris PENGGAJIAN tidak masuk Top 5 Supplier @smoke @kpi', async ({ browser }) => {
     await sebagai(browser, 'admin', async (page) => {
-      await page.goto('finance');
+      await page.goto(`finance?${SEMUA_PERIODE}`);
       await expect(page.getByRole('main').getByText('No Rekening Relawan')).toHaveCount(0);
     });
   });
@@ -184,7 +187,7 @@ test.describe.serial('Review dan publish', () => {
     const menu = readFileSync('../backend/src/lib/ingest/fixtures/sukun-menu.csv');
     await unggahKirimPublish(browser, `menu-${FILE}`, Buffer.concat([menu, Buffer.from('\n\n')]), MENU);
     await sebagai(browser, 'admin', async (page) => {
-      await page.goto('overview');
+      await page.goto(`overview?${SEMUA_PERIODE}`);
       const main = page.getByRole('main');
       await expect(main.getByText('Belum ada data menu yang dipublish.')).toHaveCount(0);
       await expect(main.getByText('Gizi rata-rata per porsi')).toBeVisible();

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="id">
-      <body className={roboto.className}>{children}</body>
+      <body className={roboto.className} suppressHydrationWarning>{children}</body>
     </html>
   );
 }
