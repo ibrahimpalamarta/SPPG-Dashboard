@@ -32,17 +32,17 @@ publik belum selesai; fondasi deployment-nya sudah jalan.
 ```mermaid
 flowchart LR
   subgraph Pengguna
-    DO[Data Operasional<br>satu dapur]
-    AD[Admin<br>semua dapur]
-    PB[Publik]
+    DO["Data Operasional<br>satu dapur"]
+    AD["Admin<br>semua dapur"]
+    PB["Publik"]
   end
-  DO & AD -->|browser| FA[frontend-admin<br>Next.js, server-side]
-  PB -->|browser| FP[frontend-public<br>Next.js]
-  FA -->|Bearer token sesi| BE[backend<br>Express /api]
-  FP -.->|/api/public/*| BE
-  BE --> PG[(Postgres RDS<br>data + akun + sesi)]
-  BE --> S3[(S3 assets<br>berkas unggahan)]
-  BE -.->|opsional| AI[LLM OpenAI-compatible<br>saran cek unggahan & insight]
+  DO & AD -->|"browser"| FA["frontend-admin<br>Next.js, server-side"]
+  PB -->|"browser"| FP["frontend-public<br>Next.js"]
+  FA -->|"Bearer token sesi"| BE["backend<br>Express /api"]
+  FP -.->|"/api/public/*"| BE
+  BE --> PG[("Postgres RDS<br>data + akun + sesi")]
+  BE --> S3[("S3 assets<br>berkas unggahan")]
+  BE -.->|"opsional"| AI["LLM OpenAI-compatible<br>saran cek unggahan dan insight"]
 ```
 
 Poin penting:
@@ -120,16 +120,16 @@ Setiap endpoint yang mengubah data menulis satu baris audit log
 ```mermaid
 sequenceDiagram
   participant B as Browser
-  participant P as proxy.ts (frontend-admin)
-  participant S as Server component / action
-  participant A as backend /api
+  participant P as proxy.ts
+  participant S as Server component atau action
+  participant A as backend API
   participant D as Postgres
   B->>P: GET /admin/finance
-  P-->>B: tanpa cookie sppg_session → redirect /login
+  P-->>B: tanpa cookie sppg_session, redirect ke /login
   P->>S: ada cookie
-  S->>A: GET /api/kpi/finance (Authorization: Bearer token)
-  A->>D: requireAuth: cari sesi (hash token), akun ACTIVE, muat permission
-  A->>A: requirePermission → kitchenScope(user, kitchenId)
+  S->>A: GET /api/kpi/finance dengan Authorization Bearer token
+  A->>D: requireAuth cari sesi (hash token), akun ACTIVE, muat permission
+  A->>A: requirePermission lalu kitchenScope
   A->>D: query dibatasi kitchenId
   A-->>S: JSON
   S-->>B: halaman ter-render
