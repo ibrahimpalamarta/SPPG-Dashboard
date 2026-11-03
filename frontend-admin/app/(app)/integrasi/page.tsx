@@ -31,7 +31,6 @@ export default async function IntegrasiPage() {
       <Card className="space-y-6 p-6 sm:p-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Integrasi")}</h1>
-          <p className="mt-2 max-w-xl text-slate-600">{t("Phase 1 membaca upload/export. Integrasi API/write-back dua arah ke SIPGN/POP/Aksis/MPM di luar lingkup (OS1, OD-08).")}</p>
         </div>
 
         <ul className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">

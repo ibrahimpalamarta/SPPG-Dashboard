@@ -27,7 +27,6 @@ export default async function Page() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold text-slate-900">{t("Pengaturan")}</h1>
-        <p className="mt-2 text-slate-500">{t("Profil dan tampilan.")}</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

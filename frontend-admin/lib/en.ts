@@ -212,7 +212,6 @@ export const EN: Record<string, string> = {
   "Opsional": "Optional",
 
   // Upload data
-  "Unggah file Excel dari dapur. Sistem akan membaca dan mengecek isinya.": "Upload an Excel file from the kitchen. The system will read and check its contents.",
   "Belum ada dapur": "No kitchen yet",
   "Akun Anda belum ditautkan ke dapur mana pun. Hubungi Admin.": "Your account is not linked to any kitchen. Contact an Admin.",
   "Input Maker": "Input Maker",
@@ -276,7 +275,6 @@ export const EN: Record<string, string> = {
   "Pilih file .xlsx atau .csv terlebih dahulu.": "Choose an .xlsx or .csv file first.",
 
   // Upload history / mapping
-  "Semua file yang pernah diunggah.": "Every file that has been uploaded.",
   "Semua jenis data": "All data types",
   "Semua status": "All statuses",
   "Terapkan": "Apply",
@@ -421,7 +419,6 @@ export const EN: Record<string, string> = {
   "Alur Data": "Data Flow",
   "Aturan Cek Data": "Data Check Rules",
   "Daftar Kode": "Code List",
-  "Buku panduan data: arti tiap data, format file yang dikenali, dan aturan pengecekan.": "Data guidebook: the meaning of each data item, recognized file formats, and checking rules.",
   "Hanya lihat": "View only",
   "Bagian Data Reference": "Data Reference sections",
   "Cari nama data": "Search data name",
@@ -473,6 +470,12 @@ export const EN: Record<string, string> = {
   "Tampilan contoh: angka di bagian ini masih data statis, belum berasal dari data dapur yang dipublikasikan.": "Sample display: the figures in this section are still static data, not yet from published kitchen data.",
 
   // Members
+  "anggota aktif": "active members",
+  "Mengerjakan data satu dapur: unggah file, cek validasi, lalu Setujui & Publish sendiri.": "Works on one kitchen's data: uploads files, checks validation, then Approves & Publishes on their own.",
+  "Melihat semua dapur, mengelola anggota, Data Reference, dan Upload History (hanya lihat).": "Sees all kitchens, manages members, Data Reference, and Upload History (view only).",
+  "Unggah & validasi": "Upload & validate",
+  "Resolve issue": "Resolve issues",
+  "Kelola anggota": "Manage members",
   "Kelola anggota, role, dan akses dapur.": "Manage members, roles, and kitchen access.",
   "Anda dapat melihat daftar anggota, tetapi tidak dapat mengubahnya.": "You can view the member list but cannot change it.",
   "Filter status": "Filter by status",
@@ -546,12 +549,10 @@ export const EN: Record<string, string> = {
   // Inbox
   "Belum ada tugas": "No tasks yet",
   "File yang perlu diperbaiki atau undangan yang kedaluwarsa akan muncul di sini.": "Files that need fixing or expired invitations will appear here.",
-  "Tugas yang menunggu tindakan Anda.": "Tasks waiting for your action.",
   "File perlu diperbaiki": "Files that need fixing",
   "Undangan kedaluwarsa": "Expired invitations",
 
   // Integration
-  "Phase 1 membaca upload/export. Integrasi API/write-back dua arah ke SIPGN/POP/Aksis/MPM di luar lingkup (OS1, OD-08).": "Phase 1 reads uploads/exports. Two-way API/write-back integration with SIPGN/POP/Aksis/MPM is out of scope (OS1, OD-08).",
   "Tidak tersedia": "Not available",
   "Manual export": "Manual export",
   "Upload aktif": "Upload active",
@@ -569,7 +570,6 @@ export const EN: Record<string, string> = {
   "API · setelah OD-08": "API · after OD-08",
 
   // Settings / security
-  "Profil dan tampilan.": "Profile and appearance.",
   "Profil": "Profile",
   "Cakupan": "Scope",
   "Verifikasi dua langkah": "Two-step verification",
