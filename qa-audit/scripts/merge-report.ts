@@ -267,7 +267,7 @@ export function evaluate(input: { gate: Gate; requirements: Requirement[]; findi
   // CI build writes no raw report; its failure is a red build/test, so a product failure, not infra.
   for (const [stage, outcome] of Object.entries(input.outcomes) as [Stage, string][]) {
     if (stage === 'env' || outcome !== 'failure') continue;
-    if (!findings.some((f) => TOOL_STAGE[f.tool] === stage && f.severity === 'Blocker')) {
+    if (!findings.some((f) => TOOL_STAGE[f.tool] === stage)) {
       findings.push({ severity: g.stageFailedWithoutReport, tool: stage === 'ci' ? 'ci' : 'infra', rule: `${stage}-failed`, message: `Tahap ${STAGES[stage]} gagal tanpa laporan yang menjelaskan.` });
     }
   }

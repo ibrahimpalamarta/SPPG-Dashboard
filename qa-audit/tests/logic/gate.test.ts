@@ -46,6 +46,13 @@ describe('gate', () => {
     expect(run({ outcomes: { logic: 'failure' } }).verdict).not.toBe('pass');
   });
 
+  it('[QA-GATE] e2e gagal karena test Warning (a11y) dilaporkan, bukan infra-error', () => {
+    const a11y: Finding = { severity: 'Warning', tool: 'playwright', rule: 'test-failed', message: 'a11y admin › overview' };
+    const e = run({ findings: [a11y], outcomes: { e2e: 'failure' } });
+    expect(e.findings.some((f) => f.rule === 'e2e-failed')).toBe(false);
+    expect(e.verdict).toBe('pass');
+  });
+
   it('[QA-GATE] CI build gagal membuat verdict fail', () => {
     expect(run({ outcomes: { ci: 'failure' } }).verdict).toBe('fail');
   });
