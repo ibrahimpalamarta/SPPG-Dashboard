@@ -16,8 +16,6 @@ export async function generateMetadata(): Promise<Metadata> {
 
 type Status = UserRow["memberStatus"];
 
-const card = "space-y-3 rounded-xl border border-slate-200 bg-white p-5";
-
 const STATUS: Record<Status, [string, string]> = {
   PENDING: ["Menunggu aktivasi", "bg-slate-400"],
   ACTIVE: ["Aktif", "bg-emerald-500"],
@@ -32,27 +30,6 @@ const TABS: { key: Status | "ALL"; label: string }[] = [
   { key: "EXPIRED", label: "Kedaluwarsa" },
   { key: "INACTIVE", label: "Nonaktif" },
 ];
-
-const ROLE_CARDS: { role: Role; description: string; chips: string[] }[] = [
-  {
-    role: "DATA_ADMIN",
-    description: "Mengerjakan data satu dapur: unggah file, cek validasi, lalu Setujui & Publish sendiri.",
-    chips: ["Unggah & validasi", "Resolve issue", "Setujui & Publish"],
-  },
-  {
-    role: "ADMIN",
-    description: "Melihat semua dapur, mengelola anggota, Data Reference, dan Upload History (hanya lihat).",
-    chips: ["Semua dapur", "Kelola anggota", "Data Reference", "Upload History"],
-  },
-];
-
-const ALUR = [
-  ["1 · Undang", "Admin", "Isi nama, email, role, dan dapur"],
-  ["2 · Validasi", "Sistem", "Email belum terdaftar"],
-  ["3 · Tautan aktivasi", "Status: Menunggu aktivasi", "Bisa dikirim ulang atau dibatalkan"],
-  ["4 · Aktivasi", "Penerima", "Membuat kata sandi; role sudah ditetapkan"],
-  ["5 · Aktif", "Masuk ke dashboard", "Akun berstatus Aktif"],
-] as const;
 
 const PERMISSION_LABELS: Record<Permission, string> = {
   "upload:create": "Unggah file",
@@ -113,32 +90,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
         {canManage && <CreateUserForm kitchens={kitchens} />}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {ROLE_CARDS.map((r) => (
-          <section key={r.role} className={card}>
-            <div>
-              <h2 className="font-semibold text-slate-800">{t(ROLE_LABELS[r.role])}</h2>
-              <p className="text-xs text-slate-500">{users.filter((u) => u.role === r.role && u.memberStatus === "ACTIVE").length} {t("anggota aktif")}</p>
-            </div>
-            <p className="text-sm text-slate-600">{t(r.description)}</p>
-            <div className="flex flex-wrap gap-2">
-              {r.chips.map((c) => (
-                <span key={c} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
-                  {t(c)}
-                </span>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-
-      <nav aria-label={t("Filter status")} className="flex flex-wrap gap-1 text-sm">
+      <nav aria-label={t("Filter status")} className="inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 text-sm">
         {TABS.map((item) => (
           <Link
             key={item.key}
             href={item.key === "ALL" ? "/anggota" : `/anggota?status=${item.key}`}
             aria-current={tab === item.key ? "page" : undefined}
-            className={`rounded-lg px-3 py-1.5 font-medium ${tab === item.key ? "bg-slate-800 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+            className={`rounded-lg px-3 py-1.5 font-medium ${tab === item.key ? "bg-white text-emerald-700 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
           >
             {t(item.label)} <span className="opacity-60">{count(item.key)}</span>
           </Link>
@@ -220,19 +178,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
             </tbody>
           )}
         </table>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-slate-800">{t("Alur undang anggota")}</h2>
-        <ol className="grid gap-3 md:grid-cols-5">
-          {ALUR.map(([step, title, note]) => (
-            <li key={step} className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase text-slate-600">{t(step)}</p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">{t(title)}</p>
-              <p className="mt-1 text-xs text-slate-500">{t(note)}</p>
-            </li>
-          ))}
-        </ol>
       </section>
 
       {roles && (
