@@ -106,9 +106,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-slate-800">{t("Anggota")}</h1>
-          <p className="max-w-2xl text-sm text-slate-600">
-            {canManage ? t("Kelola anggota, role, dan akses dapur.") : t("Anda dapat melihat daftar anggota, tetapi tidak dapat mengubahnya.")}
-          </p>
         </div>
         {canManage && <CreateUserForm kitchens={kitchens} />}
       </div>
