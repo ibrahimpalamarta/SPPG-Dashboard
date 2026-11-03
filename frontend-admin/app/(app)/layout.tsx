@@ -6,7 +6,7 @@ import { ROLE_LABELS } from "@/lib/roles";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const me = await getMe();
-  const items: NavItem[] = NAV.filter((n) => canOpen(n, me));
+  const items: NavItem[] = NAV.filter((n) => !("hidden" in n) && canOpen(n, me));
   const user = { name: me.fullName ?? ROLE_LABELS[me.role], email: me.email, role: me.role };
 
   return (
