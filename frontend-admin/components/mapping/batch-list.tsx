@@ -53,7 +53,7 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
         ) : (
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Upload History")}</h1>
-            <p className="mt-1 text-slate-500">{t("Semua file yang pernah diunggah.")}</p>
+            <p className="mt-1 text-slate-600">{t("Semua file yang pernah diunggah.")}</p>
           </div>
         )}
         <div className="flex flex-wrap items-center gap-4">

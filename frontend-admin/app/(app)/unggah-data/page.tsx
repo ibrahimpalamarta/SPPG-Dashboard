@@ -20,7 +20,7 @@ export default async function Page({
     <div className="mx-auto max-w-400 space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Unggah Data")}</h1>
-        <p className="mt-1 text-slate-500">{t("Unggah file Excel dari dapur. Sistem akan membaca dan mengecek isinya.")}</p>
+        <p className="mt-1 text-slate-600">{t("Unggah file Excel dari dapur. Sistem akan membaca dan mengecek isinya.")}</p>
       </div>
       {me.kitchens.length === 0 ? (
         <EmptyState title={t("Belum ada dapur")}>
