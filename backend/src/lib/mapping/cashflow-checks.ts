@@ -24,6 +24,26 @@ export function normalizeCategories(txns: CashflowTxn[], categories: string[]): 
   }));
 }
 
+/** SCRUM-160: code letter per `tipe`. Other types (e.g. TOP_UP_PC) stay unchecked until a business rule defines theirs. */
+const TXN_ID_PREFIX: Record<string, string> = { BELANJA: 'B', PENGGAJIAN: 'G', INSENTIF: 'I', PENERIMAAN: 'P' };
+
+/**
+ * SCRUM-160: the source txn_id is kept as is, never regenerated. Its code
+ * letter (after an optional "TXN-") must match the transaction type; a
+ * mismatch is flagged for review, never silently corrected.
+ */
+export function checkTxnIdPrefix(txns: CashflowTxn[]): Issue[] {
+  const issues: Issue[] = [];
+  for (const t of txns) {
+    const expected = t.txn_type ? TXN_ID_PREFIX[t.txn_type.toUpperCase()] : undefined;
+    const actual = /^(?:TXN[-_])?([A-Za-z])/.exec(t.txn_id)?.[1]?.toUpperCase();
+    if (expected && actual !== expected) {
+      issues.push({ code: 'TXN_ID_PREFIX_MISMATCH', rule: 'DQ-052', message: `${t.txn_id}: tipe ${t.txn_type} seharusnya berkode ${expected}, bukan ${actual ?? '-'}.` });
+    }
+  }
+  return issues;
+}
+
 /** Half a rupiah per side of spreadsheet rounding. */
 const TOLERANCE = 1;
 
