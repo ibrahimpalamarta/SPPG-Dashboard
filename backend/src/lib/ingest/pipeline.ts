@@ -106,7 +106,8 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
     if (profile.domain === 'CASHFLOW') {
       const txns = out.records as CashflowTxn[];
       if (ctx.expenseCategories) out.issues.push(...normalizeCategories(txns, ctx.expenseCategories));
-      out.issues.push(...reconcileRingkasan(sheets, txns));
+      // A web quick entry has no Ringkasan_Transaksi sheet to reconcile against.
+      if (ctx.sourceSystem !== 'WEB_MANUAL') out.issues.push(...reconcileRingkasan(sheets, txns));
     }
     await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, templateVersion: profile.version, loadedAt: ctx.loadedAt, domain: profile.domain, records: out.records, issues: out.issues });
     return { ok: true, batch, detection, mapping: summarise(profile, out, columns), columns, fields };

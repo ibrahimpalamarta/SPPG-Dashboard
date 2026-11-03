@@ -3,6 +3,7 @@ import { requirePage } from "@/lib/guard";
 import { getT } from "@/lib/lang-server";
 import { BatchList } from "@/components/mapping/batch-list";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ManualEntryForm } from "./manual-entry-form";
 import { UploadForm } from "./upload-form";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,6 +30,7 @@ export default async function Page({
       ) : (
         <>
           <UploadForm kitchens={me.kitchens} kitchenId={me.kitchens[0]?.id} />
+          <ManualEntryForm kitchens={me.kitchens} />
           <BatchList compact page={Number(listPage) || 1} canDelete={me.permissions.includes("batch:publish")} filters={filters} kitchens={me.kitchens} />
         </>
       )}
