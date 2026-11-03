@@ -7,7 +7,7 @@ import { topMenuInsight } from "@/lib/insight";
 import type { MenuKpi } from "@/lib/kpi";
 
 /** SCRUM-115: ranked by distinct serving days in the two-week window (OD-13 basis). */
-export async function TopMenu({ menus }: { menus: MenuKpi["topMenus"] }) {
+export async function TopMenu({ menus, sourceQuery }: { menus: MenuKpi["topMenus"]; sourceQuery: string }) {
   const t = await getT();
   const maxDays = Math.max(1, ...menus.map(({ days }) => days));
   return (
@@ -38,7 +38,9 @@ export async function TopMenu({ menus }: { menus: MenuKpi["topMenus"] }) {
       )}
       <InsightBox>{topMenuInsight(t, menus)}</InsightBox>
       <div className="mt-auto flex justify-end border-t border-slate-100 pt-4">
-        <SourceLink />
+        <SourceLink
+          trace={menus[0] && { kpi: "top-menu", query: sourceQuery, title: `${t("Top 5 Menu")} · ${menus[0].kitchens.join(", ")}`, headline: `${menus[0].name} · ${menus[0].days} ${t("hari")} (#1)` }}
+        />
       </div>
     </Card>
   );

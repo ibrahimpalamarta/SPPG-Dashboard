@@ -50,6 +50,12 @@ export const dashboardQuery = refineDateRange(
 /** SCRUM-104: completeness per dapur, optionally narrowed to one. */
 export const completenessQuery = z.object({ kitchenId: optionalBigInt });
 
+/** "Lacak Sumber": which uploaded files stand behind an Overview card. */
+export const sourcesQuery = z.object({ kpi: z.enum(['completeness', 'top-menu', 'nutrition']), kitchenId: optionalBigInt, region });
+
+/** Same scope filters, no KPI: the data-range lookup behind the period filter. */
+export const scopeQuery = z.object({ kitchenId: optionalBigInt, region });
+
 /** SCRUM-115: menu KPIs also filter by region (kitchens.city_regency). */
 export const menuKpiQuery = refineDateRange(
   z.object({ ...dateRangeFields, kitchenId: optionalBigInt, region }),

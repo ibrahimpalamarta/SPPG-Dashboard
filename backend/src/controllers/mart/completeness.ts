@@ -40,6 +40,7 @@ export const getCompleteness = (db: Db = prisma): RequestHandler => async (req, 
 
   sendJson(res, {
     kitchens: kitchens.map((k) => ({
+      id: k.id,
       name: k.name,
       region: k.cityRegency,
       rolloutStatus: withRollout(k).rolloutStatus,

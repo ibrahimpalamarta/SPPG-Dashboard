@@ -11,7 +11,7 @@ import { PeriodFilter } from "@/components/ui/period-filter";
 import { KitchenFilter } from "@/components/overview/kitchen-filter";
 import { getT } from "@/lib/lang-server";
 import { requirePage } from "@/lib/guard";
-import { financeKpi, mixSlices, rpFull } from "@/lib/kpi";
+import { dataRange, financeKpi, mixSlices, rpFull } from "@/lib/kpi";
 import { kpiQuery, resolvePeriod, resolveScope, type PeriodParams } from "@/lib/overview-filter";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,7 +22,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const [me, t] = await Promise.all([requirePage("/finance"), getT()]);
   const params = await searchParams;
   const scope = resolveScope(me.kitchens, params.dapur);
-  const finance = await financeKpi(kpiQuery(resolvePeriod(params), scope));
+  const period = resolvePeriod(params, await dataRange(new URLSearchParams(scope.query).toString()));
+  const finance = await financeKpi(kpiQuery(period, scope));
   if (!finance) {
     return (
       <EmptyState title={t("Tidak ada akses")}>
@@ -38,7 +39,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Finance & Cost")}</h1>
           <div className="flex flex-wrap items-center gap-3">
             <KitchenFilter kitchens={me.kitchens} selected={scope.value} />
-            <PeriodFilter />
+            <PeriodFilter mode={period.mode} range={period.range} />
           </div>
         </div>
 

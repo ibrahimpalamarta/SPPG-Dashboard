@@ -1,5 +1,6 @@
-import { apiSend } from "@/lib/api";
+import { apiGet, apiSend } from "@/lib/api";
 import type { Kitchen } from "@/lib/me";
+import type { DataRange } from "@/lib/overview-filter";
 
 /** Mirrors backend GET /api/kpi/finance (controllers/mart/kpi.ts). Published, non-superseded, TERKONFIRMASI data only. */
 export type FinanceKpi = {
@@ -24,6 +25,14 @@ export type MenuKpi = {
   portions?: { segments: { segment: string; actual: number | null }[]; actual: number | null; perDay: number | null; status: "OK" | "MISSING" | "MISMATCH" };
 };
 
+/** Mirrors backend GET /api/kpi/sources: the uploaded files behind an Overview card. */
+export type KpiSource = { code: string; domain: string; fileName: string; uploadedAt: string; uploadedBy: string | null; status: "PUBLISHED" | "NEEDS_REVIEW" };
+
+/** The period filter's default: the date range of the published data in `scope` (a query string), null when there is none. */
+export async function dataRange(scope: string): Promise<DataRange | null> {
+  return (await apiGet<{ range: DataRange | null }>(`/kpi/data-range${scope && `?${scope}`}`)).range;
+}
+
 /** Finance KPIs are cost-cleared: a role without clearance gets null, not an error page. */
 export async function financeKpi(query = ""): Promise<FinanceKpi | null> {
   const res = await apiSend(`/kpi/finance${query}`, "GET");
@@ -36,6 +45,7 @@ export async function financeKpi(query = ""): Promise<FinanceKpi | null> {
 export type CompletenessItem = { label: string; state: "COMPLETE" | "SENT" | "MISSING"; publishedAt: string | null; issue: "FIX" | "REVIEW" | null };
 
 export type KitchenCompleteness = {
+  id: string;
   name: string;
   region: string | null;
   rolloutStatus: Kitchen["rolloutStatus"];

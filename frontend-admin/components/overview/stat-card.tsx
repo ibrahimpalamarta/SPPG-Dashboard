@@ -11,7 +11,7 @@ export function StatCard({ icon: Icon, label, value, status, insight }: Stat) {
         <span className="flex size-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
           <Icon className="size-5" aria-hidden="true" />
         </span>
-        <DetailLink className="text-slate-500" />
+        <DetailLink />
       </div>
       <p className="mt-4 text-sm text-slate-600">{label}</p>
       <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
