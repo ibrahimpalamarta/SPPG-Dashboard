@@ -10,12 +10,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PeriodFilter } from "@/components/ui/period-filter";
 import { requirePage } from "@/lib/guard";
 import { financeKpi, mixSlices, rpFull } from "@/lib/kpi";
+import { kpiQuery, resolvePeriod, type PeriodParams } from "@/lib/overview-filter";
 
 export const metadata: Metadata = { title: "Finance & Cost · SPPG Internal" };
 
-export default async function FinancePage() {
+export default async function FinancePage({ searchParams }: { searchParams: Promise<PeriodParams> }) {
   await requirePage("/finance");
-  const finance = await financeKpi();
+  const finance = await financeKpi(kpiQuery(resolvePeriod(await searchParams)));
   if (!finance) {
     return (
       <EmptyState title="Tidak ada akses">

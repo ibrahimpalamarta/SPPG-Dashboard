@@ -3,8 +3,8 @@ import { Card } from "@/components/ui/card";
 import { PeriodFilter } from "@/components/ui/period-filter";
 import { KitchenFilter } from "@/components/overview/kitchen-filter";
 import { StatCard, type Stat } from "@/components/overview/stat-card";
-import { efiInsight, monthSpendInsight, portionsInsight, runwayInsight } from "@/lib/insight";
-import { dateLabel, monthSpend, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
+import { efiInsight, periodSpendInsight, portionsInsight, runwayInsight } from "@/lib/insight";
+import { dateLabel, periodSpend, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
 import type { Kitchen } from "@/lib/me";
 
 const count = new Intl.NumberFormat("id-ID");
@@ -15,17 +15,17 @@ const count = new Intl.NumberFormat("id-ID");
  * insight says what is missing. Draft vs official stays in the backend
  * (`balance.status`); the tickets ask for no "Belum resmi" label on screen.
  */
-function stats(finance: FinanceKpi | null, menu: MenuKpi): Stat[] {
+function stats(finance: FinanceKpi | null, menu: MenuKpi, period: string): Stat[] {
   const out: Stat[] = [];
   if (finance) {
     const { balance, efi } = finance;
     const sum = balance.accounts.reduce((n, a) => n + (a.balance ?? 0), 0);
-    const spend = monthSpend(finance);
+    const spend = periodSpend(finance);
     out.push({
       icon: CircleDollarSign,
-      label: "Pengeluaran · Bulan ini",
+      label: `Pengeluaran · ${period}`,
       value: spend.days ? rp(spend.total) : "-",
-      insight: monthSpendInsight(finance),
+      insight: periodSpendInsight(finance, period),
     });
     out.push({
       icon: WalletCards,
@@ -53,14 +53,14 @@ function stats(finance: FinanceKpi | null, menu: MenuKpi): Stat[] {
   return out;
 }
 
-export function WelcomeCard({ name, kitchens, kitchenId, finance, menu }: { name: string; kitchens: Kitchen[]; kitchenId: string; finance: FinanceKpi | null; menu: MenuKpi }) {
-  const items = stats(finance, menu);
+export function WelcomeCard({ name, kitchens, scope, period, finance, menu }: { name: string; kitchens: Kitchen[]; scope: string; period: string; finance: FinanceKpi | null; menu: MenuKpi }) {
+  const items = stats(finance, menu, period);
   return (
     <Card className="p-6 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Selamat Datang, {name}!</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <KitchenFilter kitchens={kitchens} selected={kitchenId} />
+          <KitchenFilter kitchens={kitchens} selected={scope} />
           <PeriodFilter />
         </div>
       </div>

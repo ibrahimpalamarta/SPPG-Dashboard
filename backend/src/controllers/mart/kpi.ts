@@ -30,7 +30,7 @@ export const getFinanceKpi = (db: Db = prisma): RequestHandler => async (req, re
     sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
-  const base = live(kitchenWhere(scope));
+  const base = { ...live(kitchenWhere(scope)), ...(q.region && { kitchen: { cityRegency: q.region } }) };
   const dates = dateFilter(q.dateFrom, q.dateTo);
 
   const [txns, balances, rab] = await Promise.all([

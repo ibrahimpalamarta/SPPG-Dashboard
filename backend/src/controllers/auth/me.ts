@@ -15,7 +15,7 @@ export const getMe = (db: Db = prisma): RequestHandler => async (req, res) => {
   const ids = resolveKitchenIds(u);
   const rows = await db.kitchen.findMany({
     where: ids === null ? {} : { id: { in: ids } },
-    select: { id: true, code: true, name: true },
+    select: { id: true, code: true, name: true, cityRegency: true },
     orderBy: { name: 'asc' },
   });
   // Stage only (SCRUM-132): the shell labels the pilot dapur from it. bucket stays on /api/kitchens.
