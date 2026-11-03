@@ -223,7 +223,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
         <ol className="grid gap-3 md:grid-cols-5">
           {ALUR.map(([step, title, note]) => (
             <li key={step} className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase text-slate-400">{step}</p>
+              <p className="text-xs font-semibold uppercase text-slate-600">{step}</p>
               <p className="mt-1 text-sm font-semibold text-slate-800">{title}</p>
               <p className="mt-1 text-xs text-slate-500">{note}</p>
             </li>

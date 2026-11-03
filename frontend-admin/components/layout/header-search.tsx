@@ -56,7 +56,7 @@ export function HeaderSearch({ items }: { items: readonly NavItem[] }) {
 
   return (
     <div ref={box} className="relative min-w-0 flex-1">
-      <label className="flex h-10 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20">
+      <label className="flex h-10 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-slate-600 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20">
         <Search className="size-4 shrink-0" aria-hidden="true" />
         <input
           ref={input}
@@ -69,7 +69,7 @@ export function HeaderSearch({ items }: { items: readonly NavItem[] }) {
           aria-label="Cari menu, nama file, atau kode upload"
           className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
         />
-        <kbd className="hidden rounded-md border border-slate-200 px-1.5 py-0.5 text-xs text-slate-400 sm:block">⌘K</kbd>
+        <kbd className="hidden rounded-md border border-slate-200 px-1.5 py-0.5 text-xs text-slate-600 sm:block">⌘K</kbd>
       </label>
 
       {open && needle && (

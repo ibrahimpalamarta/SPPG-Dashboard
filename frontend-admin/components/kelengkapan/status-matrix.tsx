@@ -49,7 +49,7 @@ export function StatusMatrix({ kitchens, selected, onSelect }: { kitchens: Kitch
                     <p className="text-xs text-slate-500">{noteOf(kitchen)}</p>
                   </td>
                   {phase ? (
-                    <td colSpan={columns.length} className="px-3 py-3 text-center text-xs text-slate-400">
+                    <td colSpan={columns.length} className="px-3 py-3 text-center text-xs text-slate-600">
                       Akan tersedia pada {phase}
                     </td>
                   ) : (

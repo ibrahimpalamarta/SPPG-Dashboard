@@ -23,7 +23,7 @@ export function TopMenu({ menus }: { menus: MenuKpi["topMenus"] }) {
               <span className="text-sm text-slate-500">{index + 1}</span>
               <div>
                 <p className="mb-1.5 text-sm font-medium text-slate-800">
-                  {name} <span className="font-normal text-slate-400">· {kitchens.join(", ")}</span>
+                  {name} <span className="font-normal text-slate-600">· {kitchens.join(", ")}</span>
                 </p>
                 <div className="h-2 overflow-hidden rounded-full bg-emerald-50">
                   <div className="grow-x h-full rounded-full bg-emerald-500" style={{ width: `${(days / maxDays) * 100}%` }} />

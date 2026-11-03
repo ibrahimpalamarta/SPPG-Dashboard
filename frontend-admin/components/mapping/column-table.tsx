@@ -46,7 +46,7 @@ export function ColumnTable({ result }: { result: MappingResult | null }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {columns.map((c) => (
-                <tr key={`${c.sheet}-${c.column}`} className={`hover:bg-slate-50 ${c.field ? "" : "text-slate-400"}`}>
+                <tr key={`${c.sheet}-${c.column}`} className={`hover:bg-slate-50 ${c.field ? "" : "text-slate-600"}`}>
                   <td className="px-4 py-3">{c.sheet}</td>
                   <td className="px-4 py-3 font-mono">{c.column}</td>
                   <td className="px-4 py-3 font-semibold">{c.header}</td>

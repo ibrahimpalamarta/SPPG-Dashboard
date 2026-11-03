@@ -46,7 +46,7 @@ export default async function IntegrasiPage() {
               {status === "upload" ? (
                 <Link href="/unggah-data" className="inline-flex h-9 items-center rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-800 hover:border-emerald-300">Unggah file</Link>
               ) : (
-                <span className="inline-flex h-9 items-center rounded-md border border-slate-100 bg-slate-50 px-3 text-sm font-medium text-slate-400">API · setelah OD-08</span>
+                <span className="inline-flex h-9 items-center rounded-md border border-slate-100 bg-slate-50 px-3 text-sm font-medium text-slate-600">API · setelah OD-08</span>
               )}
             </li>
           ))}

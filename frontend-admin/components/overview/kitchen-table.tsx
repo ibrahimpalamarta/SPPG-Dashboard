@@ -45,7 +45,7 @@ export function KitchenTable({ kitchens }: { kitchens: KitchenCompleteness[] }) 
                   ) : issues.review ? (
                     <Badge tone="amber">{issues.review} perlu dicek</Badge>
                   ) : (
-                    <span className="text-slate-400">—</span>
+                    <span className="text-slate-600">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-slate-500" title={lastPublish ? dateLabel(lastPublish.at) : undefined}>
