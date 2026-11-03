@@ -1,27 +1,29 @@
 import { HeartPulse } from "lucide-react";
+import { getLang, getT } from "@/lib/lang-server";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { InsightBox } from "@/components/ui/insight-box";
 import { kitchenInsight } from "@/lib/insight";
+import { dateLocale } from "@/lib/lang";
 import { completenessColor, dateLabel, type KitchenCompleteness } from "@/lib/kpi";
 
-const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
-
-export function KitchenTable({ kitchens }: { kitchens: KitchenCompleteness[] }) {
+export async function KitchenTable({ kitchens }: { kitchens: KitchenCompleteness[] }) {
+  const [t, lang] = await Promise.all([getT(), getLang()]);
+  const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString(dateLocale(lang), { day: "2-digit", month: "short" });
   return (
     <Card className="p-6">
       <h3 className="flex items-center gap-3 text-base font-semibold text-slate-900">
         <HeartPulse className="size-5 text-emerald-600" aria-hidden="true" />
-        Kelengkapan Data per Kitchen
+        {t("Kelengkapan Data per Kitchen")}
       </h3>
       <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[40rem] text-left">
           <thead className="bg-slate-50 text-sm text-slate-500">
             <tr>
-              <th className="px-4 py-3 font-medium">Kitchen</th>
-              <th className="px-4 py-3 font-medium">Kelengkapan</th>
-              <th className="px-4 py-3 font-medium">Masalah terbuka</th>
-              <th className="px-4 py-3 font-medium">Publish terakhir</th>
+              <th className="px-4 py-3 font-medium">{t("Kitchen")}</th>
+              <th className="px-4 py-3 font-medium">{t("Kelengkapan")}</th>
+              <th className="px-4 py-3 font-medium">{t("Masalah terbuka")}</th>
+              <th className="px-4 py-3 font-medium">{t("Publish terakhir")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
@@ -41,22 +43,22 @@ export function KitchenTable({ kitchens }: { kitchens: KitchenCompleteness[] }) 
                 </td>
                 <td className="px-4 py-3">
                   {issues.fix ? (
-                    <Badge tone="red">{issues.fix} wajib diperbaiki</Badge>
+                    <Badge tone="red">{issues.fix} {t("wajib diperbaiki")}</Badge>
                   ) : issues.review ? (
-                    <Badge tone="amber">{issues.review} perlu dicek</Badge>
+                    <Badge tone="amber">{issues.review} {t("perlu dicek")}</Badge>
                   ) : (
                     <span className="text-slate-600">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-slate-500" title={lastPublish ? dateLabel(lastPublish.at) : undefined}>
-                  {lastPublish ? `${shortDate(lastPublish.at)} · ${lastPublish.label}` : "—"}
+                  {lastPublish ? `${shortDate(lastPublish.at)} · ${t(lastPublish.label)}` : "—"}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <InsightBox>{kitchenInsight(kitchens)}</InsightBox>
+      <InsightBox>{kitchenInsight(t, kitchens)}</InsightBox>
     </Card>
   );
 }

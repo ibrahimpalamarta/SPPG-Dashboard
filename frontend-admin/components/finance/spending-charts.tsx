@@ -1,10 +1,11 @@
 import { BarChart3, TrendingUp } from "lucide-react";
+import { getT } from "@/lib/lang-server";
 import { FinanceCard } from "@/components/finance/finance-card";
 import { dateLabel, type FinanceKpi } from "@/lib/kpi";
 
 type Point = { label: string; value: number };
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"] as const;
 /** The daily chart shows the last two weeks with spend. */
 const DAILY_POINTS = 14;
 const jt = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
@@ -16,11 +17,12 @@ function axisMax(values: number[]) {
   return Math.ceil(max / step) * step * 1e6;
 }
 
-function YAxis({ max }: { max: number }) {
+async function YAxis({ max }: { max: number }) {
+  const t = await getT();
   return (
     <div className="flex h-44 w-12 flex-col justify-between text-right text-xs text-slate-600">
       {[1, 0.75, 0.5, 0.25, 0].map((f) => (
-        <span key={f}>{jt.format((max * f) / 1e6)} jt</span>
+        <span key={f}>{jt.format((max * f) / 1e6)} {t("jt")}</span>
       ))}
     </div>
   );
@@ -36,17 +38,18 @@ function Gridlines() {
   );
 }
 
-const Empty = () => <p className="text-sm text-slate-500">Belum ada data belanja yang dipublish.</p>;
+const Empty = async () => <p className="text-sm text-slate-500">{(await getT())("Belum ada data belanja yang dipublish.")}</p>;
 
-export function MonthlySpending({ daily }: { daily: FinanceKpi["daily"] }) {
+export async function MonthlySpending({ daily }: { daily: FinanceKpi["daily"] }) {
+  const t = await getT();
   const byMonth = new Map<string, number>();
   for (const { date, amount } of daily) byMonth.set(date.slice(0, 7), (byMonth.get(date.slice(0, 7)) ?? 0) + amount);
-  const monthly: Point[] = [...byMonth].map(([ym, value]) => ({ label: MONTHS[Number(ym.slice(5)) - 1]!, value }));
+  const monthly: Point[] = [...byMonth].map(([ym, value]) => ({ label: t(MONTHS[Number(ym.slice(5)) - 1]!), value }));
   const max = axisMax(monthly.map((m) => m.value));
   const latest = monthly.length - 1;
 
   return (
-    <FinanceCard title="Belanja per Bulan" icon={BarChart3}>
+    <FinanceCard title={t("Belanja per Bulan")} icon={BarChart3}>
       {monthly.length === 0 ? (
         <Empty />
       ) : (
@@ -58,7 +61,7 @@ export function MonthlySpending({ daily }: { daily: FinanceKpi["daily"] }) {
               <div className="relative flex h-full items-end justify-around">
                 {monthly.map(({ label, value }, index) => (
                   <div key={label} className="flex h-full w-10 flex-col justify-end">
-                    {index === latest && <span className="mb-1 text-center text-xs font-semibold text-slate-800">{jt.format(value / 1e6)} jt</span>}
+                    {index === latest && <span className="mb-1 text-center text-xs font-semibold text-slate-800">{jt.format(value / 1e6)} {t("jt")}</span>}
                     <div className={`grow-y rounded-t-md ${index === latest ? "bg-emerald-500" : "bg-emerald-300"}`} style={{ height: `${(value / max) * 100}%`, animationDelay: `${index * 80}ms` }} />
                   </div>
                 ))}
@@ -78,13 +81,14 @@ export function MonthlySpending({ daily }: { daily: FinanceKpi["daily"] }) {
   );
 }
 
-export function DailySpending({ daily }: { daily: FinanceKpi["daily"] }) {
+export async function DailySpending({ daily }: { daily: FinanceKpi["daily"] }) {
+  const t = await getT();
   const points = daily.slice(-DAILY_POINTS);
   const max = axisMax(points.map((p) => p.amount));
   const step = 100 / Math.max(1, points.length - 1);
   const coords = points.map(({ amount }, index) => `${index * step},${100 - (amount / max) * 100}`);
   const last = points.at(-1);
-  const title = points.length ? `Belanja per Hari · ${dateLabel(points[0]!.date)} – ${dateLabel(last!.date)}` : "Belanja per Hari";
+  const title = points.length ? `${t("Belanja per Hari")} · ${dateLabel(points[0]!.date)} – ${dateLabel(last!.date)}` : t("Belanja per Hari");
 
   return (
     <FinanceCard title={title} icon={TrendingUp}>

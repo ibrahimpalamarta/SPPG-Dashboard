@@ -1,12 +1,14 @@
 import { Hash, TrendingUp, WalletCards } from "lucide-react";
+import { getT } from "@/lib/lang-server";
 import { Card } from "@/components/ui/card";
 import { rp, type FinanceKpi } from "@/lib/kpi";
 
-export function StatStrip({ spend }: { spend: FinanceKpi["spend"] }) {
+export async function StatStrip({ spend }: { spend: FinanceKpi["spend"] }) {
+  const t = await getT();
   const stats = [
-    { icon: WalletCards, label: "Belanja ke supplier", value: rp(spend.total) },
-    { icon: Hash, label: "Jumlah transaksi", value: String(spend.transactions) },
-    { icon: TrendingUp, label: "Rata-rata belanja per hari", value: spend.perDay === null ? "-" : rp(spend.perDay) },
+    { icon: WalletCards, label: t("Belanja ke supplier"), value: rp(spend.total) },
+    { icon: Hash, label: t("Jumlah transaksi"), value: String(spend.transactions) },
+    { icon: TrendingUp, label: t("Rata-rata belanja per hari"), value: spend.perDay === null ? "-" : rp(spend.perDay) },
   ];
   return (
     <Card className="grid divide-y divide-slate-200 sm:grid-cols-3 sm:divide-y-0 lg:divide-x">
