@@ -19,6 +19,8 @@ export function MorphSelect({
   onChange,
   required,
   className = "w-48",
+  display,
+  footer,
 }: {
   name?: string;
   label: string;
@@ -28,6 +30,10 @@ export function MorphSelect({
   onChange?: (value: string) => void;
   required?: boolean;
   className?: string;
+  /** Replaces the selected option's label on the trigger. */
+  display?: string;
+  /** Extra content under the option list, inside the opened panel. */
+  footer?: React.ReactNode;
 }) {
   const [inner, setInner] = useState(defaultValue);
   const [open, setOpen] = useState(false);
@@ -62,7 +68,7 @@ export function MorphSelect({
           onClick={() => setOpen(!open)}
           className="flex h-10 w-full items-center justify-between gap-2 px-3 text-sm text-slate-800"
         >
-          <span className="truncate">{options.find((o) => o.value === current)?.label}</span>
+          <span className="truncate">{display ?? options.find((o) => o.value === current)?.label}</span>
           <ChevronDown className={`size-4 shrink-0 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden="true" />
         </button>
         <div className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
@@ -82,6 +88,7 @@ export function MorphSelect({
                 </button>
               ))}
             </div>
+            {footer && <div className="border-t border-slate-100 p-2">{footer}</div>}
           </div>
         </div>
       </div>

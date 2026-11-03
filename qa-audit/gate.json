@@ -32,6 +32,12 @@
       "reason": "DDL ALTER ROLE tidak bisa di-bind; SQL dibangun Postgres format() dengan %I/%L dari parameter ter-bind (QD-31)",
       "owner": "ItsMauls",
       "expires": "2027-04-30"
+    },
+    {
+      "match": "semgrep:qa-audit.semgrep.sppg-route-without-permission:backend/src/routes/cms/cms.ts",
+      "reason": "Guard Admin dipasang sekali lewat router.use(requireRole('ADMIN')) di cmsRouter (SCRUM-14); rule hanya melihat guard di tiap rute",
+      "owner": "ItsMauls",
+      "expires": "2027-04-30"
     }
   ]
 }

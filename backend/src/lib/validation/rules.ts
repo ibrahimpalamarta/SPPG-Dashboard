@@ -19,6 +19,8 @@ const RULES: Record<string, RuleMeta> = {
   LINE_AMOUNT_MISMATCH: { severity: 'HIGH', action: 'REVIEW' },
   NEEDS_REVIEW: { severity: 'MEDIUM', action: 'FLAG' },
   UNMAPPED_CATEGORY: { severity: 'MEDIUM', action: 'FLAG' },
+  // SCRUM-160: txn_id code letter disagrees with the transaction type.
+  TXN_ID_PREFIX_MISMATCH: { severity: 'HIGH', action: 'REVIEW' },
   // Ringkasan_Transaksi reconciliation (SCRUM-84/119): a material gap in the grand total holds the batch.
   RECON_SUM_MISMATCH: { severity: 'CRITICAL', action: 'REVIEW' },
   RECON_COUNT_MISMATCH: { severity: 'HIGH', action: 'REVIEW' },

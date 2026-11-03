@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { apiSend } from "@/lib/api";
+import { getT } from "@/lib/lang-server";
 
 export type ReferenceEntryActionState = { message?: string; ok?: boolean };
 
@@ -22,12 +23,12 @@ export async function saveReferenceEntry(id: string, _prev: ReferenceEntryAction
       .filter(Boolean);
   }
 
-  const res = await apiSend(`/reference-entries/${id}`, "PATCH", body);
+  const [t, res] = await Promise.all([getT(), apiSend(`/reference-entries/${id}`, "PATCH", body)]);
   if (res.ok) {
     revalidatePath("/referensi-data");
-    return { ok: true, message: "Tersimpan." };
+    return { ok: true, message: t("Tersimpan.") };
   }
-  if (res.status === 403) return { message: "Hanya Admin yang dapat mengubah Data Reference." };
-  if (res.status === 400) return { message: "Data tidak valid." };
-  return { message: "Gagal. Coba lagi beberapa saat lagi." };
+  if (res.status === 403) return { message: t("Hanya Admin yang dapat mengubah Data Reference.") };
+  if (res.status === 400) return { message: t("Data tidak valid.") };
+  return { message: t("Gagal. Coba lagi beberapa saat lagi.") };
 }

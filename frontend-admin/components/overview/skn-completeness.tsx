@@ -1,4 +1,5 @@
-import { ChevronRight, Check, Gauge, Minus } from "lucide-react";
+import { Check, Gauge, Minus } from "lucide-react";
+import { getT } from "@/lib/lang-server";
 import { Card } from "@/components/ui/card";
 import { SourceLink } from "@/components/ui/source-link";
 import { completenessColor, type KitchenCompleteness } from "@/lib/kpi";
@@ -6,7 +7,8 @@ import { completenessColor, type KitchenCompleteness } from "@/lib/kpi";
 const RADIUS = 40;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-export function SknCompleteness({ kitchen }: { kitchen: KitchenCompleteness }) {
+export async function SknCompleteness({ kitchen }: { kitchen: KitchenCompleteness }) {
+  const t = await getT();
   const { name, items, complete, sent, total, percent } = kitchen;
   return (
     <Card className="flex flex-col p-6">
@@ -15,7 +17,7 @@ export function SknCompleteness({ kitchen }: { kitchen: KitchenCompleteness }) {
           <Gauge className="size-5" aria-hidden="true" />
         </span>
         <button className="flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800">
-          Lihat Detail <ChevronRight className="size-4" aria-hidden="true" />
+          {t("Lihat Detail")}
         </button>
       </div>
 
@@ -37,22 +39,22 @@ export function SknCompleteness({ kitchen }: { kitchen: KitchenCompleteness }) {
           <span className="absolute inset-0 flex items-center justify-center text-xl font-bold text-slate-900">{percent}%</span>
         </div>
         <div>
-          <h3 className="text-base font-semibold text-slate-900">Kelengkapan Data</h3>
+          <h3 className="text-base font-semibold text-slate-900">{t("Kelengkapan Data")}</h3>
           <p className="mt-1 text-sm text-slate-500">{name}</p>
-          <p className="text-sm text-slate-500">{complete} dari {total} data wajib sudah lengkap</p>
-          <p className="text-sm text-slate-500">{sent} dari {total} sudah dikirim</p>
+          <p className="text-sm text-slate-500">{t("{complete} dari {total} data wajib sudah lengkap", { complete, total })}</p>
+          <p className="text-sm text-slate-500">{t("{sent} dari {total} sudah dikirim", { sent, total })}</p>
         </div>
       </div>
 
       <ul className="mt-5 flex flex-col gap-3">
         {items.map(({ label, state }) => (
           <li key={label} className="flex items-center justify-between gap-3 text-sm text-slate-700">
-            {label}
+            {t(label)}
             {state === "MISSING" ? (
-              <Minus className="size-4 text-slate-400" aria-label="Belum masuk" />
+              <Minus className="size-4 text-slate-400" aria-label={t("Belum masuk")} />
             ) : (
               <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
-                <Check className="size-3.5" strokeWidth={3} aria-label={state === "COMPLETE" ? "Lengkap" : "Sudah dikirim"} />
+                <Check className="size-3.5" strokeWidth={3} aria-label={state === "COMPLETE" ? t("Lengkap") : t("Sudah dikirim")} />
               </span>
             )}
           </li>
@@ -60,7 +62,7 @@ export function SknCompleteness({ kitchen }: { kitchen: KitchenCompleteness }) {
       </ul>
 
       <div className="mt-auto flex justify-end border-t border-slate-100 pt-4">
-        <SourceLink className="text-slate-500 hover:text-slate-800" />
+        <SourceLink trace={{ kpi: "completeness", query: new URLSearchParams({ kitchenId: kitchen.id }).toString(), title: `${t("Kelengkapan Data")} · ${name}`, headline: `${percent}%` }} />
       </div>
     </Card>
   );

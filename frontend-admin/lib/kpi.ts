@@ -1,5 +1,6 @@
-import { apiSend } from "@/lib/api";
+import { apiGet, apiSend } from "@/lib/api";
 import type { Kitchen } from "@/lib/me";
+import type { DataRange } from "@/lib/overview-filter";
 
 /** Mirrors backend GET /api/kpi/finance (controllers/mart/kpi.ts). Published, non-superseded, TERKONFIRMASI data only. */
 export type FinanceKpi = {
@@ -24,9 +25,17 @@ export type MenuKpi = {
   portions?: { segments: { segment: string; actual: number | null }[]; actual: number | null; perDay: number | null; status: "OK" | "MISSING" | "MISMATCH" };
 };
 
+/** Mirrors backend GET /api/kpi/sources: the uploaded files behind an Overview card. */
+export type KpiSource = { code: string; domain: string; fileName: string; uploadedAt: string; uploadedBy: string | null; status: "PUBLISHED" | "NEEDS_REVIEW" };
+
+/** The period filter's default: the date range of the published data in `scope` (a query string), null when there is none. */
+export async function dataRange(scope: string): Promise<DataRange | null> {
+  return (await apiGet<{ range: DataRange | null }>(`/kpi/data-range${scope && `?${scope}`}`)).range;
+}
+
 /** Finance KPIs are cost-cleared: a role without clearance gets null, not an error page. */
-export async function financeKpi(): Promise<FinanceKpi | null> {
-  const res = await apiSend("/kpi/finance", "GET");
+export async function financeKpi(query = ""): Promise<FinanceKpi | null> {
+  const res = await apiSend(`/kpi/finance${query}`, "GET");
   if (res.status === 403) return null;
   if (!res.ok) throw new Error(`GET /kpi/finance → ${res.status}`);
   return res.data as unknown as FinanceKpi;
@@ -36,6 +45,7 @@ export async function financeKpi(): Promise<FinanceKpi | null> {
 export type CompletenessItem = { label: string; state: "COMPLETE" | "SENT" | "MISSING"; publishedAt: string | null; issue: "FIX" | "REVIEW" | null };
 
 export type KitchenCompleteness = {
+  id: string;
   name: string;
   region: string | null;
   rolloutStatus: Kitchen["rolloutStatus"];
@@ -64,11 +74,9 @@ export const rpFull = (n: number) => `Rp${full.format(n)}`;
 export const pct = (share: number) => percent.format(share);
 export const dateLabel = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 
-/** Spend of the current calendar month (Jakarta) from the published daily series; `days` is how many days have spend. */
-export function monthSpend(k: FinanceKpi) {
-  const month = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }).slice(0, 7);
-  const rows = k.daily.filter(({ date }) => date.startsWith(month));
-  return { total: rows.reduce((n, { amount }) => n + amount, 0), days: rows.length };
+/** Spend of the requested period from the published daily series (the backend already bounded it); `days` is how many days have spend. */
+export function periodSpend(k: FinanceKpi) {
+  return { total: k.daily.reduce((n, { amount }) => n + amount, 0), days: k.daily.length };
 }
 
 /** Donut colours for the expense mix, in rank order; the unmapped slice is always slate. */

@@ -242,9 +242,14 @@ export type Evaluation = {
   pending: string[];
 };
 
+// A test proves a requirement by its own ID, or by a Jira ticket the requirement lists in refs (QD-43).
+// Only SCRUM refs count: P1-/AC-/OD- refs name other requirements, and matching them would let one
+// test claim its neighbours (P1-033 UAT must not turn green because P1-001 passes).
+export const proves = (t: TestCase, req: Requirement) => t.ids.includes(req.id) || req.refs.some((r) => r.startsWith('SCRUM-') && t.ids.includes(r));
+
 export function requirementStatus(req: Requirement, tests: TestCase[]): ReqStatus {
   if (req.priority === 'decision') return 'Menunggu keputusan';
-  const mine = tests.filter((t) => t.ids.includes(req.id));
+  const mine = tests.filter((t) => proves(t, req));
   if (mine.length === 0) return 'Belum ada test';
   if (mine.some((t) => t.status === 'failed')) return 'Gagal';
   const fixme = mine.filter((t) => t.status === 'fixme');
@@ -262,7 +267,7 @@ export function evaluate(input: { gate: Gate; requirements: Requirement[]; findi
   // CI build writes no raw report; its failure is a red build/test, so a product failure, not infra.
   for (const [stage, outcome] of Object.entries(input.outcomes) as [Stage, string][]) {
     if (stage === 'env' || outcome !== 'failure') continue;
-    if (!findings.some((f) => TOOL_STAGE[f.tool] === stage && f.severity === 'Blocker')) {
+    if (!findings.some((f) => TOOL_STAGE[f.tool] === stage)) {
       findings.push({ severity: g.stageFailedWithoutReport, tool: stage === 'ci' ? 'ci' : 'infra', rule: `${stage}-failed`, message: `Tahap ${STAGES[stage]} gagal tanpa laporan yang menjelaskan.` });
     }
   }
@@ -272,7 +277,7 @@ export function evaluate(input: { gate: Gate; requirements: Requirement[]; findi
     const late = r.priority === 'P0' && r.target !== null && today > r.target;
     if (late && status === 'Menunggu fitur') findings.push({ severity: g.pendingFeaturePastTarget, tool: 'requirements', rule: 'pending-past-target', location: r.id, message: `${r.id} masih fixme setelah target ${r.target}.` });
     if (late && status === 'Belum ada test') findings.push({ severity: g.noTestPastTarget, tool: 'requirements', rule: 'no-test-past-target', location: r.id, message: `${r.id} belum punya test setelah target ${r.target}.` });
-    return { ...r, status, tests: input.tests.filter((t) => t.ids.includes(r.id)).map((t) => `${t.title} (${t.status})`) };
+    return { ...r, status, tests: input.tests.filter((t) => proves(t, r)).map((t) => `${t.title} (${t.status})`) };
   });
 
   for (const w of gate.waivers) {

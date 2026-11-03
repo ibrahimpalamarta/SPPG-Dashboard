@@ -8,7 +8,7 @@ import { detectProfile, profilesFor, type Detection } from '../mapping/detect.js
 import type { MappingOutput, MappingProfile } from '../mapping/profiles.js';
 import type { Normalization } from '../mapping/values.js';
 import type { CashflowTxn } from '../mapping/sukun-cashflow.js';
-import { normalizeCategories, reconcileRingkasan } from '../mapping/cashflow-checks.js';
+import { checkTxnIdPrefix, normalizeCategories, reconcileRingkasan } from '../mapping/cashflow-checks.js';
 import { classify, type ClassifiedIssue } from '../validation/rules.js';
 
 /**
@@ -39,7 +39,17 @@ export type MappingSummary = {
   issues: ClassifiedIssue[];
   normalized: Normalization[];
   columns: MappedColumn[];
+  /** Earliest and latest date the records carry (a file can span several months); null when it has none. */
+  dateRange: { from: string; to: string } | null;
 };
+
+/** The date field of each domain's records (cashflow, menu, RAB, input maker). */
+const RECORD_DATES = ['txn_date', 'serving_date', 'budget_date', 'request_date'];
+
+function dateRangeOf(records: unknown[]): MappingSummary['dateRange'] {
+  const days = records.flatMap((r) => RECORD_DATES.map((k) => (r as Record<string, unknown>)[k]).filter((v): v is string => typeof v === 'string' && /^d{4}-d{2}-d{2}/.test(v)).map((v) => v.slice(0, 10)));
+  return days.length ? { from: days.reduce((a, b) => (b < a ? b : a)), to: days.reduce((a, b) => (b > a ? b : a)) } : null;
+}
 
 /** A canonical field of the SOP and the header the template writes it under. */
 type SopField = { field: string; header: string };
@@ -106,7 +116,7 @@ export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging:
     if (profile.domain === 'CASHFLOW') {
       const txns = out.records as CashflowTxn[];
       if (ctx.expenseCategories) out.issues.push(...normalizeCategories(txns, ctx.expenseCategories));
-      out.issues.push(...reconcileRingkasan(sheets, txns));
+      out.issues.push(...checkTxnIdPrefix(txns), ...reconcileRingkasan(sheets, txns));
     }
     await staging.replaceBatch(ctx.uploadBatchId, batch, { profileId: profile.id, templateVersion: profile.version, loadedAt: ctx.loadedAt, domain: profile.domain, records: out.records, issues: out.issues });
     return { ok: true, batch, detection, mapping: summarise(profile, out, columns), columns, fields };
@@ -141,5 +151,6 @@ function summarise(profile: MappingProfile, out: MappingOutput, columns: MappedC
     issues: classify(out.issues),
     normalized: out.normalized ?? [],
     columns,
+    dateRange: dateRangeOf(out.records),
   };
 }

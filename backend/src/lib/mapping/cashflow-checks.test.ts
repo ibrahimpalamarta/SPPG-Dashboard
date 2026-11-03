@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { staged, withRows } from '../ingest/fixtures.js';
 import type { RawSheet } from '../ingest/workbook.js';
 import type { CashflowTxn } from './sukun-cashflow.js';
-import { normalizeCategories, reconcileRingkasan } from './cashflow-checks.js';
+import { checkTxnIdPrefix, normalizeCategories, reconcileRingkasan } from './cashflow-checks.js';
 import { classifySla } from './payment-sla.js';
 
 const txn = (txn_id: string, over: Partial<CashflowTxn> = {}): CashflowTxn => ({
@@ -112,5 +112,20 @@ describe('SCRUM-48 vendor payment SLA', () => {
   test('out-of-order steps are invalid; a missing step is unknown, never on time', () => {
     assert.equal(classifySla(times('2026-03-02T05:00:00Z', '2026-03-02T02:00:00Z', '2026-03-02T06:00:00Z', '2026-03-02T07:00:00Z')), 'INVALID_SEQUENCE');
     assert.equal(classifySla({ receivedAt: null, makerInputAt: null, approvedAt: null, paidAt: at('2026-03-02T07:00:00Z') }), 'UNKNOWN');
+  });
+});
+
+describe('SCRUM-160 txn_id prefix follows the transaction type', () => {
+  test('matching prefixes pass, with or without TXN-, and unlisted types are not checked', () => {
+    const txns = [txn('TXN-B0001'), txn('G0002', { txn_type: 'PENGGAJIAN' }), txn('TXN-I0003', { txn_type: 'INSENTIF' }), txn('TXN-P0004', { txn_type: 'PENERIMAAN' }), txn('X1', { txn_type: 'TOP_UP_PC' })];
+    assert.deepEqual(checkTxnIdPrefix(txns), []);
+  });
+
+  test('a mismatch is flagged and the txn_id is left untouched', () => {
+    const txns = [txn('TXN-P0009', { txn_type: 'BELANJA' })];
+    const issues = checkTxnIdPrefix(txns);
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0]!.code, 'TXN_ID_PREFIX_MISMATCH');
+    assert.equal(txns[0]!.txn_id, 'TXN-P0009');
   });
 });

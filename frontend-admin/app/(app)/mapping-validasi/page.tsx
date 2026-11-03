@@ -11,10 +11,13 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { apiGet } from "@/lib/api";
 import { requirePage } from "@/lib/guard";
+import { getT } from "@/lib/lang-server";
 import { batchFindings, tabs, type Batch, type BatchDetail } from "@/lib/mapping-validasi";
 import { DOMAINS, StatusBadge } from "@/lib/upload";
 
-export const metadata: Metadata = { title: "Upload History · SPPG Internal" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: `${(await getT())("Upload History")} · SPPG Internal` };
+}
 
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
 
@@ -25,7 +28,7 @@ export default async function Page({
 }: {
   searchParams: Promise<{ batch?: string; listPage?: string; recordsPage?: string; kitchenId?: string; domain?: string; status?: string }>;
 }) {
-  const [me, { batch: batchId, listPage, recordsPage: recordsPageParam, ...filters }] = await Promise.all([requirePage("/mapping-validasi"), searchParams]);
+  const [[me, t], { batch: batchId, listPage, recordsPage: recordsPageParam, ...filters }] = await Promise.all([Promise.all([requirePage("/mapping-validasi"), getT()]), searchParams]);
 
   if (!batchId) {
     return <BatchList page={Number(listPage) || 1} canDelete={me.permissions.includes("batch:publish")} filters={filters} kitchens={me.kitchens} />;
@@ -37,11 +40,11 @@ export default async function Page({
   const batch = data.find((b) => b.publicId === batchId && b.status !== "FAILED");
   if (!batch) {
     return (
-      <EmptyState title="File tidak ditemukan">
+      <EmptyState title={t("File tidak ditemukan")}>
         <p>
-          File ini tidak ada atau gagal diproses.{" "}
+          {t("File ini tidak ada atau gagal diproses.")}{" "}
           <Link href="/mapping-validasi" className="font-medium text-emerald-700 underline">
-            Kembali ke daftar file
+            {t("Kembali ke daftar file")}
           </Link>
           .
         </p>
@@ -56,21 +59,21 @@ export default async function Page({
     ),
     apiGet<HistoryEntry[]>(`/upload-batches/${batch.id}/history`),
   ]);
-  const findings = batchFindings(detail);
+  const findings = batchFindings(t, detail);
   return (
     <div className="mx-auto max-w-400 space-y-4">
       <Link href="/mapping-validasi" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900">
         <ArrowLeft className="size-4" aria-hidden="true" />
-        Daftar file
+        {t("Daftar file")}
       </Link>
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 p-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{batch.fileName}</h1>
             <span className="text-slate-500">
-              {batch.kitchen.code ?? batch.kitchen.name} · {domainLabel(batch.domain)} · {batch.rowCount} baris
+              {batch.kitchen.code ?? batch.kitchen.name} · {t(domainLabel(batch.domain))} · {t("{count} baris", { count: batch.rowCount })}
             </span>
-            <StatusBadge status={batch.status} errorCode={batch.errorCode} />
+            <StatusBadge status={batch.status} errorCode={batch.errorCode} t={t} />
           </div>
           <ReviewActions
             batchId={batch.id}

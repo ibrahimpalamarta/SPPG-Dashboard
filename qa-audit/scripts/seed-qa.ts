@@ -20,6 +20,8 @@ type Account = { key: string; fullName: string; role: Role; kitchens: 'all' | st
 const ACCOUNTS: Account[] = [
   { key: 'admin', fullName: 'QA Admin', role: 'ADMIN', kitchens: 'all' },
   { key: 'data-operasional-skn', fullName: 'QA Data Operasional SKN', role: 'DATA_ADMIN', kitchens: ['SKN'] },
+  // Second dapur: the other side of every kitchen-isolation check (tests/e2e/isolasi.spec.ts).
+  { key: 'data-operasional-lwg', fullName: 'QA Data Operasional LWG', role: 'DATA_ADMIN', kitchens: ['LWG'] },
 ];
 
 // Same statement as backend/scripts/grant-public-role.ts, which cannot run as-is:
@@ -71,6 +73,40 @@ writeJson(join(AUTH, 'tokens.json'), {
   reset: { email: reset.email, token: (await issueResetToken(reset.id, prisma)).token },
   invite: { email: invited.email, token: (await issueResetToken(invited.id, prisma, env.INVITE_TTL_HOURS * 60)).token },
 });
+
+// Inbox and header bell (SCRUM-152): the tasks a kitchen would really have waiting. A Cashflow file from SKN and a Menu
+// file from LWG whose columns were not recognised (Data Operasional sees only its own dapur's), and an invitation
+// nobody accepted in time (Admin only). Without these the Inbox is the empty state for every role.
+const uploaders = await prisma.user.findMany({ where: { email: { in: ['qa.data-operasional-skn@qa-audit.test', 'qa.data-operasional-lwg@qa-audit.test'] } }, select: { id: true, email: true } });
+const notRecognised = (missing: string) => `Format file belum dikenali untuk kitchen/source ini. File belum dipublish. Kolom tidak ditemukan: ${missing}.`;
+for (const f of [
+  { kitchen: 'SKN', as: 'qa.data-operasional-skn@qa-audit.test', domain: 'CASHFLOW', fileName: 'Cashflow_Sukun_Minggu2_Nov2026.xlsx', missing: 'txn_id, tanggal, harga_satuan' },
+  { kitchen: 'LWG', as: 'qa.data-operasional-lwg@qa-audit.test', domain: 'MENU', fileName: 'Menu_Lawang_Nov2026.xlsx', missing: 'Menu Type, Porsi' },
+] as const) {
+  const kitchen = kitchens.find((k) => k.code === f.kitchen);
+  const uploader = uploaders.find((u) => u.email === f.as);
+  if (!kitchen || !uploader) throw new Error(`cannot seed inbox file for ${f.kitchen}`);
+  await prisma.uploadBatch.create({
+    data: {
+      kitchenId: kitchen.id,
+      uploaderId: uploader.id,
+      domain: f.domain,
+      fileName: f.fileName,
+      fileHash: randomBytes(32).toString('hex'),
+      fileSize: 48_213,
+      rowCount: 0,
+      status: 'NEEDS_MAPPING_UPDATE',
+      errorCode: 'PROFILE_NOT_DETECTED',
+      errorSummary: notRecognised(f.missing),
+    },
+  });
+}
+const lapsed = await prisma.user.upsert({
+  where: { email: 'qa.undangan-lewat@qa-audit.test' },
+  create: { email: 'qa.undangan-lewat@qa-audit.test', fullName: 'Siti Rahmawati', role: 'DATA_ADMIN' },
+  update: { passwordHash: null },
+});
+await issueResetToken(lapsed.id, prisma, -60);
 
 writeJson(join(AUTH, 'accounts.json'), credentials);
 console.log(`seeded ${ACCOUNTS.length} QA accounts`);

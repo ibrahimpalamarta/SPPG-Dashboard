@@ -1,4 +1,5 @@
 import type { RequestHandler } from 'express';
+import type { UploadDomain } from '@prisma/client';
 import type { z } from 'zod';
 import { prisma, type Db } from '../../db.js';
 import { env } from '../../config/env.js';
@@ -8,7 +9,7 @@ import { kitchenScope, kitchenWhere } from '../../lib/scope.js';
 import { canSeeCost } from '../../lib/visibility.js';
 import { dateFilter } from '../../schemas/common.js';
 import { deliveredPortions, financeKpi, nutritionBySegment, plannedCostPerPortion, topMenus } from '../../lib/kpi.js';
-import type { dashboardQuery, menuKpiQuery } from '../../schemas/mart.js';
+import type { dashboardQuery, menuKpiQuery, scopeQuery, sourcesQuery } from '../../schemas/mart.js';
 
 /** Live = published, not superseded by a later publish, inside the caller's dapur (SCRUM-54/78). */
 const live = (kitchens: ReturnType<typeof kitchenWhere>) => ({ ...kitchens, supersededByBatchId: null, uploadBatch: { status: 'PUBLISHED' as const } });
@@ -30,7 +31,7 @@ export const getFinanceKpi = (db: Db = prisma): RequestHandler => async (req, re
     sendError(res, 'FORBIDDEN_KITCHEN');
     return;
   }
-  const base = live(kitchenWhere(scope));
+  const base = { ...live(kitchenWhere(scope)), ...(q.region && { kitchen: { cityRegency: q.region } }) };
   const dates = dateFilter(q.dateFrom, q.dateTo);
 
   const [txns, balances, rab] = await Promise.all([
@@ -141,4 +142,85 @@ export const getMenuKpi = (db: Db = prisma): RequestHandler => async (req, res) 
     nutrition: nutritionBySegment(rows),
     ...(counts && { portions: deliveredPortions(counts) }),
   });
+};
+
+/** "Lacak Sumber": the upload domains each Overview card is built from (completeness: the six required data, see lib/completeness.ts). */
+const SOURCE_DOMAINS: Record<z.infer<typeof sourcesQuery>['kpi'], UploadDomain[]> = {
+  completeness: ['CASHFLOW', 'RAB', 'PO', 'INPUT_MAKER', 'VENDOR_PAYMENT'],
+  'top-menu': ['MENU'],
+  nutrition: ['MENU'],
+};
+
+const jakartaDay = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+
+/**
+ * Files behind a card: successfully uploaded (published or waiting for a
+ * check), not replaced, inside the caller's dapur. `code` is the display code
+ * UPL-<dapur>-<yyyymmdd>-<nnn>, numbered per dapur per upload day.
+ */
+export const getKpiSources = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const q = req.valid!.query as z.infer<typeof sourcesQuery>;
+  const scope = kitchenScope(req.user!, q.kitchenId);
+  if (!scope.ok) {
+    sendError(res, 'FORBIDDEN_KITCHEN');
+    return;
+  }
+  const where = { ...kitchenWhere(scope), ...(q.region && { kitchen: { cityRegency: q.region } }) };
+
+  const [batches, all] = await Promise.all([
+    db.uploadBatch.findMany({
+      where: { ...where, domain: { in: SOURCE_DOMAINS[q.kpi] }, status: { in: ['PUBLISHED', 'NEEDS_REVIEW'] } },
+      orderBy: { uploadDate: 'desc' },
+      select: {
+        id: true,
+        kitchenId: true,
+        domain: true,
+        fileName: true,
+        uploadDate: true,
+        status: true,
+        kitchen: { select: { code: true } },
+        uploader: { select: { fullName: true, email: true } },
+      },
+    }),
+    // ponytail: reads every batch id of the dapur to number the day's uploads; add a stored code column if this gets heavy.
+    db.uploadBatch.findMany({ where, select: { id: true, kitchenId: true, uploadDate: true } }),
+  ]);
+
+  const seq = (b: { id: bigint; kitchenId: bigint; uploadDate: Date }) =>
+    all.filter((o) => o.kitchenId === b.kitchenId && jakartaDay(o.uploadDate) === jakartaDay(b.uploadDate) && o.id <= b.id).length;
+
+  sendJson(res, {
+    sources: batches.map((b) => ({
+      code: `UPL-${b.kitchen.code ?? b.kitchenId}-${jakartaDay(b.uploadDate).replaceAll('-', '')}-${String(seq(b)).padStart(3, '0')}`,
+      domain: b.domain,
+      fileName: b.fileName,
+      uploadedAt: b.uploadDate,
+      uploadedBy: b.uploader?.fullName ?? b.uploader?.email ?? null,
+      status: b.status,
+    })),
+  });
+};
+
+/**
+ * Earliest and latest data date across the published files in scope; the
+ * period filter opens on this range. Null when nothing is published.
+ */
+export const getDataRange = (db: Db = prisma): RequestHandler => async (req, res) => {
+  const q = req.valid!.query as z.infer<typeof scopeQuery>;
+  const scope = kitchenScope(req.user!, q.kitchenId);
+  if (!scope.ok) {
+    sendError(res, 'FORBIDDEN_KITCHEN');
+    return;
+  }
+  const base = { ...live(kitchenWhere(scope)), ...(q.region && { kitchen: { cityRegency: q.region } }) };
+
+  const spans = await Promise.all([
+    db.financeTransaction.aggregate({ where: base, _min: { txnDate: true }, _max: { txnDate: true } }).then((r) => [r._min.txnDate, r._max.txnDate]),
+    db.menuRecipeLine.aggregate({ where: base, _min: { servingDate: true }, _max: { servingDate: true } }).then((r) => [r._min.servingDate, r._max.servingDate]),
+    db.beneficiaryDailyCount.aggregate({ where: base, _min: { countDate: true }, _max: { countDate: true } }).then((r) => [r._min.countDate, r._max.countDate]),
+    db.rabDailyBudget.aggregate({ where: base, _min: { budgetDate: true }, _max: { budgetDate: true } }).then((r) => [r._min.budgetDate, r._max.budgetDate]),
+  ]);
+  const dates = (i: 0 | 1) => spans.flatMap((s) => (s[i] ? [s[i].getTime()] : []));
+  const [from, to] = [dates(0), dates(1)];
+  sendJson(res, { range: from.length ? { from: new Date(Math.min(...from)).toISOString().slice(0, 10), to: new Date(Math.max(...to)).toISOString().slice(0, 10) } : null });
 };

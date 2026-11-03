@@ -1,3 +1,4 @@
+import type { T } from "@/lib/lang";
 import { Check, Eye, Loader, Replace, TriangleAlert, X, type LucideIcon } from "lucide-react";
 
 /** Mirrors backend `UploadDomain` (schema.prisma), in PRD order. */
@@ -29,12 +30,12 @@ const BY_ERROR_CODE: Record<string, { label: string; tone: string; icon: LucideI
   EMPTY_FILE: { label: "Ditahan · file kosong", tone: "border-amber-200 bg-amber-50 text-amber-700", icon: TriangleAlert },
 };
 
-export function StatusBadge({ status, errorCode }: { status: string; errorCode?: string | null }) {
+export function StatusBadge({ status, errorCode, t }: { status: string; errorCode?: string | null; t: T }) {
   const s = (errorCode && BY_ERROR_CODE[errorCode]) || STATUS[status as keyof typeof STATUS] || { label: status, tone: "border-slate-200 bg-slate-50 text-slate-600", icon: Loader };
   return (
     <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium ${s.tone}`}>
       <s.icon className="size-3" aria-hidden="true" />
-      {s.label}
+      {t(s.label)}
     </span>
   );
 }

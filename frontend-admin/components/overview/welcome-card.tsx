@@ -1,9 +1,14 @@
-import { CircleDollarSign, RefreshCw, Users, Warehouse, WalletCards } from "lucide-react";
+import { CircleDollarSign, RefreshCw, Users, WalletCards } from "lucide-react";
+import { getT } from "@/lib/lang-server";
 import { Card } from "@/components/ui/card";
-import { MorphSelect } from "@/components/ui/morph-select";
+import { PeriodFilter } from "@/components/ui/period-filter";
+import { KitchenFilter } from "@/components/overview/kitchen-filter";
 import { StatCard, type Stat } from "@/components/overview/stat-card";
-import { efiInsight, monthSpendInsight, portionsInsight, runwayInsight } from "@/lib/insight";
-import { dateLabel, monthSpend, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
+import type { T } from "@/lib/lang";
+import { efiInsight, periodSpendInsight, portionsInsight, runwayInsight } from "@/lib/insight";
+import { dateLabel, periodSpend, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
+import type { Kitchen } from "@/lib/me";
+import type { resolvePeriod } from "@/lib/overview-filter";
 
 const count = new Intl.NumberFormat("id-ID");
 
@@ -13,57 +18,54 @@ const count = new Intl.NumberFormat("id-ID");
  * insight says what is missing. Draft vs official stays in the backend
  * (`balance.status`); the tickets ask for no "Belum resmi" label on screen.
  */
-function stats(finance: FinanceKpi | null, menu: MenuKpi): Stat[] {
+function stats(t: T, finance: FinanceKpi | null, menu: MenuKpi, period: string): Stat[] {
   const out: Stat[] = [];
   if (finance) {
     const { balance, efi } = finance;
     const sum = balance.accounts.reduce((n, a) => n + (a.balance ?? 0), 0);
-    const spend = monthSpend(finance);
+    const spend = periodSpend(finance);
     out.push({
       icon: CircleDollarSign,
-      label: "Pengeluaran · Bulan ini",
+      label: `${t("Pengeluaran")} · ${period}`,
       value: spend.days ? rp(spend.total) : "-",
-      insight: monthSpendInsight(finance),
+      insight: periodSpendInsight(t, finance, period),
     });
     out.push({
       icon: WalletCards,
-      label: balance.asOf ? `Saldo Rekening · per ${dateLabel(balance.asOf)}` : "Saldo Rekening",
+      label: balance.asOf ? t("Saldo Rekening · per {date}", { date: dateLabel(balance.asOf) }) : t("Saldo Rekening"),
       value: balance.status === "UNAVAILABLE" ? "-" : rp(sum),
-      insight: runwayInsight(finance, sum),
+      insight: runwayInsight(t, finance, sum),
     });
     out.push({
       icon: RefreshCw,
-      label: efi.latest ? `Transfer EFI Terakhir · ${dateLabel(efi.latest.date)}` : "Transfer EFI Terakhir",
+      label: efi.latest ? `${t("Transfer EFI Terakhir")} · ${dateLabel(efi.latest.date)}` : t("Transfer EFI Terakhir"),
       value: efi.latest?.amount != null ? rp(efi.latest.amount) : "-",
-      insight: efiInsight(finance),
+      insight: efiInsight(t, finance),
     });
   }
   if (menu.portions) {
     const { perDay, status } = menu.portions;
     out.push({
       icon: Users,
-      label: "Penerima Manfaat / hari",
+      label: t("Penerima Manfaat / hari"),
       value: perDay === null ? "-" : count.format(perDay),
-      status: status === "MISMATCH" ? "Total segmen tidak cocok" : undefined,
-      insight: portionsInsight(menu.portions),
+      status: status === "MISMATCH" ? t("Total segmen tidak cocok") : undefined,
+      insight: portionsInsight(t, menu.portions),
     });
   }
   return out;
 }
 
-export function WelcomeCard({ name, finance, menu }: { name: string; finance: FinanceKpi | null; menu: MenuKpi }) {
-  const items = stats(finance, menu);
+export async function WelcomeCard({ name, kitchens, scope, period, finance, menu }: { name: string; kitchens: Kitchen[]; scope: string; period: ReturnType<typeof resolvePeriod>; finance: FinanceKpi | null; menu: MenuKpi }) {
+  const t = await getT();
+  const items = stats(t, finance, menu, t(period.label));
   return (
     <Card className="p-6 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Selamat Datang, {name}!</h1>
-        {/* Hardcoded until the dapur and period filters are wired to data. */}
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Selamat Datang, {name}!", { name })}</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="flex h-10 items-center gap-2.5 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-800">
-            <Warehouse className="size-4 text-slate-600" aria-hidden="true" />
-            SPPG Sukun Kebonsari 2
-          </span>
-          <MorphSelect label="Periode" options={[{ value: "2026-08-10", label: "Periode: 10 – 21 Agu 2026" }]} defaultValue="2026-08-10" className="w-64" />
+          <KitchenFilter kitchens={kitchens} selected={scope} />
+          <PeriodFilter mode={period.mode} range={period.range} />
         </div>
       </div>
       {items.length > 0 && (

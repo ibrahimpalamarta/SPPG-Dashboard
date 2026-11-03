@@ -2,9 +2,11 @@
 
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
+import { useT } from "@/components/i18n-provider";
 
 /** Native <dialog>: focus trap, Esc and backdrop come from the platform. */
 export function Modal({ open, onClose, icon, title, subtitle, footer, children }: { open: boolean; onClose: () => void; icon: ReactNode; title: string; subtitle: string; footer: ReactNode; children: ReactNode }) {
+  const t = useT();
   if (!open) return null;
 
   return (
@@ -26,7 +28,7 @@ export function Modal({ open, onClose, icon, title, subtitle, footer, children }
           <h2 className="text-lg font-semibold">{title}</h2>
           <p className="truncate text-sm text-slate-500">{subtitle}</p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Tutup" className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">
+        <button type="button" onClick={onClose} aria-label={t("Tutup")} className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">
           <X className="size-4" aria-hidden="true" />
         </button>
       </div>

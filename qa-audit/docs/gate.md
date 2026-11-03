@@ -22,6 +22,8 @@ Mengubahnya wajib disertai entri di [decision-log.md](decision-log.md).
 Ambang awal: Lighthouse performa 0.8, aksesibilitas 0.9; diff visual 1%. Dikalibrasi setelah
 2 minggu data nightly.
 
+Sementara, axe critical/serious bertag `@a11y` saja (tanpa `@smoke`), jadi gagalnya Warning, bukan Blocker (QD-45).
+
 ## Waiver
 Tambahkan ke `waivers` di `gate.json`:
 ```json

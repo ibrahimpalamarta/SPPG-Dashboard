@@ -11,6 +11,8 @@ import {
   menuCostQuery,
   menuKpiQuery,
   menuNutritionQuery,
+  scopeQuery,
+  sourcesQuery,
   summaryQuery,
 } from '../../schemas/mart.js';
 import {
@@ -21,7 +23,7 @@ import {
   listSummaries,
 } from '../../controllers/mart/mart.js';
 import { getDashboardSummary } from '../../controllers/mart/dashboard.js';
-import { getFinanceKpi, getMenuKpi } from '../../controllers/mart/kpi.js';
+import { getFinanceKpi, getMenuKpi, getKpiSources, getDataRange } from '../../controllers/mart/kpi.js';
 import { getCompleteness } from '../../controllers/mart/completeness.js';
 
 /**
@@ -60,3 +62,5 @@ kpiRouter.use(requirePermission('dashboard:view'));
 kpiRouter.get('/finance', requireRole(...COST_ROLES), validate({ query: dashboardQuery }), wrap(getFinanceKpi()));
 kpiRouter.get('/menu', validate({ query: menuKpiQuery }), wrap(getMenuKpi()));
 kpiRouter.get('/completeness', validate({ query: completenessQuery }), wrap(getCompleteness()));
+kpiRouter.get('/sources', validate({ query: sourcesQuery }), wrap(getKpiSources()));
+kpiRouter.get('/data-range', validate({ query: scopeQuery }), wrap(getDataRange()));

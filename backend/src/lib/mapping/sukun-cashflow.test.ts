@@ -19,8 +19,8 @@ describe('MAP-SKN-CF-001 adapter (SCRUM-27/55)', () => {
   test('Rupiah with thousand dots, decimal-comma qty, folded type/direction/unit', async () => {
     const { batch, mapping } = await staged(
       withRows('sukun-cashflow.csv', [
-        '1,TXN-X1,05/03/2026,belanja,keluar,Bahan Baku,Uraian,Ayam,Supplier A,"7,75",KG,Rp40.000,Rp310.000,Rp327.000,high,TERKONFIRMASI,',
-        '2,TXN-X1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Garam,Supplier A,1,pcs,17000,Rp17.000,Rp327.000,high,TERKONFIRMASI,',
+        '1,TXN-BX1,05/03/2026,belanja,keluar,Bahan Baku,Uraian,Ayam,Supplier A,"7,75",KG,Rp40.000,Rp310.000,Rp327.000,high,TERKONFIRMASI,',
+        '2,TXN-BX1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Garam,Supplier A,1,pcs,17000,Rp17.000,Rp327.000,high,TERKONFIRMASI,',
       ]),
       'CASHFLOW',
     );
@@ -53,13 +53,13 @@ describe('MAP-SKN-CF-001 adapter (SCRUM-27/55)', () => {
   test('lines that do not add up, or disagree on the total, are reported, not fixed', async () => {
     const { mapping } = await staged(
       withRows('sukun-cashflow.csv', [
-        '1,TXN-X2,05/03/2026,BELANJA,KELUAR,Bahan Baku,U,Ayam,S,1,kg,Rp40.000,Rp40.000,Rp50.000,high,TERKONFIRMASI,',
-        '2,TXN-X2,05/03/2026,BELANJA,KELUAR,Bahan Baku,U,Garam,S,1,kg,Rp5.000,Rp5.000,Rp45.000,high,TERKONFIRMASI,',
+        '1,TXN-BX2,05/03/2026,BELANJA,KELUAR,Bahan Baku,U,Ayam,S,1,kg,Rp40.000,Rp40.000,Rp50.000,high,TERKONFIRMASI,',
+        '2,TXN-BX2,05/03/2026,BELANJA,KELUAR,Bahan Baku,U,Garam,S,1,kg,Rp5.000,Rp5.000,Rp45.000,high,TERKONFIRMASI,',
       ]),
       'CASHFLOW',
     );
     assert.deepEqual(mapping?.issueCounts, { TOTAL_INCONSISTENT: 1, LINES_NOT_TOTAL: 1, RECON_NO_SUMMARY: 1 });
-    assert.match(mapping!.issues[1]!.message, /TXN-X2: jumlah baris Rp45\.000 ≠ total Rp50\.000/);
+    assert.match(mapping!.issues[1]!.message, /TXN-BX2: jumlah baris Rp45\.000 ≠ total Rp50\.000/);
   });
 });
 
@@ -102,9 +102,9 @@ describe('MAP-LWG-CF-001 (SCRUM-32/56)', () => {
 
 describe('anti-double-count (SCRUM-41, DQ PRD §7.4)', () => {
   const multiLine = withRows('sukun-cashflow.csv', [
-    '1,TXN-X1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Ayam,Supplier A,1,kg,Rp300.000,Rp300.000,Rp327.000,high,TERKONFIRMASI,',
-    '2,TXN-X1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Garam,Supplier A,1,pcs,Rp27.000,Rp27.000,Rp327.000,high,TERKONFIRMASI,',
-    '3,TXN-X1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Merica,Supplier A,1,pcs,Rp0,Rp0,Rp327.000,high,TERKONFIRMASI,',
+    '1,TXN-BX1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Ayam,Supplier A,1,kg,Rp300.000,Rp300.000,Rp327.000,high,TERKONFIRMASI,',
+    '2,TXN-BX1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Garam,Supplier A,1,pcs,Rp27.000,Rp27.000,Rp327.000,high,TERKONFIRMASI,',
+    '3,TXN-BX1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Merica,Supplier A,1,pcs,Rp0,Rp0,Rp327.000,high,TERKONFIRMASI,',
   ]);
 
   test('a three-line BELANJA counts its total once: header total = Σ line_amount, not 3 × total', async () => {
@@ -122,8 +122,8 @@ describe('anti-double-count (SCRUM-41, DQ PRD §7.4)', () => {
   test('a total that differs between the lines of one transaction is flagged', async () => {
     const { mapping } = await staged(
       withRows('sukun-cashflow.csv', [
-        '1,TXN-X2,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Ayam,Supplier A,1,kg,Rp300.000,Rp300.000,Rp327.000,high,TERKONFIRMASI,',
-        '2,TXN-X2,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Garam,Supplier A,1,pcs,Rp27.000,Rp27.000,Rp654.000,high,TERKONFIRMASI,',
+        '1,TXN-BX2,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Ayam,Supplier A,1,kg,Rp300.000,Rp300.000,Rp327.000,high,TERKONFIRMASI,',
+        '2,TXN-BX2,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Garam,Supplier A,1,pcs,Rp27.000,Rp27.000,Rp654.000,high,TERKONFIRMASI,',
       ]),
       'CASHFLOW',
     );

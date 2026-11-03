@@ -15,7 +15,7 @@ export function ForgotForm() {
       ) : (
         <>
           <Field label="Email">
-            <input type="email" name="email" autoComplete="username" required autoFocus placeholder="nama@sppg.internal" className={field} />
+            <input type="email" name="email" autoComplete="off" required autoFocus placeholder="nama@sppg.internal" className={field} />
           </Field>
           <FormMessage>{state.message}</FormMessage>
           <button type="submit" disabled={pending} className={`${primaryButton} w-full`}>

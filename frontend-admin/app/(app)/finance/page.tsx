@@ -7,18 +7,27 @@ import { StatStrip } from "@/components/finance/stat-strip";
 import { ExpenseBreakdown, TopSuppliers } from "@/components/finance/supplier-expense";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PeriodFilter } from "@/components/ui/period-filter";
+import { KitchenFilter } from "@/components/overview/kitchen-filter";
+import { getT } from "@/lib/lang-server";
 import { requirePage } from "@/lib/guard";
-import { financeKpi, mixSlices, rpFull } from "@/lib/kpi";
+import { dataRange, financeKpi, mixSlices, rpFull } from "@/lib/kpi";
+import { kpiQuery, resolvePeriod, resolveScope, type PeriodParams } from "@/lib/overview-filter";
 
-export const metadata: Metadata = { title: "Finance & Cost · SPPG Internal" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: `${(await getT())("Finance & Cost")} · SPPG Internal` };
+}
 
-export default async function FinancePage() {
-  await requirePage("/finance");
-  const finance = await financeKpi();
+export default async function FinancePage({ searchParams }: { searchParams: Promise<PeriodParams & { dapur?: string }> }) {
+  const [me, t] = await Promise.all([requirePage("/finance"), getT()]);
+  const params = await searchParams;
+  const scope = resolveScope(me.kitchens, params.dapur);
+  const period = resolvePeriod(params, await dataRange(new URLSearchParams(scope.query).toString()));
+  const finance = await financeKpi(kpiQuery(period, scope));
   if (!finance) {
     return (
-      <EmptyState title="Tidak ada akses">
-        <p>Peran Anda tidak dapat melihat angka biaya.</p>
+      <EmptyState title={t("Tidak ada akses")}>
+        <p>{t("Peran Anda tidak dapat melihat angka biaya.")}</p>
       </EmptyState>
     );
   }
@@ -26,7 +35,13 @@ export default async function FinancePage() {
   return (
     <div className="mx-auto max-w-400">
       <Card className="space-y-5 p-6 sm:p-8">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Finance &amp; Cost</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Finance & Cost")}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <KitchenFilter kitchens={me.kitchens} selected={scope.value} />
+            <PeriodFilter mode={period.mode} range={period.range} />
+          </div>
+        </div>
 
         <StatStrip spend={finance.spend} />
         <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
@@ -43,10 +58,10 @@ export default async function FinancePage() {
         </div>
         {/* SCRUM-100: behind KPI_PLANNED_COST until B-PLAN is decided; always labelled as plan, never actual. */}
         {planned.enabled && (
-          <FinanceCard title={`Biaya per Porsi · ${planned.label}`} icon={Calculator}>
+          <FinanceCard title={`${t("Biaya per Porsi")} · ${planned.label}`} icon={Calculator}>
             <p className="text-3xl font-bold text-slate-900">{planned.value === null ? "-" : rpFull(Math.round(planned.value))}</p>
-            <p className="mt-1 text-sm text-slate-500">Rencana dari RAB yang dipublish, bukan belanja aktual. Rumus {planned.formulaVersion}.</p>
-            {planned.incomplete && <p className="mt-2 text-sm text-amber-800">Sebagian baris RAB tanpa total atau jumlah paket; angka belum lengkap.</p>}
+            <p className="mt-1 text-sm text-slate-500">{t("Rencana dari RAB yang dipublish, bukan belanja aktual. Rumus {version}.", { version: planned.formulaVersion })}</p>
+            {planned.incomplete && <p className="mt-2 text-sm text-amber-800">{t("Sebagian baris RAB tanpa total atau jumlah paket; angka belum lengkap.")}</p>}
           </FinanceCard>
         )}
       </Card>

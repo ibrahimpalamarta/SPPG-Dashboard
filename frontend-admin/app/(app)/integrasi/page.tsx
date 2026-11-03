@@ -3,8 +3,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { requirePage } from "@/lib/guard";
+import { getT } from "@/lib/lang-server";
 
-export const metadata: Metadata = { title: "Integrasi · SPPG Internal" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: `${(await getT())("Integrasi")} · SPPG Internal` };
+}
 
 const STATUS = {
   none: { label: "Tidak tersedia", className: "bg-slate-100 text-slate-600" },
@@ -22,13 +25,12 @@ const INTEGRATIONS = [
 ] as const satisfies readonly { name: string; status: keyof typeof STATUS; scope: string; note: string }[];
 
 export default async function IntegrasiPage() {
-  await requirePage("/integrasi");
+  const [, t] = await Promise.all([requirePage("/integrasi"), getT()]);
   return (
     <div className="mx-auto max-w-400">
       <Card className="space-y-6 p-6 sm:p-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Integrasi</h1>
-          <p className="mt-2 max-w-xl text-slate-600">Phase 1 membaca upload/export. Integrasi API/write-back dua arah ke SIPGN/POP/Aksis/MPM di luar lingkup (OS1, OD-08).</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Integrasi")}</h1>
         </div>
 
         <ul className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -39,14 +41,14 @@ export default async function IntegrasiPage() {
                   <Plug className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
                   {name}
                 </h2>
-                <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${STATUS[status].className}`}>{STATUS[status].label}</span>
+                <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${STATUS[status].className}`}>{t(STATUS[status].label)}</span>
               </div>
-              <p className="text-sm text-slate-700">{scope}</p>
-              <p className="text-xs text-slate-500">{note}</p>
+              <p className="text-sm text-slate-700">{t(scope)}</p>
+              <p className="text-xs text-slate-500">{t(note)}</p>
               {status === "upload" ? (
-                <Link href="/unggah-data" className="inline-flex h-9 items-center rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-800 hover:border-emerald-300">Unggah file</Link>
+                <Link href="/unggah-data" className="inline-flex h-9 items-center rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-800 hover:border-emerald-300">{t("Unggah file")}</Link>
               ) : (
-                <span className="inline-flex h-9 items-center rounded-md border border-slate-100 bg-slate-50 px-3 text-sm font-medium text-slate-400">API · setelah OD-08</span>
+                <span className="inline-flex h-9 items-center rounded-md border border-slate-100 bg-slate-50 px-3 text-sm font-medium text-slate-600">{t("API · setelah OD-08")}</span>
               )}
             </li>
           ))}

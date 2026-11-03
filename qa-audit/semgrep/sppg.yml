@@ -18,3 +18,26 @@ rules:
     pattern-either:
       - pattern: $DB.$queryRawUnsafe(...)
       - pattern: $DB.$executeRawUnsafe(...)
+
+  # Every router is mounted behind requireAuth (backend/src/routes/index.ts), which only proves who the caller is.
+  # A write route that names no requirePermission/requireRole is open to every logged-in role (SCRUM-20, SCRUM-152).
+  # routes/auth/ is excluded: login, reset and logout have no role by design.
+  - id: sppg-route-without-permission
+    languages: [typescript]
+    severity: ERROR
+    message: Route tulis ($R.$M) tanpa requirePermission/requireRole terbuka untuk semua role yang login. Tambahkan guard, atau catat waiver di gate.json bila memang publik bagi semua role.
+    metadata:
+      category: security
+      cwe: "CWE-862: Missing Authorization"
+    paths:
+      include:
+        - routes/
+      exclude:
+        - routes/auth/
+    patterns:
+      - pattern: $R.$M(...)
+      - metavariable-regex:
+          metavariable: $M
+          regex: ^(post|put|patch|delete)$
+      - pattern-not: $R.$M(..., requirePermission(...), ...)
+      - pattern-not: $R.$M(..., requireRole(...), ...)

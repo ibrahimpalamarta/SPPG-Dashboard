@@ -1,4 +1,5 @@
 import type { Tone } from "@/components/ui/badge";
+import type { T } from "@/lib/lang";
 
 export type Severity = "blocker" | "check" | "auto";
 
@@ -127,27 +128,27 @@ export const severityMeta: Record<Severity, { label: string; tone: Tone; statusL
 export const tabs = ["Yang perlu ditangani", "Kolom file", "Dirapikan otomatis", "Hasil data", "Riwayat"];
 
 /** Findings from the batch and its stored mapping result: one per issue code and one per clean-up. */
-export function batchFindings(b: BatchDetail): Finding[] {
-  const rows = `${b.rowCount} baris`;
+export function batchFindings(t: T, b: BatchDetail): Finding[] {
+  const rows = t("{count} baris", { count: b.rowCount });
   const out: Finding[] = [];
   if (b.status === "NEEDS_MAPPING_UPDATE") {
     out.push({
       id: "format",
       severity: "blocker",
-      title: "Format file belum dikenali",
-      section: "Kolom file",
+      title: t("Format file belum dikenali"),
+      section: t("Kolom file"),
       rows,
-      description: b.errorSummary ?? "Format file tidak cocok dengan profil mapping yang ada.",
+      description: b.errorSummary ?? t("Format file tidak cocok dengan profil mapping yang ada."),
     });
   }
   if (b.mappingProfileId) {
     out.push({
       id: "profile",
       severity: "auto",
-      title: "Profil mapping terdeteksi",
-      section: "Mapping profile",
+      title: t("Profil mapping terdeteksi"),
+      section: t("Mapping profile"),
       rows,
-      description: `Profil ${b.mappingProfileId} versi ${b.templateVersion ?? "—"} diterapkan otomatis pada file ini.`,
+      description: t("Profil {profile} versi {version} diterapkan otomatis pada file ini.", { profile: b.mappingProfileId, version: b.templateVersion ?? "—" }),
     });
   }
 
@@ -164,10 +165,10 @@ export function batchFindings(b: BatchDetail): Finding[] {
       severity: issues[0]?.severity === "CRITICAL" ? "blocker" : "check",
       code,
       resolvedNote: resolved ? (status[0]?.note ?? "") : null,
-      title: meta.title,
-      section: rule ? `Aturan ${rule}` : "Isi data",
-      rows: `${issues.length} temuan`,
-      description: meta.description,
+      title: t(meta.title),
+      section: rule ? t("Aturan {rule}", { rule }) : t("Isi data"),
+      rows: t("{count} temuan", { count: issues.length }),
+      description: t(meta.description),
       details: issues.map((i) => i.message),
     });
   }
@@ -177,12 +178,12 @@ export function batchFindings(b: BatchDetail): Finding[] {
     out.push({
       id: `auto-${n.code}-${n.field}`,
       severity: "auto",
-      title: normalizedTitle[n.code] ?? n.code,
-      section: grouped ? "Transaksi" : `Kolom ${headerOf.get(n.field) ?? n.field}`,
-      rows: grouped ? `${n.count} transaksi` : `${n.count} nilai`,
+      title: t(normalizedTitle[n.code] ?? n.code),
+      section: grouped ? t("Transaksi") : t("Kolom {header}", { header: headerOf.get(n.field) ?? n.field }),
+      rows: grouped ? t("{count} transaksi", { count: n.count }) : t("{count} nilai", { count: n.count }),
       description: grouped
-        ? `${n.example.raw} digabung menjadi ${n.example.value} berdasarkan txn_id; total transaksi dihitung sekali.`
-        : `Contoh: “${n.example.raw}” dibaca sebagai ${n.example.value}. Nilai asli tetap tersimpan di data mentah.`,
+        ? t("{raw} digabung menjadi {value} berdasarkan txn_id; total transaksi dihitung sekali.", { raw: n.example.raw, value: n.example.value })
+        : t("Contoh: “{raw}” dibaca sebagai {value}. Nilai asli tetap tersimpan di data mentah.", { raw: n.example.raw, value: n.example.value }),
     });
   }
   return out;
