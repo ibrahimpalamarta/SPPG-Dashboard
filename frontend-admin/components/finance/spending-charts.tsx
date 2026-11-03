@@ -18,7 +18,7 @@ function axisMax(values: number[]) {
 
 function YAxis({ max }: { max: number }) {
   return (
-    <div className="flex h-44 w-12 flex-col justify-between text-right text-xs text-slate-400">
+    <div className="flex h-44 w-12 flex-col justify-between text-right text-xs text-slate-600">
       {[1, 0.75, 0.5, 0.25, 0].map((f) => (
         <span key={f}>{jt.format((max * f) / 1e6)} jt</span>
       ))}

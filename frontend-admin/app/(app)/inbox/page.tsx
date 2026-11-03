@@ -35,7 +35,7 @@ function Row({ href, title, subtitle, time }: { href: string; title: string; sub
         <p className="truncate font-medium text-slate-900">{title}</p>
         <p className="truncate text-slate-500">{subtitle}</p>
       </div>
-      {time && <span className="shrink-0 text-xs text-slate-400">{fmt(time)}</span>}
+      {time && <span className="shrink-0 text-xs text-slate-600">{fmt(time)}</span>}
     </Link>
   );
 }

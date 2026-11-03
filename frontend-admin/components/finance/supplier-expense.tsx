@@ -20,7 +20,7 @@ export function TopSuppliers({ suppliers }: { suppliers: FinanceKpi["topSupplier
             </div>
             <div className="text-right text-sm">
               <strong className="block text-slate-800">{rp(amount)}</strong>
-              <span className="text-slate-400">{pct(share)}</span>
+              <span className="text-slate-600">{pct(share)}</span>
             </div>
           </div>
         ))}

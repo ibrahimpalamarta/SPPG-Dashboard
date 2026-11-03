@@ -136,7 +136,7 @@ function UploadProgress({ children }: { children?: ReactNode }) {
     <div role="status" className="grid gap-6 rounded-xl border border-slate-200 p-5 md:grid-cols-[minmax(0,1fr)_2fr]">
       <ul className="space-y-3 text-sm">
         {STEPS.map((label, i) => (
-          <li key={label} className={`flex items-center gap-3 ${i > step ? "text-slate-400" : "text-slate-800"}`}>
+          <li key={label} className={`flex items-center gap-3 ${i > step ? "text-slate-600" : "text-slate-800"}`}>
             {i < step ? (
               <span className="grid size-6 place-items-center rounded-full bg-emerald-700 text-white">
                 <Check className="size-3.5" aria-hidden="true" />

@@ -26,7 +26,7 @@ export function Pager({ page, totalPages, hrefFor }: { page: number; totalPages:
       <ul className="flex items-center gap-1">
         {pageNumbers(page, totalPages).map((p, i) =>
           p === "…" ? (
-            <li key={`gap-${i}`} className="px-1 text-slate-400">
+            <li key={`gap-${i}`} className="px-1 text-slate-600">
               …
             </li>
           ) : (

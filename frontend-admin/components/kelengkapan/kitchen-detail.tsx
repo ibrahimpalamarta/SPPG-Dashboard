@@ -46,7 +46,7 @@ export function KitchenDetail({ kitchen }: { kitchen?: KitchenCompleteness }) {
                     </span>
                   </td>
                   <td className="px-4 py-3"><StatusLabel tone={status.tone}>{status.label}</StatusLabel></td>
-                  <td className="px-4 py-3">{issue ? <Badge tone={issue.tone}>{issue.label}</Badge> : <span className="text-slate-400">Tidak ada</span>}</td>
+                  <td className="px-4 py-3">{issue ? <Badge tone={issue.tone}>{issue.label}</Badge> : <span className="text-slate-600">Tidak ada</span>}</td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-600">{publishedAt ? publishedLabel(publishedAt) : "—"}</td>
                   <td className="px-4 py-3">
                     {action === "Buka" ? (
@@ -55,7 +55,7 @@ export function KitchenDetail({ kitchen }: { kitchen?: KitchenCompleteness }) {
                         <ArrowRight className="size-3.5" aria-hidden="true" />
                       </button>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-slate-600">—</span>
                     )}
                   </td>
                 </tr>
