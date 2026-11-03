@@ -186,7 +186,7 @@ function InviteModal({ open, onClose, kitchens }: { open: boolean; onClose: () =
           <input name="fullName" required autoFocus className={field} />
         </Field>
         <Field label={t("Email kerja")}>
-          <input type="email" name="email" required placeholder="nama@instansi.go.id" className={field} />
+          <input type="email" name="email" autoComplete="off" required placeholder="nama@instansi.go.id" className={field} />
         </Field>
         <RoleFields kitchens={kitchens} defaultRole="DATA_ADMIN" />
         <Field label={t("Pesan (opsional)")}>
