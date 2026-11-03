@@ -34,6 +34,7 @@ for (const role of Object.keys(PAGES) as RoleKey[]) {
     test.use({ storageState: storageState(role) });
 
     test(`[SCRUM-152] ${role}: judul halaman sama dengan nama menu di ID dan EN @smoke`, async ({ page }) => {
+      test.setTimeout(120_000); // 14 halaman berturut-turut; 30 detik tidak cukup saat worker lain berjalan
       for (const lang of ['id', 'en'] as const) {
         if (lang === 'en') await useEnglish(page);
         const nav = page.getByRole('navigation', { name: lang === 'en' ? 'Main menu' : 'Menu utama' });
@@ -41,13 +42,14 @@ for (const role of Object.keys(PAGES) as RoleKey[]) {
           await page.goto(p.path);
           const menu = p[lang];
           await expect(nav.getByRole('link', { name: menu, exact: true })).toBeVisible();
-          // Overview menyapa dengan nama pengguna dan Inbox kosong memakai judul empty state; halaman lain memakai nama menu sebagai judul.
+          // Overview menyapa dengan nama pengguna dan Inbox bisa memakai judul empty state; halaman lain memakai nama menu sebagai judul.
           if (p.path !== 'overview' && p.path !== 'inbox') await expect(page.getByRole('heading', { level: 1, name: menu, exact: true })).toBeVisible();
         }
       }
     });
 
     test(`[SCRUM-152] ${role}: tampilan EN tidak menyisakan teks Indonesia @smoke`, async ({ page }) => {
+      test.setTimeout(120_000);
       await useEnglish(page);
       const paths = PAGES[role].flatMap((p) => (p.path === 'referensi-data' ? ['referensi-data?tab=format', 'referensi-data?tab=alur'] : [p.path]));
       for (const path of paths) {

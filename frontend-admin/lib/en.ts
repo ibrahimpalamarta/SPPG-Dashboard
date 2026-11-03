@@ -325,6 +325,8 @@ export const EN: Record<string, string> = {
   "Perbedaan kolom dengan format yang dikenal": "Column differences from the known format",
   "Sheet": "Sheet",
   "Kolom tidak ditemukan": "Columns not found",
+  "Kolom tidak ditemukan: {columns}.": "Columns not found: {columns}.",
+  "Format file belum dikenali untuk dapur dan sumber ini. File belum dipublish.": "The file format is not recognised for this kitchen and source. The file has not been published.",
   "Kolom tidak dikenal": "Unrecognized columns",
   "Judul di file": "Title in file",
   "Dibaca sebagai": "Read as",

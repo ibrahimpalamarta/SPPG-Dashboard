@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api";
-import type { Inbox } from "@/lib/inbox";
+import { inboxReason, type Inbox } from "@/lib/inbox";
 import { getT } from "@/lib/lang-server";
 import { ROLE_LABELS } from "@/lib/roles";
 
@@ -16,7 +16,7 @@ export async function GET() {
   const entries: NotificationEntry[] = [
     ...inbox.quarantinedFiles.map((b) => ({
       title: b.fileName,
-      subtitle: b.errorSummary ?? b.notes ?? t("{kitchen} perlu diperbaiki", { kitchen: b.kitchen.code ?? b.kitchen.name }),
+      subtitle: (b.errorSummary && inboxReason(t, b.errorSummary)) || b.notes || t("{kitchen} perlu diperbaiki", { kitchen: b.kitchen.code ?? b.kitchen.name }),
       href: `/mapping-validasi?batch=${b.publicId}`,
     })),
     ...inbox.expiredInvites.map((u) => ({
