@@ -1,6 +1,6 @@
 import { CircleDollarSign, RefreshCw, Users, Warehouse, WalletCards } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { MorphSelect } from "@/components/ui/morph-select";
+import { PeriodFilter } from "@/components/ui/period-filter";
 import { StatCard, type Stat } from "@/components/overview/stat-card";
 import { efiInsight, monthSpendInsight, portionsInsight, runwayInsight } from "@/lib/insight";
 import { dateLabel, monthSpend, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
@@ -63,7 +63,7 @@ export function WelcomeCard({ name, finance, menu }: { name: string; finance: Fi
             <Warehouse className="size-4 text-slate-600" aria-hidden="true" />
             SPPG Sukun Kebonsari 2
           </span>
-          <MorphSelect label="Periode" options={[{ value: "2026-08-10", label: "Periode: 10 – 21 Agu 2026" }]} defaultValue="2026-08-10" className="w-64" />
+          <PeriodFilter />
         </div>
       </div>
       {items.length > 0 && (

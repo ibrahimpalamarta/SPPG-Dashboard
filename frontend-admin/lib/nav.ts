@@ -21,9 +21,9 @@ export const NAV = [
   { group: "Data", href: "/inbox", label: "Inbox", icon: "Inbox", permission: "dashboard:view" },
   // Administrasi akun; hanya muncul bagi peran yang diberi izinnya.
   { group: "Tools", href: "/anggota", label: "Anggota", icon: "Users", permission: "users:read" },
-  // Phase 1 hanya membaca upload/export; API dua arah di luar lingkup (OS1, OD-08).
-  { group: "Tools", href: "/integrasi", label: "Integrasi", icon: "Plug", permission: "dashboard:view" },
-] as const satisfies readonly { group: string; href: string; label: string; icon: string; permission: Permission; alsoRole?: Role }[];
+  // Phase 1 hanya membaca upload/export; API dua arah di luar lingkup (OS1, OD-08). Disembunyikan dari sidebar: isinya masih hardcode.
+  { group: "Tools", href: "/integrasi", label: "Integrasi", icon: "Plug", permission: "dashboard:view", hidden: true },
+] as const satisfies readonly { group: string; href: string; label: string; icon: string; permission: Permission; alsoRole?: Role; hidden?: true }[];
 
 export type NavHref = (typeof NAV)[number]["href"];
 
