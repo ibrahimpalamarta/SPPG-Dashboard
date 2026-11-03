@@ -8,7 +8,7 @@ import { apiGet } from "@/lib/api";
 import { requirePage } from "@/lib/guard";
 import { dateLocale, type T } from "@/lib/lang";
 import { getLang, getT } from "@/lib/lang-server";
-import type { Inbox, InboxBatch } from "@/lib/inbox";
+import { inboxReason, type Inbox, type InboxBatch } from "@/lib/inbox";
 import { ROLE_LABELS } from "@/lib/roles";
 import { DOMAINS } from "@/lib/upload";
 
@@ -71,7 +71,7 @@ export default async function Page() {
               key={b.publicId}
               href={`/mapping-validasi?batch=${b.publicId}`}
               title={b.fileName}
-              subtitle={b.errorSummary ?? b.notes ?? kitchenLabel(t, b)}
+              subtitle={b.errorSummary ? inboxReason(t, b.errorSummary) : (b.notes ?? kitchenLabel(t, b))}
               time={b.uploadDate}
             />
           ))}
