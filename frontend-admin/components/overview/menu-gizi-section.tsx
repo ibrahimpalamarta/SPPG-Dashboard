@@ -9,7 +9,7 @@ export async function MenuGiziSection({ menu }: { menu: MenuKpi }) {
   return (
     <Section
       title={t("Menu, Gizi & Porsi")}
-      action={menu.window && <span className="text-sm text-slate-500">{t("Periode")}: {dateLabel(menu.window.from)} – {dateLabel(menu.window.to)}</span>}
+      action={menu.window && <span className="text-sm text-slate-600">{t("Periode")}: {dateLabel(menu.window.from)} – {dateLabel(menu.window.to)}</span>}
     >
       <TopMenu menus={menu.topMenus} />
       <NutritionInfo menu={menu} />

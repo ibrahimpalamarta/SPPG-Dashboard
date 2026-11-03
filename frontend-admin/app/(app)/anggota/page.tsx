@@ -106,7 +106,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-slate-800">{t("Anggota")}</h1>
-          <p className="max-w-2xl text-sm text-slate-500">
+          <p className="max-w-2xl text-sm text-slate-600">
             {canManage ? t("Kelola anggota, role, dan akses dapur.") : t("Anda dapat melihat daftar anggota, tetapi tidak dapat mengubahnya.")}
           </p>
         </div>
@@ -167,7 +167,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
                     </span>
                     <span>
                       <span className="font-medium text-slate-800">{u.fullName ?? "—"}</span>
-                      {u.id === me.id && <span className="ml-2 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">{t("Anda")}</span>}
+                      {u.id === me.id && <span className="ml-2 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{t("Anda")}</span>}
                       <span className="block text-xs text-slate-500">{u.email}</span>
                     </span>
                   </div>

@@ -61,7 +61,7 @@ export default async function Page() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold text-slate-900">{t("Inbox")}</h1>
-        <p className="mt-2 text-slate-500">{t("Tugas yang menunggu tindakan Anda.")}</p>
+        <p className="mt-2 text-slate-600">{t("Tugas yang menunggu tindakan Anda.")}</p>
       </div>
 
       {inbox.quarantinedFiles.length > 0 && (
