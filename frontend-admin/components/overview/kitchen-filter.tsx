@@ -2,11 +2,10 @@
 
 import { Warehouse } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useT } from "@/components/i18n-provider";
 import { MorphSelect } from "@/components/ui/morph-select";
 import { REGION_PREFIX, regionsOf } from "@/lib/overview-filter";
 import type { Kitchen } from "@/lib/me";
-
-const label = ({ name, rolloutStatus }: Kitchen) => (rolloutStatus === "PHASE_2A" || rolloutStatus === "PHASE_2B" ? `${name} · Phase 2` : name);
 
 /**
  * SCRUM-142/152: a Data Operasional account is bound to one dapur and sees its name; Admin picks
@@ -16,6 +15,8 @@ export function KitchenFilter({ kitchens, selected }: { kitchens: Kitchen[]; sel
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const t = useT();
+  const label = ({ name, rolloutStatus }: Kitchen) => (rolloutStatus === "PHASE_2A" || rolloutStatus === "PHASE_2B" ? `${name} · Phase 2` : name);
   if (kitchens.length === 0) return null;
   if (kitchens.length === 1) {
     return (
@@ -34,12 +35,12 @@ export function KitchenFilter({ kitchens, selected }: { kitchens: Kitchen[]; sel
   };
   return (
     <MorphSelect
-      label="Dapur"
+      label={t("Dapur")}
       className="w-72"
       value={selected}
       options={[
-        { value: "", label: "Semua Dapur" },
-        ...(regions.length > 1 ? regions.map((r) => ({ value: `${REGION_PREFIX}${r}`, label: `Daerah ${r}` })) : []),
+        { value: "", label: t("Semua Dapur") },
+        ...(regions.length > 1 ? regions.map((r) => ({ value: `${REGION_PREFIX}${r}`, label: t("Daerah {region}", { region: r }) })) : []),
         ...kitchens.map((k) => ({ value: k.id, label: label(k) })),
       ]}
       onChange={pick}

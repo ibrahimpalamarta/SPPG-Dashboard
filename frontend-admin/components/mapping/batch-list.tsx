@@ -6,6 +6,8 @@ import { Pager } from "@/components/ui/pager";
 import { DeleteAllBatchesButton, DeleteBatchButton, DevModeSwitch } from "@/components/mapping/delete-batch-button";
 import { apiGet } from "@/lib/api";
 import { isDevMode } from "@/lib/dev-mode";
+import { dateLocale } from "@/lib/lang";
+import { getLang, getT } from "@/lib/lang-server";
 import { DOMAINS, STATUS, StatusBadge } from "@/lib/upload";
 import type { Kitchen } from "@/lib/me";
 import type { Batch } from "@/lib/mapping-validasi";
@@ -14,7 +16,6 @@ const PAGE_SIZE = 20;
 
 const actionButton = "inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2 text-xs font-medium text-slate-700 hover:bg-slate-50";
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—");
 
 const uploader = (b: Batch) => b.uploader?.fullName ?? b.uploader?.email ?? "—";
 const initials = (name: string) => name.split(/[\s@]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
@@ -34,6 +35,8 @@ const DEV_TOOLS = process.env.NODE_ENV !== "production" || process.env.ALLOW_DEV
  * and Hapus semua file, which also remove PUBLISHED batches so testing can restart from an empty Overview.
  */
 export async function BatchList({ page, canDelete, compact = false, filters = {}, kitchens = [] }: { page: number; canDelete: boolean; compact?: boolean; filters?: BatchFilters; kitchens?: Kitchen[] }) {
+  const [t, lang] = await Promise.all([getT(), getLang()]);
+  const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(dateLocale(lang), { dateStyle: "medium", timeStyle: "short" }) : "—");
   const base = compact ? "/unggah-data" : "/mapping-validasi";
   const showDev = canDelete && DEV_TOOLS;
   const devOn = showDev && (await isDevMode());
@@ -46,11 +49,11 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
     <div className="mx-auto max-w-400 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         {compact ? (
-          <h2 className="text-xl font-bold tracking-tight text-slate-900">Upload History</h2>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">{t("Upload History")}</h2>
         ) : (
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Upload History</h1>
-            <p className="mt-1 text-slate-500">Semua file yang pernah diunggah.</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Upload History")}</h1>
+            <p className="mt-1 text-slate-500">{t("Semua file yang pernah diunggah.")}</p>
           </div>
         )}
         <div className="flex flex-wrap items-center gap-4">
@@ -63,38 +66,38 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
           {kitchens.length > 1 && (
             <MorphSelect
               name="kitchenId"
-              label="Dapur"
+              label={t("Dapur")}
               defaultValue={filters.kitchenId}
-              options={[{ value: "", label: "Semua dapur" }, ...kitchens.map((k) => ({ value: k.id, label: k.code ?? k.name }))]}
+              options={[{ value: "", label: t("Semua dapur") }, ...kitchens.map((k) => ({ value: k.id, label: k.code ?? k.name }))]}
             />
           )}
-          <MorphSelect name="domain" label="Jenis data" defaultValue={filters.domain} options={[{ value: "", label: "Semua jenis data" }, ...DOMAINS]} />
+          <MorphSelect name="domain" label={t("Jenis data")} defaultValue={filters.domain} options={[{ value: "", label: t("Semua jenis data") }, ...DOMAINS.map((d) => ({ value: d.value, label: t(d.label) }))]} />
           <MorphSelect
             name="status"
-            label="Status"
+            label={t("Status")}
             defaultValue={filters.status}
-            options={[{ value: "", label: "Semua status" }, ...Object.entries(STATUS).map(([value, s]) => ({ value, label: s.label }))]}
+            options={[{ value: "", label: t("Semua status") }, ...Object.entries(STATUS).map(([value, s]) => ({ value, label: t(s.label) }))]}
           />
-          <button className={actionButton}>Terapkan</button>
+          <button className={actionButton}>{t("Terapkan")}</button>
         </form>
       )}
       <Card className="overflow-x-auto">
         <table className="w-full min-w-3xl text-left">
           <thead className="border-b border-slate-200 bg-slate-50 text-sm text-slate-500">
             <tr>
-              <th className="px-4 py-3 font-medium">File</th>
-              <th className="px-4 py-3 font-medium">Dapur</th>
-              <th className="px-4 py-3 font-medium">Jenis data</th>
-              <th className="px-4 py-3 font-medium">Diunggah</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium"><span className="sr-only">Aksi</span></th>
+              <th className="px-4 py-3 font-medium">{t("File")}</th>
+              <th className="px-4 py-3 font-medium">{t("Dapur")}</th>
+              <th className="px-4 py-3 font-medium">{t("Jenis data")}</th>
+              <th className="px-4 py-3 font-medium">{t("Diunggah")}</th>
+              <th className="px-4 py-3 font-medium">{t("Status")}</th>
+              <th className="px-4 py-3 font-medium"><span className="sr-only">{t("Aksi")}</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
             {data.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                  Belum ada file yang diunggah.
+                  {t("Belum ada file yang diunggah.")}
                 </td>
               </tr>
             )}
@@ -107,7 +110,7 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-slate-700">{b.kitchen.code ?? b.kitchen.name}</td>
-                <td className="px-4 py-3 text-slate-700">{domainLabel(b.domain)}</td>
+                <td className="px-4 py-3 text-slate-700">{t(domainLabel(b.domain))}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarTone(uploader(b))}`} aria-hidden="true">
@@ -120,19 +123,19 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={b.status} errorCode={b.errorCode} />
+                  <StatusBadge status={b.status} errorCode={b.errorCode} t={t} />
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
                     {!compact && b.status !== "FAILED" && (
-                      <Link href={`/mapping-validasi?batch=${b.publicId}`} aria-label={`Buka ${b.fileName}`} className={actionButton}>
-                        Buka
+                      <Link href={`/mapping-validasi?batch=${b.publicId}`} aria-label={`${t("Buka")} ${b.fileName}`} className={actionButton}>
+                        {t("Buka")}
                       </Link>
                     )}
                     {compact && b.storageKey && (
-                      <a href={`/unggah-data/batch/${b.id}/file`} aria-label={`Export ${b.fileName}`} className={actionButton}>
+                      <a href={`/unggah-data/batch/${b.id}/file`} aria-label={`${t("Export")} ${b.fileName}`} className={actionButton}>
                         <Download className="size-3.5" aria-hidden="true" />
-                        Export
+                        {t("Export")}
                       </a>
                     )}
                     {devOn && <DeleteBatchButton id={b.id} fileName={b.fileName} />}

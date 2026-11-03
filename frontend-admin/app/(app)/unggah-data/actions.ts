@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { apiFetch, apiSend } from "@/lib/api";
 import { DEV_MODE_COOKIE } from "@/lib/dev-mode";
+import { getT } from "@/lib/lang-server";
+import type { T } from "@/lib/lang";
 
 export type ColumnDiff = { sheet: string; missing: string[]; unexpected: string[] };
 
@@ -47,10 +49,10 @@ export type UploadResult =
 
 /** Dev-mode delete (`force`: PUBLISHED too). Returns an error message, or null once it is gone. */
 async function forceDelete(path: string): Promise<string | null> {
-  const res = await apiSend(`${path}force=true`, "DELETE");
-  if (res.status === 403) return "Anda tidak memiliki akses untuk menghapus.";
-  if (res.status === 409) return typeof res.data.message === "string" ? res.data.message : "Penghapusan ditolak.";
-  if (!res.ok && res.status !== 404) return "Gagal menghapus. Coba lagi beberapa saat lagi.";
+  const [t, res] = await Promise.all([getT(), apiSend(`${path}force=true`, "DELETE")]);
+  if (res.status === 403) return t("Anda tidak memiliki akses untuk menghapus.");
+  if (res.status === 409) return typeof res.data.message === "string" ? res.data.message : t("Penghapusan ditolak.");
+  if (!res.ok && res.status !== 404) return t("Gagal menghapus. Coba lagi beberapa saat lagi.");
   revalidatePath("/unggah-data");
   revalidatePath("/mapping-validasi");
   revalidatePath("/overview");
@@ -72,22 +74,23 @@ export async function deleteAllBatches(): Promise<string | null> {
 }
 
 /** The backend's verdict on a rejected upload or check, in Indonesian. */
-function failure(status: number, body: { message?: string; details?: { fields?: Record<string, string[]> } }) {
-  if (status === 403) return { ok: false as const, message: body.message ?? "Anda tidak memiliki akses untuk mengunggah." };
+function failure(t: T, status: number, body: { message?: string; details?: { fields?: Record<string, string[]> } }) {
+  if (status === 403) return { ok: false as const, message: body.message ?? t("Anda tidak memiliki akses untuk mengunggah.") };
   const fields = body.details?.fields;
-  return { ok: false as const, message: fields ? Object.values(fields).flat().join(" ") : `Upload gagal (${status}). Coba lagi beberapa saat lagi.` };
+  return { ok: false as const, message: fields ? Object.values(fields).flat().join(" ") : t("Upload gagal ({status}). Coba lagi beberapa saat lagi.", { status }) };
 }
 
 /** Reads the picked file and reports what an upload would do, storing nothing (POST /api/upload-batches?dryRun=true). */
 export async function checkFile(form: FormData): Promise<CheckResult> {
+  const t = await getT();
   const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Pilih file .xlsx atau .csv terlebih dahulu." };
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: t("Pilih file .xlsx atau .csv terlebih dahulu.") };
   if (!form.get("period")) form.delete("period");
   if (!form.get("columnMap")) form.delete("columnMap");
 
   const res = await apiFetch("/upload-batches?dryRun=true", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) return failure(res.status, body);
+  if (!res.ok) return failure(t, res.status, body);
   return { ok: true, ready: body.ready, issues: body.issues, columnDiff: body.columnDiff, rowCount: body.rowCount, columns: body.columns, fields: body.fields, ai: body.ai };
 }
 
@@ -97,14 +100,15 @@ export async function checkFile(form: FormData): Promise<CheckResult> {
  * all the backend's; this only relays its verdict in Indonesian.
  */
 export async function uploadFile(_prev: UploadResult | null, form: FormData): Promise<UploadResult> {
+  const t = await getT();
   const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Pilih file .xlsx atau .csv terlebih dahulu." };
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: t("Pilih file .xlsx atau .csv terlebih dahulu.") };
   if (!form.get("period")) form.delete("period");
   if (!form.get("columnMap")) form.delete("columnMap");
 
   const res = await apiFetch("/upload-batches", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) return failure(res.status, body);
+  if (!res.ok) return failure(t, res.status, body);
   return {
     ok: true,
     batchId: body.publicId,

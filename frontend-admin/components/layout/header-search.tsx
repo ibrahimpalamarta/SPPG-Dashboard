@@ -3,6 +3,7 @@
 import { GitBranch, LayoutGrid, Search, Upload } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/components/i18n-provider";
 import type { NavItem } from "@/components/layout/app-sidebar";
 import type { SearchEntry } from "@/app/api/search-index/route";
 
@@ -12,6 +13,7 @@ const ICON = { upload: Upload, format: GitBranch };
 const MAX_RESULTS = 20;
 
 export function HeaderSearch({ items }: { items: readonly NavItem[] }) {
+  const t = useT();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState<SearchEntry[] | null>(null);
@@ -45,7 +47,7 @@ export function HeaderSearch({ items }: { items: readonly NavItem[] }) {
   const needle = q.trim().toLowerCase();
   const results: Result[] = needle
     ? [
-        ...items.map((n) => ({ icon: LayoutGrid, title: n.label, subtitle: "Halaman", href: n.href, text: n.label })),
+        ...items.map((n) => ({ icon: LayoutGrid, title: n.label, subtitle: t("Halaman"), href: n.href, text: n.label })),
         ...(index ?? [])
           .filter((e) => items.some((n) => n.href === e.page))
           .map((e) => ({ icon: ICON[e.kind], title: e.title, subtitle: e.subtitle, href: e.href, text: `${e.title} ${e.subtitle}` })),
@@ -65,8 +67,8 @@ export function HeaderSearch({ items }: { items: readonly NavItem[] }) {
           onChange={(e) => setQ(e.target.value)}
           onFocus={load}
           onKeyDown={(e) => e.key === "Escape" && (setOpen(false), input.current?.blur())}
-          placeholder="Cari menu, nama file, atau kode upload..."
-          aria-label="Cari menu, nama file, atau kode upload"
+          placeholder={t("Cari menu, nama file, atau kode upload...")}
+          aria-label={t("Cari menu, nama file, atau kode upload")}
           className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
         />
         <kbd className="hidden rounded-md border border-slate-200 px-1.5 py-0.5 text-xs text-slate-600 sm:block">⌘K</kbd>
@@ -85,7 +87,7 @@ export function HeaderSearch({ items }: { items: readonly NavItem[] }) {
               </Link>
             </li>
           ))}
-          {!results.length && <li className="px-3 py-2 text-sm text-slate-500">{index ? "Tidak ada hasil." : "Memuat..."}</li>}
+          {!results.length && <li className="px-3 py-2 text-sm text-slate-500">{index ? t("Tidak ada hasil.") : t("Memuat...")}</li>}
         </ul>
       )}
     </div>

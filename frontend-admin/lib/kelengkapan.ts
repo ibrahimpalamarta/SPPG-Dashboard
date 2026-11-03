@@ -1,5 +1,6 @@
 import { BookOpen, Building2, CircleCheck, CircleX, Coins, FileText, Gauge, Package, UserRound, Utensils, Wallet, WalletCards, type LucideIcon } from "lucide-react";
 import type { Tone } from "@/components/ui/badge";
+import { dateLocale, type Lang, type T } from "@/lib/lang";
 import type { CompletenessItem, KitchenCompleteness } from "@/lib/kpi";
 
 type Status = { label: string; tone: Tone };
@@ -50,21 +51,21 @@ export const phaseOf = ({ rolloutStatus }: KitchenCompleteness) => (rolloutStatu
 export const noteOf = ({ rolloutStatus }: KitchenCompleteness) => (rolloutStatus ? NOTES[rolloutStatus] : NOTES.PHASE_2A);
 export const byRollout = (kitchens: KitchenCompleteness[]) => [...kitchens].sort((a, b) => (a.rolloutStatus ? RANK[a.rolloutStatus] : 4) - (b.rolloutStatus ? RANK[b.rolloutStatus] : 4));
 
-const parts = new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Jakarta" });
+const parts = (lang: Lang) => new Intl.DateTimeFormat(dateLocale(lang), { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Jakarta" });
 /** "03 Nov 2026 16:48" in Jakarta time. */
-export function publishedLabel(iso: string) {
-  const p = Object.fromEntries(parts.formatToParts(new Date(iso)).map(({ type, value }) => [type, value]));
+export function publishedLabel(iso: string, lang: Lang) {
+  const p = Object.fromEntries(parts(lang).formatToParts(new Date(iso)).map(({ type, value }) => [type, value]));
   return `${p.day} ${p.month} ${p.year} ${p.hour}:${p.minute}`;
 }
 
-export function statsOf(kitchens: KitchenCompleteness[]): Stat[] {
+export function statsOf(t: T, lang: Lang, kitchens: KitchenCompleteness[]): Stat[] {
   const fix = kitchens.reduce((n, k) => n + k.issues.fix, 0);
   const last = kitchens.flatMap((k) => k.lastPublish ?? []).sort((a, b) => b.at.localeCompare(a.at))[0];
   const average = kitchens.length ? Math.round(kitchens.reduce((n, k) => n + k.percent, 0) / kitchens.length) : 0;
   return [
-    { icon: Building2, label: "Dapur terhubung", value: `${kitchens.filter((k) => k.sent > 0).length} / ${kitchens.length}` },
-    { icon: Gauge, label: "Kelengkapan rata-rata", value: `${average}%` },
-    { icon: CircleX, label: "Wajib diperbaiki", value: String(fix), valueClass: fix ? "text-red-500" : undefined },
-    { icon: CircleCheck, label: "Publish terakhir", value: last ? `${new Date(`${last.at}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })} · ${last.label}` : "—" },
+    { icon: Building2, label: t("Dapur terhubung"), value: `${kitchens.filter((k) => k.sent > 0).length} / ${kitchens.length}` },
+    { icon: Gauge, label: t("Kelengkapan rata-rata"), value: `${average}%` },
+    { icon: CircleX, label: t("Wajib diperbaiki"), value: String(fix), valueClass: fix ? "text-red-500" : undefined },
+    { icon: CircleCheck, label: t("Publish terakhir"), value: last ? `${new Date(`${last.at}T00:00:00`).toLocaleDateString(dateLocale(lang), { day: "2-digit", month: "short" })} · ${t(last.label)}` : "—" },
   ];
 }
