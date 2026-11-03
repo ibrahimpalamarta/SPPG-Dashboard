@@ -17,9 +17,9 @@ export async function TopMenu({ menus }: { menus: MenuKpi["topMenus"] }) {
         {t("Top 5 Menu")}
       </h3>
       {menus.length === 0 ? (
-        <p className="mt-6 text-sm text-slate-500">{t("Belum ada data menu yang dipublish.")}</p>
+        <p className="mt-6 flex min-h-32 flex-1 items-center justify-center text-center text-sm text-slate-500">{t("Belum ada data menu yang dipublish.")}</p>
       ) : (
-        <ol className="mt-6 flex flex-col gap-4">
+        <ol className="mt-6 flex flex-1 flex-col gap-4">
           {menus.map(({ name, kitchens, days }, index) => (
             <li key={name} className="grid grid-cols-[20px_1fr_auto] items-center gap-3">
               <span className="text-sm text-slate-500">{index + 1}</span>
