@@ -8,18 +8,21 @@ import { ExpenseBreakdown, TopSuppliers } from "@/components/finance/supplier-ex
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PeriodFilter } from "@/components/ui/period-filter";
+import { KitchenFilter } from "@/components/overview/kitchen-filter";
 import { getT } from "@/lib/lang-server";
 import { requirePage } from "@/lib/guard";
 import { financeKpi, mixSlices, rpFull } from "@/lib/kpi";
-import { kpiQuery, resolvePeriod, type PeriodParams } from "@/lib/overview-filter";
+import { kpiQuery, resolvePeriod, resolveScope, type PeriodParams } from "@/lib/overview-filter";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: `${(await getT())("Finance & Cost")} · SPPG Internal` };
 }
 
-export default async function FinancePage({ searchParams }: { searchParams: Promise<PeriodParams> }) {
-  const [, t] = await Promise.all([requirePage("/finance"), getT()]);
-  const finance = await financeKpi(kpiQuery(resolvePeriod(await searchParams)));
+export default async function FinancePage({ searchParams }: { searchParams: Promise<PeriodParams & { dapur?: string }> }) {
+  const [me, t] = await Promise.all([requirePage("/finance"), getT()]);
+  const params = await searchParams;
+  const scope = resolveScope(me.kitchens, params.dapur);
+  const finance = await financeKpi(kpiQuery(resolvePeriod(params), scope));
   if (!finance) {
     return (
       <EmptyState title={t("Tidak ada akses")}>
@@ -33,7 +36,10 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       <Card className="space-y-5 p-6 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Finance & Cost")}</h1>
-          <PeriodFilter />
+          <div className="flex flex-wrap items-center gap-3">
+            <KitchenFilter kitchens={me.kitchens} selected={scope.value} />
+            <PeriodFilter />
+          </div>
         </div>
 
         <StatStrip spend={finance.spend} />
