@@ -10,7 +10,7 @@ export function ExpenseDonut({ slices, total }: { slices: Slice[]; total: number
     <div className="flex flex-col items-center gap-6 sm:flex-row">
       <div className="sweep flex size-40 shrink-0 items-center justify-center rounded-full" style={{ background: donutGradient(slices) }}>
         <div className="flex size-24 flex-col items-center justify-center rounded-full bg-white">
-          <strong className="text-xl text-slate-900">{rp(total)}</strong>
+          <strong className="text-xl text-slate-900">{slices.length ? rp(total) : "-"}</strong>
           <span className="text-xs text-slate-500">total keluar</span>
         </div>
       </div>

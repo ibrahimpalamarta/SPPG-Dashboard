@@ -25,8 +25,8 @@ export type MenuKpi = {
 };
 
 /** Finance KPIs are cost-cleared: a role without clearance gets null, not an error page. */
-export async function financeKpi(): Promise<FinanceKpi | null> {
-  const res = await apiSend("/kpi/finance", "GET");
+export async function financeKpi(query = ""): Promise<FinanceKpi | null> {
+  const res = await apiSend(`/kpi/finance${query}`, "GET");
   if (res.status === 403) return null;
   if (!res.ok) throw new Error(`GET /kpi/finance → ${res.status}`);
   return res.data as unknown as FinanceKpi;
@@ -64,11 +64,9 @@ export const rpFull = (n: number) => `Rp${full.format(n)}`;
 export const pct = (share: number) => percent.format(share);
 export const dateLabel = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 
-/** Spend of the current calendar month (Jakarta) from the published daily series; `days` is how many days have spend. */
-export function monthSpend(k: FinanceKpi) {
-  const month = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }).slice(0, 7);
-  const rows = k.daily.filter(({ date }) => date.startsWith(month));
-  return { total: rows.reduce((n, { amount }) => n + amount, 0), days: rows.length };
+/** Spend of the requested period from the published daily series (the backend already bounded it); `days` is how many days have spend. */
+export function periodSpend(k: FinanceKpi) {
+  return { total: k.daily.reduce((n, { amount }) => n + amount, 0), days: k.daily.length };
 }
 
 /** Donut colours for the expense mix, in rank order; the unmapped slice is always slate. */

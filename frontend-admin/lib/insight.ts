@@ -1,4 +1,4 @@
-import { dateLabel, monthSpend, pct, rp, type FinanceKpi, type KitchenCompleteness, type MenuKpi } from "@/lib/kpi";
+import { dateLabel, periodSpend, pct, rp, type FinanceKpi, type KitchenCompleteness, type MenuKpi } from "@/lib/kpi";
 
 /**
  * SCRUM-158/149: an insight is one or two sentences, finding first with its
@@ -48,10 +48,11 @@ export function efiInsight(finance: FinanceKpi): string {
   return `Transfer EFI terakhir ${rp(latest.amount)} pada ${dateLabel(latest.date)}, setara ${latest.amount < perDay ? "kurang dari 1" : Math.floor(latest.amount / perDay)} hari belanja (rata-rata ${rp(perDay)}/hari). Pantau jadwal transfer berikutnya agar dana tetap tersedia.`;
 }
 
-export function monthSpendInsight(finance: FinanceKpi): string {
-  const { total, days } = monthSpend(finance);
-  if (!days) return "Belum ada data pengeluaran bulan ini yang dipublish. Unggah dan publish data belanja bulan ini agar pengeluaran bisa dipantau.";
-  return `Pengeluaran bulan ini ${rp(total)} dalam ${days} hari belanja (rata-rata ${rp(total / days)}/hari). Pantau belanja harian agar tetap terkendali.`;
+export function periodSpendInsight(finance: FinanceKpi, period: string): string {
+  const { total, days } = periodSpend(finance);
+  const when = period.toLowerCase();
+  if (!days) return `Belum ada data pengeluaran ${when} yang dipublish. Unggah dan publish data belanja ${when} agar pengeluaran bisa dipantau.`;
+  return `Pengeluaran ${when} ${rp(total)} dalam ${days} hari belanja (rata-rata ${rp(total / days)}/hari). Pantau belanja harian agar tetap terkendali.`;
 }
 
 export function portionsInsight(portions: NonNullable<MenuKpi["portions"]>): string {
