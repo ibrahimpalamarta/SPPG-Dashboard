@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { UploadDomain } from '@prisma/client';
+import type { SourceSystem, UploadDomain } from '@prisma/client';
 import { parseToStaging } from './pipeline.js';
 import { InMemoryStagingRepository } from './staging.js';
 
@@ -12,14 +12,14 @@ export const fixture = (name: 'sukun-cashflow.csv' | 'sukun-menu.csv') =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
 
 /** A file run through the real pipeline, as the upload controller would. */
-export async function staged(file: Buffer, domain: UploadDomain, kitchenCode = 'SKN') {
+export async function staged(file: Buffer, domain: UploadDomain, kitchenCode = 'SKN', sourceSystem: SourceSystem = 'INTERNAL') {
   const out = await parseToStaging(
     file,
     {
       uploadBatchId: 'b-1',
       kitchenCode,
       domain,
-      sourceSystem: 'INTERNAL',
+      sourceSystem,
       sourceFileName: `${domain}.csv`,
       fileHash: 'abcdef1234567890',
       loadedAt: new Date('2026-10-26T00:00:00Z'),

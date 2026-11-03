@@ -130,3 +130,17 @@ describe('anti-double-count (SCRUM-41, DQ PRD §7.4)', () => {
     assert.equal(mapping?.issueCounts.TOTAL_INCONSISTENT, 1);
   });
 });
+
+describe('WEB_MANUAL quick entry (SCRUM-75/108)', () => {
+  test('reads through its own profile and raises no Ringkasan_Transaksi issue', async () => {
+    const out = await staged(
+      withRows('sukun-cashflow.csv', ['1,TXN-BM1,05/03/2026,BELANJA,KELUAR,Bahan Baku,Uraian,Ayam,Supplier A,1,kg,Rp40.000,Rp40.000,Rp40.000,,TERKONFIRMASI,']),
+      'CASHFLOW',
+      'SKN',
+      'WEB_MANUAL',
+    );
+    assert.ok(out.detection.ok && out.detection.profile.id === 'MAP-SKN-CFM-001');
+    assert.deepEqual(out.mapping?.issues, []);
+    assert.equal(out.mapping?.totals.KELUAR, 40000);
+  });
+});

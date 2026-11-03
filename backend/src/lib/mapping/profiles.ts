@@ -101,6 +101,17 @@ export const PROFILES: MappingProfile[] = [
     columns: CASHFLOW_COLUMNS,
     apply: applySukunCashflow,
   },
+  // SCRUM-75/108: the web quick entry writes the same columns as the template, so it reads through the same adapter.
+  ...(['SKN', 'LWG'] as const).map((kitchenCode): MappingProfile => ({
+    id: `MAP-${kitchenCode}-CFM-001`,
+    version: '1',
+    status: 'DRAFT',
+    kitchenCode,
+    domain: 'CASHFLOW',
+    sourceSystem: 'WEB_MANUAL',
+    columns: CASHFLOW_COLUMNS,
+    apply: applySukunCashflow,
+  })),
   {
     id: 'MAP-SKN-MENU-001',
     version: '1',

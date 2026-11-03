@@ -124,4 +124,24 @@ test.describe.serial('Unggah Data: unggah file', () => {
     // Without the override this file is "Format berbeda".
     await expect(result(page).getByText('Perlu dicek')).toBeVisible();
   });
+
+  test('[SCRUM-75][SCRUM-108] entri manual satu transaksi lewat form, masuk sebagai batch WEB_MANUAL dan dipublish sendiri @smoke', async ({ page }) => {
+    await page.goto('unggah-data');
+    await page.getByText('Tidak punya file? Isi satu transaksi secara manual').click();
+    const form = page.locator('form', { hasText: 'Entri manual hanya cadangan.' });
+    await form.getByLabel('Tanggal').fill('2026-03-05');
+    await form.getByLabel('Kategori').fill('Bahan Baku');
+    await form.getByLabel('Uraian').fill('Pembelian ayam');
+    await form.getByRole('textbox', { name: 'Penerima', exact: true }).fill('Supplier A');
+    await form.getByLabel('Nama barang', { exact: true }).fill('Ayam');
+    await form.getByLabel('Jumlah', { exact: true }).fill('2');
+    await form.getByLabel('Satuan', { exact: true }).fill('kg');
+    await form.getByLabel('Harga satuan', { exact: true }).fill('40000');
+    await shot(form, 'SCRUM-108', 1, 'form-entri-manual-terisi');
+    await form.getByRole('button', { name: 'Simpan entri' }).click();
+    await expect(form.getByText('Entri dipublish.')).toBeVisible();
+    await shot(form, 'SCRUM-108', 2, 'entri-dipublish');
+    await page.goto('mapping-validasi');
+    await expect(page.getByRole('row', { name: /entri-manual-TXN-BM/ })).toBeVisible();
+  });
 });

@@ -119,3 +119,48 @@ export async function uploadFile(_prev: UploadResult | null, form: FormData): Pr
     warning: body.warning?.message,
   };
 }
+
+/** SCRUM-75/108: code letter per type (SCRUM-160) and whether money comes in or goes out. */
+const MANUAL_TYPES = { BELANJA: ["B", "KELUAR"], PENGGAJIAN: ["G", "KELUAR"], INSENTIF: ["I", "KELUAR"], PENERIMAAN: ["P", "MASUK"] } as const;
+const MANUAL_HEADER = "id,txn_id,tanggal,tipe,arah,kategori,uraian,nama_barang,nama_penerima,qty,satuan,harga_satuan,jumlah_baris,total,confidence,status_review,catatan_review";
+const csvCell = (v: string | number) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+
+/**
+ * Controlled fallback when a file is not possible: the form becomes the same CSV the template would hold and goes
+ * through the ordinary upload (WEB_MANUAL source), so validation, dapur scope and publish are the upload's own.
+ * It always makes a new batch, never overwrites one.
+ */
+export async function submitManualEntry(_prev: UploadResult | null, form: FormData): Promise<UploadResult> {
+  const t = await getT();
+  const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(form.get("date") ?? ""));
+  const type = String(form.get("type") ?? "") as keyof typeof MANUAL_TYPES;
+  const text = (name: string) => String(form.get(name) ?? "").trim();
+  const qtys = form.getAll("qty");
+  const units = form.getAll("unit");
+  const prices = form.getAll("price");
+  const lines = form
+    .getAll("item")
+    .map((name, i) => ({ name: String(name).trim(), qty: Number(qtys[i]), unit: String(units[i] ?? "").trim(), price: Number(prices[i]) }))
+    .filter((l) => l.name);
+  if (!date || !(type in MANUAL_TYPES) || !text("category") || !text("description") || !text("counterparty") || lines.length === 0 || lines.some((l) => !(l.qty > 0) || !(l.price >= 0))) {
+    return { ok: false, message: t("Lengkapi tanggal, jenis, kategori, uraian, penerima, dan minimal satu barang dengan jumlah dan harga.") };
+  }
+
+  const [prefix, direction] = MANUAL_TYPES[type];
+  const txnId = `TXN-${prefix}M${Date.now().toString(36).toUpperCase()}`;
+  const amounts = lines.map((l) => Math.round(l.qty * l.price));
+  const total = amounts.reduce((a, b) => a + b, 0);
+  const csv = [
+    MANUAL_HEADER,
+    ...lines.map((l, i) =>
+      [i + 1, txnId, `${date[3]}/${date[2]}/${date[1]}`, type, direction, text("category"), text("description"), l.name, text("counterparty"), l.qty, l.unit, l.price, amounts[i], total, "", "TERKONFIRMASI", ""].map(csvCell).join(","),
+    ),
+  ].join("\n");
+
+  const upload = new FormData();
+  upload.set("file", new File([csv], `entri-manual-${txnId}.csv`, { type: "text/csv" }));
+  upload.set("kitchenId", text("kitchenId"));
+  upload.set("domain", "CASHFLOW");
+  upload.set("sourceSystem", "WEB_MANUAL");
+  return uploadFile(null, upload);
+}
