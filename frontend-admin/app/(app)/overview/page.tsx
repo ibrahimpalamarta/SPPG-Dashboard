@@ -11,13 +11,20 @@ import { financeKpi, mixSlices, type KitchenCompleteness, type MenuKpi } from "@
 
 export const metadata: Metadata = { title: "Overview · SPPG Internal" };
 
-export default async function OverviewPage() {
+export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ dapur?: string }> }) {
   const me = await requirePage("/overview");
+  // Only a dapur in the caller's own list counts; anything else falls back to "Semua Dapur" (the backend re-checks scope).
+  const { dapur } = await searchParams;
+  const kitchenId = me.kitchens.find((k) => k.id === dapur)?.id ?? "";
   // SCRUM-97..116: published data only; finance is null for roles without cost clearance.
-  const [finance, menu, completeness] = await Promise.all([financeKpi(), apiGet<MenuKpi>("/kpi/menu"), apiGet<{ kitchens: KitchenCompleteness[] }>("/kpi/completeness")]);
+  const [finance, menu, completeness] = await Promise.all([
+    financeKpi(kitchenId),
+    apiGet<MenuKpi>(`/kpi/menu${kitchenId && `?kitchenId=${kitchenId}`}`),
+    apiGet<{ kitchens: KitchenCompleteness[] }>("/kpi/completeness"),
+  ]);
   return (
     <div className="mx-auto max-w-400 space-y-5">
-      <WelcomeCard name={me.fullName ?? me.email ?? "Pengguna"} finance={finance} menu={menu} />
+      <WelcomeCard name={me.fullName ?? me.email ?? "Pengguna"} kitchens={me.kitchens} kitchenId={kitchenId} finance={finance} menu={menu} />
       {finance && (
         <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <TopSuppliers suppliers={finance.topSuppliers} insight={supplierInsight(finance)} />

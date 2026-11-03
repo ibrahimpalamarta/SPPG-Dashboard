@@ -25,8 +25,8 @@ export type MenuKpi = {
 };
 
 /** Finance KPIs are cost-cleared: a role without clearance gets null, not an error page. */
-export async function financeKpi(): Promise<FinanceKpi | null> {
-  const res = await apiSend("/kpi/finance", "GET");
+export async function financeKpi(kitchenId = ""): Promise<FinanceKpi | null> {
+  const res = await apiSend(`/kpi/finance${kitchenId && `?kitchenId=${kitchenId}`}`, "GET");
   if (res.status === 403) return null;
   if (!res.ok) throw new Error(`GET /kpi/finance → ${res.status}`);
   return res.data as unknown as FinanceKpi;

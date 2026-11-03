@@ -1,9 +1,11 @@
-import { CircleDollarSign, RefreshCw, Users, Warehouse, WalletCards } from "lucide-react";
+import { CircleDollarSign, RefreshCw, Users, WalletCards } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PeriodFilter } from "@/components/ui/period-filter";
+import { KitchenFilter } from "@/components/overview/kitchen-filter";
 import { StatCard, type Stat } from "@/components/overview/stat-card";
 import { efiInsight, monthSpendInsight, portionsInsight, runwayInsight } from "@/lib/insight";
 import { dateLabel, monthSpend, rp, type FinanceKpi, type MenuKpi } from "@/lib/kpi";
+import type { Kitchen } from "@/lib/me";
 
 const count = new Intl.NumberFormat("id-ID");
 
@@ -51,18 +53,14 @@ function stats(finance: FinanceKpi | null, menu: MenuKpi): Stat[] {
   return out;
 }
 
-export function WelcomeCard({ name, finance, menu }: { name: string; finance: FinanceKpi | null; menu: MenuKpi }) {
+export function WelcomeCard({ name, kitchens, kitchenId, finance, menu }: { name: string; kitchens: Kitchen[]; kitchenId: string; finance: FinanceKpi | null; menu: MenuKpi }) {
   const items = stats(finance, menu);
   return (
     <Card className="p-6 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Selamat Datang, {name}!</h1>
-        {/* Hardcoded until the dapur and period filters are wired to data. */}
         <div className="flex flex-wrap items-center gap-3">
-          <span className="flex h-10 items-center gap-2.5 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-800">
-            <Warehouse className="size-4 text-slate-600" aria-hidden="true" />
-            SPPG Sukun Kebonsari 2
-          </span>
+          <KitchenFilter kitchens={kitchens} selected={kitchenId} />
           <PeriodFilter />
         </div>
       </div>
