@@ -45,7 +45,7 @@ export function LoginForm({ returnTo, notice }: { returnTo?: string; notice?: st
             </div>
             <div className="relative">
               <Lock className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-              <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Masukkan kata sandi" className={`${input} px-11`} />
+              <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" required placeholder="Masukkan kata sandi" className={`${input} px-11`} />
               <button type="button" onClick={() => setShowPassword((shown) => !shown)} className="absolute right-3 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}>
                 {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
               </button>
