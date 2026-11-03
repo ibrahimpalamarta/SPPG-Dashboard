@@ -64,6 +64,18 @@ describe('gate', () => {
     });
   });
 
+  it('[QA-GATE] test membuktikan requirement lewat ref SCRUM, bukan lewat ref requirement lain', () => {
+    const v = run({
+      requirements: [{ ...req('AC-UP-02'), refs: ['SCRUM-35'] }, { ...req('P1-033'), refs: ['P1-001'] }, { ...req('P1-001'), refs: [] }],
+      tests: [tc('[P1-001][SCRUM-35] ok', 'passed')],
+    });
+    expect(Object.fromEntries(v.requirements.map((r) => [r.id, r.status]))).toEqual({
+      'AC-UP-02': 'Lulus',
+      'P1-033': 'Belum ada test',
+      'P1-001': 'Lulus',
+    });
+  });
+
   it('[QA-GATE] fitur belum ada jadi Blocker setelah tanggal target', () => {
     const input = { requirements: [req('AC-PUB-01')], tests: [tc('[AC-PUB-01] publish', 'fixme')] };
     expect(run({ ...input, on: '2026-11-14' }).verdict).toBe('pass');

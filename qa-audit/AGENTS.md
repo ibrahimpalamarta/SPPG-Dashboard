@@ -9,7 +9,7 @@ Panduan untuk agen AI yang bekerja di `qa-audit/`. Baca juga [README.md](README.
   (status tiket SCRUM dan decision log aplikasi D-xx). Tiap folder punya lockfile sendiri.
 - Alur branch: `feature/*`/`fix/*` → PR ke `develop` → `staging` → `main`. Jangan push ke
   `develop`, `staging`, atau `main`. Commit kecil, present tense.
-- Requirement: PRD SPPG Internal Dashboard v0.1 (Drive `1kBwyixbJadujNz0pT1dfJCZ6LIMwJXgbdw5TW0KJqpc`).
+- Requirement: kutipan AC di `requirements.json` masih dari PRD v0.1 (Drive `1kBwyixbJadujNz0pT1dfJCZ6LIMwJXgbdw5TW0KJqpc`); produk sudah PRD v4 (roadmap O-18).
 
 ## Tujuan service
 Satu verdict per run (aman di-merge atau tidak) plus bukti: code audit, logic test, E2E, UI/UX,
@@ -39,10 +39,11 @@ reports/ .auth/ .pg/ hasil run, sesi login, data Postgres — gitignored
 
 ## Konvensi
 - Judul test: `[ID] deskripsi @tag`; ID dari PRD (AC-*, P1-0xx, OD-xx, ERR-xx) atau Jira (SCRUM-xx).
-  Hanya ID yang benar-benar dibuktikan test itu.
+  Hanya ID yang benar-benar dibuktikan test itu. Requirement dibuktikan oleh ID-nya sendiri atau oleh
+  ref `SCRUM-xx` di `requirements.json` (QD-43); ref P1-/AC-/OD- tidak dihitung.
 - Tag: smoke, rbac, pii, kpi, a11y, visual, responsive, demo, uat, lawang, quarantine
   (arti di [docs/konfigurasi.md](docs/konfigurasi.md)).
-- Role lewat storageState: `management`, `finance`, `kepala-kitchen-skn`, `data-steward`.
+- Role lewat storageState: `admin`, `data-operasional-skn`, `data-operasional-lwg` (`tests/e2e/roles.ts`).
 - Selector: role/label dulu; `data-testid` hanya yang ada di [docs/data-testid.md](docs/data-testid.md).
 - Navigasi relatif (`page.goto('finance')`) karena basePath `/admin`.
 - Bahasa severity: Blocker, Warning, Info.

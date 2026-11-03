@@ -13,7 +13,7 @@ npm run audit                               # enam tahap, hasil di reports/score
 |---|---|
 | 0 CI build | Hanya di CI: backend build + test, build frontend-public, terraform fmt/validate (dulu `ci.yml`) |
 | 1 Code audit | tsc (backend, frontend-admin), ESLint + jsx-a11y + useEffect, knip (frontend-admin), Semgrep, gitleaks. Blocker → tahap 2–5 dilewati |
-| 2 Logic test | Vitest: aturan DQ, adapter, rumus KPI |
+| 2 Logic test | Vitest: gate qa-audit sendiri, plus aturan PRD (AC-DQ, AC-DASH) pada fungsi murni backend (`prd-rules.test.ts`) |
 | 3 Environment | Postgres embedded, migrate, seed akun per role, build, start |
 | 4 Feature E2E | Playwright: RBAC, PII, alur upload → dashboard, axe |
 | 5 UI/UX | Visual, Lighthouse (fase 3) |

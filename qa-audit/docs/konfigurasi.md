@@ -49,14 +49,12 @@ Dibuat `scripts/seed-qa.ts`, email `qa.<key>@qa-audit.test`. Peta role PRD → r
 
 | Key / storageState | Role PRD | Role kode | Kitchen scope |
 |---|---|---|---|
-| `management` | Management (COO/Head of MBG) | `MANAGEMENT` | semua |
-| `finance` | Finance | `FINANCE` | semua |
-| `kepala-kitchen-skn` | Kepala Kitchen Sukun | `KEPALA_KITCHEN` | SKN |
-| `data-steward` | Data Steward pusat | `DATA_STEWARD` | semua |
-| `pm` | Super Admin / PM MBG (QD-39) | `SUPER_ADMIN` | semua |
+| `admin` | Admin (dulu PM MBG; SCRUM-148/152) | `ADMIN` | semua |
+| `data-operasional-skn` | Data Operasional Sukun | `DATA_ADMIN` | SKN |
+| `data-operasional-lwg` | Data Operasional Lawang (sisi lain tes isolasi, QD-44) | `DATA_ADMIN` | LWG |
 
 Login dilakukan sekali per role oleh project `setup` (`tests/e2e/auth.setup.ts`), disimpan ke
-`.auth/<key>.json`; test memakai `test.use({ storageState: storageState('finance') })`.
+`.auth/<key>.json`; test memakai `test.use({ storageState: storageState('admin') })`.
 Akun QA tanpa MFA (`MFA_REQUIRED_ROLES` kosong di environment QA, QD-10).
 
 ## Fixture (fase 2)
