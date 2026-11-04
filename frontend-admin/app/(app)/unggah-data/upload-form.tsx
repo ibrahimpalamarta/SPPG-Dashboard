@@ -28,6 +28,23 @@ const DOMAIN_OPTIONS = [
   { value: "GOODS_RECEIPT", label: "Penerimaan Barang" },
 ];
 
+// Words in a file name that give away its domain, e.g. "03_master_menu.xlsx" or "CASHFLOW_SUKUN - Transaksi_Kas.csv".
+const DOMAIN_WORDS: [string, RegExp][] = [
+  ["INPUT_MAKER", /\binput maker\b|\binputmaker\b/],
+  ["GOODS_RECEIPT", /\bpenerimaan\b|\breceipt\b|\bgr\b/],
+  ["VENDOR_PAYMENT", /\bpembayaran\b|\bpayment\b/],
+  ["PO", /\bpo\b|\bpurchase order\b/],
+  ["RAB", /\brab\b/],
+  ["MENU", /\bmenu\b/],
+  ["CASHFLOW", /\bcashflow\b|\bkas\b|\btransaksi\b/],
+];
+
+/** The domain a file name points to, or null when it says nothing (the picked one then stays). */
+const detectDomain = (fileName: string) => {
+  const name = fileName.toLowerCase().replace(/\.[a-z]+$/, "").replace(/[^a-z0-9]+/g, " ");
+  return DOMAIN_WORDS.find(([, re]) => re.test(name))?.[0] ?? null;
+};
+
 const LABEL_TONE: Record<string, string> = {
   "Wajib diperbaiki": "border-red-200 bg-red-50 text-red-700",
   "Perlu dicek": "border-amber-200 bg-amber-50 text-amber-700",
@@ -409,7 +426,10 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
             // A new pick hides the previous upload's result.
             setRetry(true);
             resetMapping();
-            runCheck({ columnMap: "" });
+            // The domain follows the file name; the check must read it with that domain, the state has not flushed yet.
+            const detected = picked ? detectDomain(picked.name) : null;
+            if (detected) setDomain(detected);
+            runCheck({ columnMap: "", ...(detected && { domain: detected }) });
           }}
         />
         {file ? (

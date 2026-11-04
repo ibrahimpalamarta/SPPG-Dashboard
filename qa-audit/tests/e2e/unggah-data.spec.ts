@@ -129,6 +129,16 @@ test.describe.serial('Unggah Data: unggah file', () => {
     await expect(result(page).getByText(heldOrPublished)).toBeVisible();
   });
 
+  test('jenis data dikenali dari nama file, tanpa dipilih manual @smoke', async ({ page }) => {
+    await page.goto('unggah-data');
+    await page.locator('input[type=file]').setInputFiles({ name: '03_master_menu.csv', mimeType: 'text/csv', buffer: menu });
+    await expect(jenisData(page)).toHaveText('Master Menu');
+    await expect(page.getByRole('button', { name: 'Validasi Data' })).toBeEnabled();
+    await page.locator('input[type=file]').setInputFiles({ name: 'CASHFLOW_SUKUN - Transaksi_Kas.csv', mimeType: 'text/csv', buffer: cashflow });
+    await expect(jenisData(page)).toHaveText('Cashflow');
+    await expect(page.getByRole('button', { name: 'Validasi Data' })).toBeEnabled();
+  });
+
   test('Validasi Data: isi file tampil di tabel yang bisa diedit, tambah dan hapus baris @smoke', async ({ page }) => {
     await pick(page, 'Master Menu', 'menu-edit.csv', menu);
     await page.getByRole('button', { name: 'Validasi Data' }).click();
