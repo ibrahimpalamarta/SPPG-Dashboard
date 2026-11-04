@@ -75,6 +75,7 @@ module "app" {
   db_tier         = "db-custom-1-3840"
   db_availability = "REGIONAL"
 
+  email_from    = "zerostuntingteam@gmail.com"
   smtp_url      = var.smtp_url
   ai_api_key    = var.ai_api_key
   public_db_url = var.public_db_url

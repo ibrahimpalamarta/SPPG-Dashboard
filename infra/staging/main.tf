@@ -63,7 +63,7 @@ module "app" {
   db_deletion_protection = false
   db_stop_overnight      = true
 
-  email_from = "ibrahimpalamarta@gmail.com"
+  email_from = "zerostuntingteam@gmail.com"
   smtp_url   = var.smtp_url
   ai_api_key = var.ai_api_key
 }

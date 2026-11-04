@@ -54,7 +54,7 @@ Prasyarat: `gcloud` dan Terraform ≥ 1.6, akun dengan role **Owner** di project
    | `GCP_DEPLOY_SA` | variable | output `deploy_service_accounts[<env>]` |
    | `TF_STATE_BUCKET` | variable | output `tf_state_bucket` |
    | `AI_API_KEY` | secret | Kunci Gemini (`AQ.…`). Kosong = cek AI upload dilewati |
-   | `SMTP_URL` | secret | mis. `smtps://user%40gmail.com:app-password@smtp.gmail.com:465`. Kosong = email tidak dikirim |
+   | `SMTP_URL` | secret | Gmail tim: `smtps://zerostuntingteam%40gmail.com:<APP_PASSWORD>@smtp.gmail.com:465`. App password dibuat di akun Google tersebut (butuh verifikasi 2 langkah aktif; Akun Google → Keamanan → Sandi aplikasi). Kosong = email tidak dikirim |
    | `DATABASE_URL_PUBLIC` | secret | **production saja, wajib**: `postgresql://sppg_public:<pw>@localhost/sppg_dashboard?host=/cloudsql/<connection name>` (role dari `npm run grant:public-role`) |
 
    Variable/secret AWS lama (`AWS_ROLE_ARN`, `AWS_REGION`, `TF_LOCK_TABLE`) boleh dihapus. Dua aturan manual, **bukan** Terraform:
