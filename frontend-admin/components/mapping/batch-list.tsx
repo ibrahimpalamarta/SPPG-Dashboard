@@ -34,7 +34,7 @@ const DEV_TOOLS = process.env.NODE_ENV !== "production" || process.env.ALLOW_DEV
  * no filters, and its pages stay on Unggah Data. Development mode (a switch in the header, kept in a cookie) adds Hapus per row
  * and Hapus semua file, which also remove PUBLISHED batches so testing can restart from an empty Overview.
  */
-export async function BatchList({ page, canDelete, compact = false, filters = {}, kitchens = [] }: { page: number; canDelete: boolean; compact?: boolean; filters?: BatchFilters; kitchens?: Kitchen[] }) {
+export async function BatchList({ page, canDelete, compact = false, title = "Upload History", filters = {}, kitchens = [] }: { page: number; canDelete: boolean; compact?: boolean; title?: string; filters?: BatchFilters; kitchens?: Kitchen[] }) {
   const [t, lang] = await Promise.all([getT(), getLang()]);
   const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(dateLocale(lang), { dateStyle: "medium", timeStyle: "short" }) : "—");
   const base = compact ? "/unggah-data" : "/mapping-validasi";
@@ -52,7 +52,7 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
           <h2 className="text-xl font-bold tracking-tight text-slate-900">{t("Upload History")}</h2>
         ) : (
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("Upload History")}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t(title)}</h1>
           </div>
         )}
         <div className="flex flex-wrap items-center gap-4">
@@ -131,7 +131,7 @@ export async function BatchList({ page, canDelete, compact = false, filters = {}
                         {t("Buka")}
                       </Link>
                     )}
-                    {compact && b.storageKey && (
+                    {(compact || !canDelete) && b.storageKey && (
                       <a href={`/unggah-data/batch/${b.id}/file`} aria-label={`${t("Export")} ${b.fileName}`} className={actionButton}>
                         <Download className="size-3.5" aria-hidden="true" />
                         {t("Export")}
