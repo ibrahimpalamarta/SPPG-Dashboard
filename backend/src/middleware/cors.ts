@@ -3,9 +3,9 @@ import type { RequestHandler } from 'express';
 import { env } from '../config/env.js';
 
 /**
- * In staging and production this is a no-op: both frontends sit behind the
- * same ALB, where `/api/*` is a listener rule rather than a separate origin,
- * so browser calls are same-origin already.
+ * In staging and production this is a no-op: frontend-admin calls this API
+ * from its server (API_BASE_URL), never from the browser, so no browser call
+ * is cross-origin.
  *
  * It exists for local development — Next.js on :3000 talking to this API on
  * :8080 is cross-origin and would otherwise fail preflight.

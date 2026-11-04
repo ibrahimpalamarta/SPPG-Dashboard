@@ -55,7 +55,7 @@ environment yang gagal menjadi `infra-error`, bukan kegagalan produk. Test non-s
 | `QA_S3_BUCKET`, `QA_S3_ROLE_ARN`, `AWS_REGION` | variable | publikasi scorecard ke S3 privat | ditunda (QD-20) |
 | `JIRA_*` | secret | sinkronisasi Jira | fase 5 |
 | `AI_API_KEY` | secret | Analisis AI (QD-30); wrapper meneruskan lewat `secrets: inherit` | aktif |
-| `AI_BASE_URL`, `AI_MODEL` | variable | endpoint OpenAI-compatible + model, mis. `https://openrouter.ai/api/v1` | aktif |
+| `AI_BASE_URL`, `AI_MODEL` | variable | opsional, override endpoint Gemini + model (default Vertex AI express, `gemini-3.8-flash`) | aktif |
 
 `GITHUB_TOKEN` cukup untuk komentar PR (`pull-requests: write`) dan, nanti, issue otomatis (`issues: write`).
 

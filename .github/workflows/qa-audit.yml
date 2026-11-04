@@ -98,7 +98,7 @@ jobs:
           ( (
             set -e
             terraform fmt -check -recursive infra
-            for dir in infra/backend-bootstrap infra/environments/staging infra/environments/production; do
+            for dir in infra/bootstrap infra/staging infra/production; do
               terraform -chdir="$dir" init -backend=false -input=false
               terraform -chdir="$dir" validate
             done

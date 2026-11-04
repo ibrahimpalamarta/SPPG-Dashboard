@@ -1,7 +1,7 @@
 name: Sync Staging from Develop
 
-# Fires right after staging scales down for the night (21:00 WIB = 14:00 UTC,
-# see infra/modules/scheduler), so develop's day of commits lands on staging
+# Fires right after staging's Cloud SQL stops for the night (21:00 WIB = 14:00 UTC,
+# see infra/modules/app), so develop's day of commits lands on staging
 # and gets deployed before the next working-hours window opens.
 on:
   schedule:

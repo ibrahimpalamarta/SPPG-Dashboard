@@ -7,7 +7,7 @@ import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated, type PageQuery } from '../../lib/pagination.js';
 import { kitchenScope, kitchenWhere } from '../../lib/scope.js';
-import { CSV_MIME, XLSX_MIME, deleteObject, getObject, putObject, type DeleteObject, type GetObject, type PutObject } from '../../lib/s3.js';
+import { CSV_MIME, XLSX_MIME, deleteObject, getObject, putObject, type DeleteObject, type GetObject, type PutObject } from '../../lib/storage.js';
 import { dateFilter } from '../../schemas/common.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import { trackEvent } from '../../lib/events.js';
@@ -222,7 +222,7 @@ export const deleteAllUploadBatches = (db: Db = prisma, remove: DeleteObject = d
 const PREVIEW_ROWS = 50;
 
 /**
- * The S3 key is built from the batch's public id, never from the original file
+ * The object key is built from the batch's public id, never from the original file
  * name (SCRUM-22 security note): one object per attempt, nothing user-supplied
  * in the path.
  */
@@ -265,7 +265,7 @@ const notRecognised = (diff: ColumnDiff[]) => {
  *
  * ponytail: synchronous within the request, like the rest of the repo; the
  * UPLOAD_MAX_BYTES cap (10 MB) keeps that bounded. Move to a queue if real
- * files start timing out the ALB.
+ * files start hitting the Cloud Run request timeout (300 s).
  */
 export const createUploadBatch =
   (db: Db = prisma, put: PutObject = putObject, staging: StagingRepository = new PrismaStagingRepository(prisma)): RequestHandler =>

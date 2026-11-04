@@ -7,7 +7,7 @@ import { prisma, type Db } from '../../db.js';
 import { sendError } from '../../middleware/error-handler.js';
 import { sendJson } from '../../lib/serialize.js';
 import { pageArgs, paginated } from '../../lib/pagination.js';
-import { putObject, type PutObject } from '../../lib/s3.js';
+import { putObject, type PutObject } from '../../lib/storage.js';
 import { writeAuditLog } from '../../auth/audit.js';
 import type {
   announcementCreate,
@@ -41,7 +41,7 @@ export interface CmsResource {
   hasCategory: boolean;
   /** Set for resources backed by an uploaded file (SCRUM-14 AC2). */
   file?: {
-    /** Accepted extensions, and the S3 prefix objects are written under. */
+    /** Accepted extensions, and the bucket prefix objects are written under. */
     extensions: readonly string[];
     prefix: string;
     /** cms_documents also records which of the three formats it received. */
@@ -253,7 +253,7 @@ export function deleteCms(resource: CmsResource, db: Db = prisma): RequestHandle
         entityId: id,
         metadata: { title: String(row[resource.titleField]) },
       });
-      // The S3 object behind storageKey is deliberately left in place: this
+      // The stored object behind storageKey is deliberately left in place: this
       // phase does not own the bucket lifecycle.
       res.status(204).end();
     } catch (err) {

@@ -10,8 +10,8 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(8080),
 
-  // Prisma reads DATABASE_URL. In ECS only the discrete DB_* pieces are
-  // injected (see infra/modules/compute), so we compose the URL below.
+  // Prisma reads DATABASE_URL (Cloud Run gets it from Secret Manager, see
+  // infra/modules/app). The discrete DB_* pieces are a local alternative.
   DATABASE_URL: z.string().min(1).optional(),
   DB_HOST: z.string().optional(),
   DB_PORT: z.coerce.number().int().positive().default(5432),
@@ -32,10 +32,9 @@ const schema = z.object({
   // Never set in the production environment.
   ALLOW_DEV_DELETE: z.enum(['true']).optional(),
 
-  // S3 assets bucket (Terraform output `bucket_name`). Credentials come from
-  // the ECS task role — the app configures nothing beyond bucket and region.
-  S3_BUCKET: z.string().min(1),
-  AWS_REGION: z.string().min(1).default('ap-southeast-3'),
+  // GCS assets bucket (Terraform output `assets_bucket_name`). Credentials come
+  // from the Cloud Run service account — the app configures only the name.
+  GCS_BUCKET: z.string().min(1),
 
   /** Upload ceiling. A menu workbook is a few hundred KB; 10 MB is slack, not a
    * target, and it is what stops an upload from becoming a memory lever. */
@@ -47,9 +46,9 @@ const schema = z.object({
   SESSION_ABSOLUTE_HOURS: z.coerce.number().int().positive().default(7 * 24),
 
   // Proxy hops in front of this API whose X-Forwarded-For is trusted. 1 = the
-  // ALB. The admin frontend relays logins and forwards the real client address,
-  // so when it reaches this API through the ALB too (client -> ALB -> frontend
-  // -> ALB -> API) set 2; otherwise every user shares the frontend's address
+  // Cloud Run front end. The admin frontend relays logins and forwards the real
+  // client address, so when it reaches this API through Cloud Run too
+  // (client -> GFE -> frontend -> GFE -> API) set 2; otherwise every user shares the frontend's address
   // and one person can exhaust the per-IP login limit for everyone.
   TRUST_PROXY_HOPS: z.coerce.number().int().min(1).max(5).default(1),
 
@@ -62,10 +61,12 @@ const schema = z.object({
 
   // Lifetime of a set/reset-password link.
   PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(60),
-  // Self-service "forgot password": the verified SES sender and the public URL
-  // of the admin frontend (including its /admin base path) the emailed link
-  // points at. Either unset = the endpoint still answers but sends nothing.
+  // Self-service "forgot password": the sender, the SMTP connection
+  // (smtps://user:pass@host:465, see lib/mailer.ts) and the public URL of the
+  // admin frontend (including its /admin base path) the emailed link points
+  // at. Any unset = the endpoint still answers but sends nothing.
   EMAIL_FROM: z.string().min(1).optional(),
+  SMTP_URL: z.string().url().optional(),
   ADMIN_BASE_URL: z.string().url().optional(),
   // SCRUM-121: lifetime of an invitation (set-password link of a new account).
   INVITE_TTL_HOURS: z.coerce.number().int().positive().default(72),
@@ -116,16 +117,18 @@ const schema = z.object({
   // "data Rencana disembunyikan" vs AC-DASH-01) is decided.
   KPI_PLANNED_COST: z.enum(['true']).optional(),
 
-  // SCRUM-150: OpenAI-compatible chat endpoint for the upload check (same
-  // variables as qa-audit's ai-review). No key or model = the check is skipped
-  // and uploads behave as before.
+  // SCRUM-150: Gemini generateContent for the upload check (same variables as
+  // qa-audit's ai-review). The default base is Vertex AI express mode (an
+  // `AQ.` key); a Google AI Studio key (`AIza…`) needs
+  // https://generativelanguage.googleapis.com/v1beta/models. No key = the
+  // check is skipped and uploads behave as before.
   AI_API_KEY: z.string().min(1).optional(),
-  AI_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
-  AI_MODEL: z.string().min(1).optional(),
+  AI_BASE_URL: z.string().url().default('https://aiplatform.googleapis.com/v1/publishers/google/models'),
+  AI_MODEL: z.string().min(1).default('gemini-3.8-flash'),
 });
 
 /**
- * `KEY=` in a .env file (and an unset ECS parameter) arrives as `""`, which is
+ * `KEY=` in a .env file (and an unset Cloud Run variable) arrives as `""`, which is
  * not the same as absent to zod: `.optional()` would reject it and `.default()`
  * would not fire. Treat blank as unset so a commented-out-looking line behaves
  * like one.
@@ -145,8 +148,7 @@ if (!env.DATABASE_URL) {
   const { DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD } = env;
   if (DB_HOST && DB_NAME && DB_USERNAME && DB_PASSWORD) {
     const auth = `${encodeURIComponent(DB_USERNAME)}:${encodeURIComponent(DB_PASSWORD)}`;
-    // sslmode=require: RDS is reachable only inside the VPC, but the hop is
-    // still encrypted.
+    // sslmode=require: a TCP hop to Postgres is always encrypted.
     process.env.DATABASE_URL = `postgresql://${auth}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require`;
   } else if (env.NODE_ENV !== 'test') {
     throw new Error('Set DATABASE_URL, or DB_HOST/DB_NAME/DB_USERNAME/DB_PASSWORD.');

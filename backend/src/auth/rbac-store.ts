@@ -12,7 +12,7 @@ const known =(p: string): p is Permission => (PERMISSIONS as readonly string[]).
  * What `role` may do right now. Cached per process for a few seconds because
  * every authenticated request asks.
  *
- * ponytail: with several ECS tasks a permission edit reaches the others within
+ * ponytail: with several Cloud Run instances a permission edit reaches the others within
  * TTL_MS, not instantly. Per-request reads (or pg NOTIFY) if that is too slow.
  */
 export async function permissionsFor(role: Role, db: Db, now = Date.now()): Promise<readonly Permission[]> {

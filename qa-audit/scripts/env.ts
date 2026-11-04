@@ -5,7 +5,7 @@
  *   serve  own Postgres + migrate + seed + both servers for the life of the run
  *   down   stop whatever `up` started
  *
- * Postgres is embedded-postgres (16.14, same as RDS) unless QA_DATABASE_URL
+ * Postgres is embedded-postgres (16.14, same as Cloud SQL) unless QA_DATABASE_URL
  * points at one you already run locally. Nothing here can reach production:
  * every URL goes through the guard first.
  */
@@ -58,10 +58,34 @@ function step(name: string, r: ReturnType<typeof run>) {
 
 let pg: EmbeddedPostgres | undefined;
 
-/** The backend only PUTs the original file to the assets bucket; this answers 200 and drops the body, so uploads work without AWS. */
-const s3 = createServer((req, res) => {
-  req.resume();
-  req.on('end', () => res.writeHead(200, { ETag: '"qa"' }).end());
+/** CRC32C (Castagnoli), base64 big-endian: the hash the GCS client checks an upload against. */
+const crc32c = (buf: Buffer) => {
+  let c = ~0;
+  for (const x of buf) {
+    c ^= x;
+    for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0x82f63b78 : c >>> 1;
+  }
+  const out = Buffer.alloc(4);
+  out.writeUInt32BE(~c >>> 0);
+  return out.toString('base64');
+};
+
+/**
+ * Stands in for GCS (STORAGE_EMULATOR_HOST), so uploads work without GCP. Drops
+ * what is written; an upload answers with the file part's CRC32C, because the
+ * client deletes and fails any upload whose hash it cannot confirm.
+ */
+const gcs = createServer((req, res) => {
+  const chunks: Buffer[] = [];
+  req.on('data', (c: Buffer) => chunks.push(c));
+  req.on('end', () => {
+    if (!req.url?.startsWith('/upload/')) return res.writeHead(200).end();
+    // multipart/related: JSON metadata part, then the file part.
+    const body = Buffer.concat(chunks);
+    const b = `--${req.headers['content-type']?.split('boundary=')[1]}`;
+    const file = body.subarray(body.indexOf('\r\n\r\n', body.indexOf(b, b.length)) + 4, body.lastIndexOf(`\r\n${b}--`));
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ crc32c: crc32c(file) }));
+  });
 });
 
 async function serve() {
@@ -93,7 +117,7 @@ async function serve() {
     dbUrl = `postgresql://postgres:postgres@localhost:${PORTS.db}/sppg_qa`;
   }
 
-  await new Promise<void>((r) => s3.listen(PORTS.s3, '127.0.0.1', r));
+  await new Promise<void>((r) => gcs.listen(PORTS.gcs, '127.0.0.1', r));
 
   // Generated per run: nothing to leak, nothing to rotate.
   const publicPassword = randomBytes(18).toString('base64url');
@@ -103,11 +127,9 @@ async function serve() {
     DATABASE_URL: dbUrl,
     DATABASE_URL_PUBLIC: dbUrl.replace(/\/\/[^@]+@/, `//sppg_public:${publicPassword}@`),
     PUBLIC_DB_PASSWORD: publicPassword,
-    S3_BUCKET: 'qa-audit-fake',
-    // An IP endpoint makes the SDK use path-style URLs; the keys are dummies for the stub above.
-    AWS_ENDPOINT_URL_S3: `http://127.0.0.1:${PORTS.s3}`,
-    AWS_ACCESS_KEY_ID: 'qa',
-    AWS_SECRET_ACCESS_KEY: 'qa',
+    GCS_BUCKET: 'qa-audit-fake',
+    // The emulator endpoint also turns off auth in the client; it hits the stub above.
+    STORAGE_EMULATOR_HOST: `http://127.0.0.1:${PORTS.gcs}`,
     MFA_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     MFA_REQUIRED_ROLES: '',
     // Every test logs in from the same IP; the per-IP limit would trip otherwise.
@@ -132,7 +154,7 @@ async function serve() {
   ];
   const stop = async (code: number) => {
     children.forEach((c) => c.kill());
-    s3.close();
+    gcs.close();
     await pg?.stop();
     process.exit(code);
   };

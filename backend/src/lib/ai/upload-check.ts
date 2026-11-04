@@ -26,15 +26,19 @@ Bahasa Indonesia.`;
 
 /** The model call, kept apart so tests can feed an answer without a network. */
 const askModel: Ask = async (system, prompt) => {
-  const res = await fetch(`${env.AI_BASE_URL.replace(/\/$/, '')}/chat/completions`, {
+  const res = await fetch(`${env.AI_BASE_URL.replace(/\/$/, '')}/${env.AI_MODEL}:generateContent`, {
     method: 'POST',
-    headers: { authorization: `Bearer ${env.AI_API_KEY}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ model: env.AI_MODEL, temperature: 0.1, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }),
+    headers: { 'x-goog-api-key': env.AI_API_KEY!, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+    }),
     signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const text = body.choices?.[0]?.message?.content?.trim();
+  const body = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('').trim();
   if (!text) throw new Error('empty response');
   return text;
 };
@@ -46,7 +50,7 @@ const askModel: Ask = async (system, prompt) => {
 export async function checkUpload(
   input: { columnDiff: ColumnDiff[]; issueCounts: Record<string, number> },
   ask: Ask = askModel,
-  enabled = Boolean(env.AI_API_KEY && env.AI_MODEL),
+  enabled = Boolean(env.AI_API_KEY),
 ): Promise<UploadAdvice | null> {
   const diff = input.columnDiff.filter((d) => d.missing.length || d.unexpected.length);
   const codes = Object.entries(input.issueCounts);

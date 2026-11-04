@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { env } from './config/env.js';
 
-// `error`/`warn` only: `query` logging would put row values into CloudWatch.
+// `error`/`warn` only: `query` logging would put row values into Cloud Logging.
 const log: ('warn' | 'error')[] = env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'];
 
 export const prisma = new PrismaClient({ log });

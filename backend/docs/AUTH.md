@@ -60,11 +60,10 @@ menjawab `401` yang sama.
 
 **Lupa kata sandi (mandiri)** — `POST /api/auth/forgot-password {email}` selalu
 menjawab `204` (tidak membocorkan ada/tidaknya akun). Akun `ACTIVE` yang sudah
-punya password dikirimi email SES berisi link `ADMIN_BASE_URL/reset-password/<token>`
+punya password dikirimi email (SMTP) berisi link `ADMIN_BASE_URL/reset-password/<token>`
 (token sama dengan reset admin: sekali pakai, `PASSWORD_RESET_TTL_MINUTES`,
-audit `auth.password.forgot`). `EMAIL_FROM` (identitas SES terverifikasi) dan
-`ADMIN_BASE_URL` harus diisi; kosong = tidak ada yang dikirim. Task role ECS
-butuh `ses:SendEmail`.
+audit `auth.password.forgot`). `EMAIL_FROM`, `SMTP_URL` (secret) dan
+`ADMIN_BASE_URL` harus diisi; kosong = tidak ada yang dikirim.
 
 **Pemulihan password oleh admin** — Super Admin
 membuat link sekali pakai: `POST /api/admin/users/:id/password-reset` →
@@ -168,14 +167,14 @@ Jangan pernah mengandalkan menu/tombol frontend sebagai satu-satunya pembatas.
 
 | Variabel | Keterangan |
 |---|---|
-| `MFA_ENCRYPTION_KEY` | **Secret, wajib.** `openssl rand -base64 32`. Mengubahnya mendaftar-ulang semua autentikator. Di ECS: Secrets Manager (dibuat Terraform) |
+| `MFA_ENCRYPTION_KEY` | **Secret, wajib.** `openssl rand -base64 32`. Mengubahnya mendaftar-ulang semua autentikator. Di Cloud Run: Secret Manager (dibuat Terraform) |
 | `MFA_REQUIRED_ROLES` | Mis. `ADMIN`. Kosong = MFA opsional |
 | `SESSION_IDLE_MINUTES`, `SESSION_ABSOLUTE_HOURS` | 480 / 168 |
 | `LOGIN_MAX_FAILURES`, `LOGIN_LOCK_MINUTES` | 5 / 15 |
 | `AUTH_ENDPOINT_RATE_LIMIT_WINDOW_MS`, `_MAX` | limiter per-IP untuk login/MFA/reset (15 mnt / 20) |
 | `PASSWORD_RESET_TTL_MINUTES` | 60 |
 | `INVITE_TTL_HOURS` | 72 |
-| `TRUST_PROXY_HOPS` | 1 = hanya ALB. **2** bila frontend-admin menjangkau API lewat ALB juga (diset Terraform). Salah set → semua user berbagi satu limiter IP |
+| `TRUST_PROXY_HOPS` | 1 = hanya front end Cloud Run. **2** bila frontend-admin menjangkau API lewat Cloud Run juga (diset Terraform). Salah set → semua user berbagi satu limiter IP |
 
 Frontend-admin hanya butuh `API_BASE_URL` (server-side) dan `NEXT_PUBLIC_BASE_PATH`
 (diturunkan dari `next.config.ts`).
@@ -225,12 +224,12 @@ Rate limiter Express (`express-rate-limit`) tidak diuji unit — diuji manual.
 ## Keterbatasan yang diketahui
 
 - **Reset buatan admin tanpa email.** Undangan (buat & kirim ulang) dikirim lewat
-  SES berisi link `ADMIN_BASE_URL/aktivasi/<token>` plus pesan opsional dari
-  pengundang; bila SES belum dikonfigurasi atau gagal, respons `emailed: false`
+  (SMTP) berisi link `ADMIN_BASE_URL/aktivasi/<token>` plus pesan opsional dari
+  pengundang; bila SMTP belum dikonfigurasi atau gagal, respons `emailed: false`
   dan link diserahkan manual. Reset password akun aktif tetap manual.
 - **Kode TOTP bisa dipakai ulang dalam jendela 30 detik** (tidak ada pelacakan
   langkah terakhir). Dibatasi lockout 5 percobaan.
 - **MFA tanpa QR code** — pengguna memasukkan secret / membuka tautan otpauth.
 - **Cache izin 30 detik antar-instance** setelah mengubah peta role.
-- **Rate limiter in-memory** per proses; dengan banyak task ECS batasnya per task.
+- **Rate limiter in-memory** per proses; dengan banyak instance Cloud Run batasnya per instance.
 - Hash password Auth0 tidak bisa diekspor → semua akun lama wajib set password baru.

@@ -1,13 +1,14 @@
 /**
  * Advisory AI analysis (QD-30, QD-33). Runs after merge-report, reads
- * reports/verdict.json plus the PR diff and asks an OpenAI-compatible model
+ * reports/verdict.json plus the PR diff and asks Gemini (generateContent)
  * two independent questions in parallel: why the tool findings happened and how
  * to fix them, and what in the diff is over-built. The answers are appended to
  * pr-comment.md and scorecard.html. Never changes the verdict, always exits 0.
  *
  *   AI_API_KEY   empty = skipped (local runs, fork PRs)
- *   AI_BASE_URL  default https://openrouter.ai/api/v1
- *   AI_MODEL     required with AI_API_KEY
+ *   AI_BASE_URL  default Vertex AI express mode (`AQ.` key); AI Studio key
+ *                (`AIza…`): https://generativelanguage.googleapis.com/v1beta/models
+ *   AI_MODEL     default gemini-3.8-flash
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -84,18 +85,23 @@ export function buildEfficiencyPrompt(v: Verdict, diff: string): string | null {
   return safe.trim() ? diffBlock(diff, safe).join('\n') : null;
 }
 
+const MODEL = process.env.AI_MODEL || 'gemini-3.8-flash';
+
 async function ask(system: string, prompt: string): Promise<string> {
-  const base = process.env.AI_BASE_URL || 'https://openrouter.ai/api/v1';
-  if (!process.env.AI_MODEL) throw new Error('AI_MODEL kosong');
-  const res = await fetch(`${base.replace(/\/$/, '')}/chat/completions`, {
+  const base = process.env.AI_BASE_URL || 'https://aiplatform.googleapis.com/v1/publishers/google/models';
+  const res = await fetch(`${base.replace(/\/$/, '')}/${MODEL}:generateContent`, {
     method: 'POST',
-    headers: { authorization: `Bearer ${process.env.AI_API_KEY}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ model: process.env.AI_MODEL, temperature: 0.2, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }),
+    headers: { 'x-goog-api-key': process.env.AI_API_KEY!, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2 },
+    }),
     signal: AbortSignal.timeout(90_000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
-  const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const text = body.choices?.[0]?.message?.content?.trim();
+  const body = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('').trim();
   if (!text) throw new Error('respons kosong');
   return text;
 }
@@ -120,7 +126,7 @@ async function main() {
     const a = answers[i]!;
     return `**${q.title}**\n\n${a.status === 'fulfilled' ? a.value : `Analisis AI tidak tersedia: ${(a.reason as Error).message}`}`;
   });
-  const section = `${parts.join('\n\n')}\n\n<sub>Model \`${process.env.AI_MODEL}\`. Saran otomatis, verifikasi sendiri; verdict tetap dari gate.json.</sub>`;
+  const section = `${parts.join('\n\n')}\n\n<sub>Model \`${MODEL}\`. Saran otomatis, verifikasi sendiri; verdict tetap dari gate.json.</sub>`;
 
   writeFileSync(join(REPORTS, 'ai-review.md'), section);
   const comment = join(REPORTS, 'pr-comment.md');

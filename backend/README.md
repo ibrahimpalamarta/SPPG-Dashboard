@@ -111,7 +111,7 @@ field yang berubah, bukan nilainya.
 ```bash
 cd backend
 npm install
-cp .env.example .env        # isi DATABASE_URL, S3_BUCKET, MFA_ENCRYPTION_KEY
+cp .env.example .env        # isi DATABASE_URL, GCS_BUCKET, MFA_ENCRYPTION_KEY
 npx prisma migrate deploy   # atau: npm run migrate:dev
 npm run seed                # data acuan: 6 dapur + 12 target AKG
 npm run dev
@@ -192,7 +192,7 @@ Ditambah untuk fase unggah: parsing workbook (pemetaan header yang toleran
 kapital/tanda baca/satuan, kolom wajib hilang, sel rusak dilaporkan bernomor
 baris, berkas non-xlsx), dan hasil `POST /api/upload-batches` —
 batch PROCESSING → NEEDS_REVIEW / NEEDS_MAPPING_UPDATE, `dryRun` yang tidak menulis apa pun,
-duplikat jadi peringatan, S3 gagal → FAILED, dan transisi status tak sah (SCRUM-22).
+duplikat jadi peringatan, GCS gagal → FAILED, dan transisi status tak sah (SCRUM-22).
 Workbook uji dibangun di memori dengan exceljs, jadi tetap tanpa berkas fixture
 dan tanpa jaringan.
 
@@ -213,14 +213,14 @@ service gagal start (bukan jalan setengah benar) kalau ada yang kurang.
 
 | Variabel | Lokal | Staging / Production |
 |---|---|---|
-| `MFA_ENCRYPTION_KEY` | `.env` | AWS Secrets Manager (dibuat Terraform) → ECS `secrets` |
-| `MFA_REQUIRED_ROLES`, `TRUST_PROXY_HOPS` | `.env` | Terraform → ECS `environment` |
-| `SESSION_*`, `LOGIN_*`, `AUTH_ENDPOINT_RATE_LIMIT_*`, `PASSWORD_RESET_TTL_MINUTES` | `.env` (opsional) | default; override lewat ECS `environment` |
-| `DB_HOST`, `DB_PORT`, `DB_NAME` | `.env` / `DATABASE_URL` | Output Terraform → ECS `environment` |
-| `DB_USERNAME`, `DB_PASSWORD` | `.env` | AWS Secrets Manager → ECS `secrets` |
-| `DATABASE_URL_PUBLIC` | `.env` (opsional) | Secrets Manager → ECS `secrets`, lewat `public_db_secret_key` |
-| `S3_BUCKET`, `AWS_REGION`, `UPLOAD_MAX_BYTES` | `.env` | Output Terraform → ECS `environment` |
-| `SEED_SUPERADMIN_EMAIL`, `SEED_SUPERADMIN_PASSWORD` | shell | hanya untuk menjalankan seed, tidak pernah ke ECS |
+| `DATABASE_URL`, `MFA_ENCRYPTION_KEY` | `.env` | Secret Manager (dibuat Terraform) → Cloud Run env |
+| `MFA_REQUIRED_ROLES`, `TRUST_PROXY_HOPS`, `ADMIN_BASE_URL`, `EMAIL_FROM` | `.env` | Terraform → Cloud Run env |
+| `SESSION_*`, `LOGIN_*`, `AUTH_ENDPOINT_RATE_LIMIT_*`, `PASSWORD_RESET_TTL_MINUTES` | `.env` (opsional) | default; override lewat Cloud Run env |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` | `.env` (alternatif `DATABASE_URL`) | tidak dipakai |
+| `DATABASE_URL_PUBLIC`, `SMTP_URL`, `AI_API_KEY` | `.env` (opsional) | GitHub secret → Terraform → Secret Manager → Cloud Run env |
+| `GCS_BUCKET`, `UPLOAD_MAX_BYTES` | `.env` | Output Terraform → Cloud Run env |
+| `AI_BASE_URL`, `AI_MODEL` | default (Vertex AI express, `gemini-3.8-flash`) | default |
+| `SEED_SUPERADMIN_EMAIL`, `SEED_SUPERADMIN_PASSWORD` | shell | hanya untuk menjalankan seed, tidak pernah ke Cloud Run |
 
 ### Yang tidak pernah disimpan atau di-log
 
@@ -228,7 +228,7 @@ service gagal start (bukan jalan setengah benar) kalau ada yang kurang.
   Postgres atau log — yang tersimpan hanya hash argon2id / SHA-256 dan secret TOTP
   terenkripsi AES-256-GCM.
 - Prisma query logging dimatikan di luar development (nilai baris akan ikut
-  masuk CloudWatch).
+  masuk Cloud Logging).
 - Respons validasi (400) hanya memuat nama field, tidak pernah nilai yang ditolak.
 - Error handler mengembalikan `{ error: 'internal_error' }` — stack trace tinggal
   di log server.
@@ -319,7 +319,7 @@ Merutekan pada `publicId` (UUID), tidak pernah pada id berurutan.
 ### Unggah berkas (SCRUM-5, 6, 14)
 
 Byte-nya lewat API (`multipart/form-data`, multer `memoryStorage`), diparse di
-request yang sama, lalu ditulis ke bucket assets S3. Tidak ada presigned URL:
+request yang sama, lalu ditulis ke bucket assets GCS. Tidak ada presigned URL:
 backend perlu memegang isi berkasnya untuk bisa memeriksa formatnya sama
 sekali, yang justru inti SCRUM-5 AC2.
 
@@ -350,9 +350,9 @@ diunggah ulang; batch itu jadi `FAILED` + `error_code = REPLACED`, "Diganti").
 | berkas dikenali profil (SCRUM-39) | `201` + batch + `mapping` (ringkasan adapter) | `NEEDS_REVIEW`, `mapping_profile_id` + `template_version` terisi |
 | berkas tidak dikenali | `201` + batch + `columnDiff` | `NEEDS_MAPPING_UPDATE` (`error_code = PROFILE_NOT_DETECTED` / `PROFILE_AMBIGUOUS`) |
 | hash sama untuk kitchen + domain yang sama | `201` + batch baru + `warning.code = DUPLICATE_FILE` | batch baru; penggandaan dicegah saat publish |
-| S3 gagal | `500` | `FAILED` (`error_code = STORAGE_FAILED`) — tidak tertinggal di PROCESSING |
+| GCS gagal | `500` | `FAILED` (`error_code = STORAGE_FAILED`) — tidak tertinggal di PROCESSING |
 
-Key S3-nya `upload-batches/<publicId>.xlsx` (atau `.csv`) (kolom `storage_key`), tidak pernah
+Key object-nya `upload-batches/<publicId>.xlsx` (atau `.csv`) (kolom `storage_key`), tidak pernah
 memuat nama berkas asli. Batch lama sebelum SCRUM-22 tetap di key turunan hash.
 
 Transisi status hanya lewat `canTransition` di `src/lib/upload-status.ts`;
@@ -410,7 +410,7 @@ PUBLIC_DB_PASSWORD='...' npm run grant:public-role
 Migrasi `20260819000000_public_db_role` membuat role-nya `NOLOGIN` — password
 tidak pernah masuk berkas `.sql` yang di-commit. Script di atas yang memberi
 password + `LOGIN`, lalu mencetak `DATABASE_URL_PUBLIC` yang harus disimpan ke
-Secrets Manager. Selama `DATABASE_URL_PUBLIC` kosong, aplikasi jalan dengan
+GitHub secret `DATABASE_URL_PUBLIC` (environment production; Terraform meneruskannya ke Secret Manager). Selama `DATABASE_URL_PUBLIC` kosong, aplikasi jalan dengan
 koneksi utama dan **memperingatkan saat boot**; di `NODE_ENV=production` ia
 menolak start sama sekali.
 

@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars (gitignored). The project ID is the string id shown
+# in the console project picker, not "projects/<number>".
+project_id = "your-project-id"
+# region      = "asia-southeast2"
+# github_repo = "ibrahimpalamarta/SPPG-Dashboard"

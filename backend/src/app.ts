@@ -10,7 +10,7 @@ import { errorHandler } from './middleware/error-handler.js';
 export function createApp() {
   const app = express();
 
-  // ALB terminates TLS, so the client IP the rate limiter keys on comes from
+  // Cloud Run terminates TLS, so the client IP the rate limiter keys on comes from
   // X-Forwarded-For. Never widen this to `true`; see TRUST_PROXY_HOPS in env.ts.
   app.set('trust proxy', env.TRUST_PROXY_HOPS);
   app.disable('x-powered-by');
@@ -19,7 +19,7 @@ export function createApp() {
   app.use(corsMiddleware());
   app.use(express.json({ limit: '100kb' }));
 
-  // Unauthenticated: the ALB health check hits this directly.
+  // Unauthenticated: the Cloud Run startup probe hits this directly.
   app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
   // Order matters. The public transparency dashboard is mounted first so it
