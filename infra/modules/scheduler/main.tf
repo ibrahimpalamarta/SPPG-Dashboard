@@ -56,7 +56,6 @@ resource "aws_scheduler_schedule" "ecs_start" {
   for_each = var.ecs_services
 
   name       = "${local.prefix}-ecs-start-${each.key}"
-  state      = var.suspended ? "DISABLED" : "ENABLED"
   group_name = "default"
 
   # OFF, not a flexible window: these fire in a fixed order relative to each
@@ -107,7 +106,6 @@ resource "aws_scheduler_schedule" "ecs_stop" {
 
 resource "aws_scheduler_schedule" "rds_start" {
   name       = "${local.prefix}-rds-start"
-  state      = var.suspended ? "DISABLED" : "ENABLED"
   group_name = "default"
 
   flexible_time_window {
