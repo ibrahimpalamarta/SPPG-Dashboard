@@ -32,11 +32,11 @@ const withScope = {
 const INVITE_TTL_MINUTES = () => env.INVITE_TTL_HOURS * 60;
 
 /**
- * Emails the activation link. False when mail is not configured or
+ * Emails the activation link over SMTP. False when mail is not configured or
  * sending fails, so the admin still gets the link in the response to hand over.
  */
 async function sendInvite(send: SendMail, to: string | null, token: string, message?: string): Promise<boolean> {
-  if (!to || !env.EMAIL_FROM || !env.ADMIN_BASE_URL) return false;
+  if (!to || !env.EMAIL_FROM || !env.SMTP_URL || !env.ADMIN_BASE_URL) return false;
   const link = `${env.ADMIN_BASE_URL.replace(/\/$/, '')}/aktivasi/${token}`;
   try {
     const mail = renderMail({
