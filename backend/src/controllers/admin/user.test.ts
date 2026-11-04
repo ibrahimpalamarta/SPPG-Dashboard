@@ -103,7 +103,7 @@ async function call(handler: RequestHandler, req: Partial<Request>) {
   return out;
 }
 
-// .env.test sets EMAIL_FROM, so every handler gets a stub instead of the real SMTP transport.
+// .env.test sets EMAIL_FROM, so every handler gets a stub instead of the real mail transport.
 const noMail: SendMail = async () => {};
 
 const SUPER = actor('ADMIN', ['users:manage', 'settings:manage']);
@@ -274,7 +274,7 @@ describe('SCRUM-121: members and invitations', () => {
     assert.ok(sent[0]?.text.includes('Halo tim'));
   });
 
-  test('a failing SMTP send does not fail the invitation; the admin gets the link instead', async () => {
+  test('a failing mail send does not fail the invitation; the admin gets the link instead', async () => {
     const { db } = setup();
     const mail: SendMail = async () => Promise.reject(new Error('ses down'));
     const body = { email: 'x@example.com', fullName: 'X', role: 'DATA_ADMIN', kitchenIds: [1n] };

@@ -32,9 +32,12 @@ const schema = z.object({
   // Never set in the production environment.
   ALLOW_DEV_DELETE: z.enum(['true']).optional(),
 
-  // GCS assets bucket (Terraform output `assets_bucket_name`). Credentials come
-  // from the Cloud Run service account — the app configures only the name.
-  GCS_BUCKET: z.string().min(1),
+  // Assets bucket: S3_BUCKET (+ AWS_REGION) or GCS_BUCKET (Terraform output
+  // `assets_bucket_name`); exactly one is needed, S3 wins if both are set.
+  // Credentials come from the SDK chains, never from here.
+  S3_BUCKET: z.string().min(1).optional(),
+  AWS_REGION: z.string().min(1).default('ap-southeast-3'),
+  GCS_BUCKET: z.string().min(1).optional(),
 
   /** Upload ceiling. A menu workbook is a few hundred KB; 10 MB is slack, not a
    * target, and it is what stops an upload from becoming a memory lever. */
@@ -61,7 +64,7 @@ const schema = z.object({
 
   // Lifetime of a set/reset-password link.
   PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(60),
-  // Self-service "forgot password": the sender, the SMTP connection
+  // Self-service "forgot password": the sender, the optional SMTP connection (SES when unset)
   // (smtps://user:pass@host:465, see lib/mailer.ts) and the public URL of the
   // admin frontend (including its /admin base path) the emailed link points
   // at. Any unset = the endpoint still answers but sends nothing.
@@ -125,7 +128,7 @@ const schema = z.object({
   AI_API_KEY: z.string().min(1).optional(),
   AI_BASE_URL: z.string().url().default('https://aiplatform.googleapis.com/v1/publishers/google/models'),
   AI_MODEL: z.string().min(1).default('gemini-3.8-flash'),
-});
+}).refine((e) => e.S3_BUCKET || e.GCS_BUCKET, { message: 'set S3_BUCKET or GCS_BUCKET', path: ['S3_BUCKET'] });
 
 /**
  * `KEY=` in a .env file (and an unset Cloud Run variable) arrives as `""`, which is
