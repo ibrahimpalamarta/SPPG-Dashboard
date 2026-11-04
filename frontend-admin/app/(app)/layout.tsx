@@ -3,13 +3,13 @@ import { AppSidebar, type NavItem } from "@/components/layout/app-sidebar";
 import { I18nProvider } from "@/components/i18n-provider";
 import { getLang, getT } from "@/lib/lang-server";
 import { getMe } from "@/lib/me";
-import { NAV, canOpen } from "@/lib/nav";
+import { NAV, canOpen, historyLabel } from "@/lib/nav";
 import { ROLE_LABELS } from "@/lib/roles";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const me = await getMe();
   const [lang, t] = await Promise.all([getLang(), getT()]);
-  const items: NavItem[] = NAV.filter((n) => !("hidden" in n) && canOpen(n, me)).map((n) => ({ ...n, label: t(n.label) }));
+  const items: NavItem[] = NAV.filter((n) => !("hidden" in n) && canOpen(n, me)).map((n) => ({ ...n, label: t(n.href === "/mapping-validasi" ? historyLabel(me) : n.label) }));
   const user = { name: me.fullName ?? t(ROLE_LABELS[me.role]), email: me.email, role: me.role };
 
   return (

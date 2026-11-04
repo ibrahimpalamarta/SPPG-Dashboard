@@ -27,6 +27,9 @@ export const NAV = [
 
 export type NavHref = (typeof NAV)[number]["href"];
 
+/** /mapping-validasi is "Validasi Data" for Data Operasional (who checks and publishes), "Upload History" for Admin (watch only). */
+export const historyLabel = (me: { permissions: readonly string[] }) => (me.permissions.includes("upload:create") ? "Validasi Data" : "Upload History");
+
 /** Single rule for sidebar and requirePage(): the permission, or the page's extra role. */
 export function canOpen(n: { permission: Permission; alsoRole?: Role }, me: { permissions: readonly string[]; role: string }): boolean {
   return me.permissions.includes(n.permission) || n.alsoRole === me.role;
