@@ -164,7 +164,7 @@ describe('createUploadBatch (SCRUM-22/37)', () => {
     };
   };
 
-  /** Records what would have been written to S3 without touching the network. */
+  /** Records what would have been written to the bucket without touching the network. */
   function fakePut(fail = false) {
     const puts: { key: string; bytes: number }[] = [];
     const put = async (key: string, bytes: Buffer) => {

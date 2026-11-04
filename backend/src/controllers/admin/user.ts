@@ -32,11 +32,11 @@ const withScope = {
 const INVITE_TTL_MINUTES = () => env.INVITE_TTL_HOURS * 60;
 
 /**
- * Emails the activation link through SES. False when mail is not configured or
- * SES fails, so the admin still gets the link in the response to hand over.
+ * Emails the activation link over SMTP. False when mail is not configured or
+ * sending fails, so the admin still gets the link in the response to hand over.
  */
 async function sendInvite(send: SendMail, to: string | null, token: string, message?: string): Promise<boolean> {
-  if (!to || !env.EMAIL_FROM || !env.ADMIN_BASE_URL) return false;
+  if (!to || !env.EMAIL_FROM || !env.SMTP_URL || !env.ADMIN_BASE_URL) return false;
   const link = `${env.ADMIN_BASE_URL.replace(/\/$/, '')}/aktivasi/${token}`;
   try {
     const mail = renderMail({
@@ -118,7 +118,7 @@ async function mayManageAll(actor: AppUser, roles: Role[], db: Db): Promise<bool
 
 /**
  * Invitation. Creates the account with no password and returns a one-time
- * set-password token — the only copy. The link is also emailed through SES;
+ * set-password token — the only copy. The link is also emailed over SMTP;
  * when that is not configured (`emailed: false`) the admin hands it over.
  */
 export const createUser = (db: Db = prisma, send: SendMail = sendMail): RequestHandler => async (req, res) => {

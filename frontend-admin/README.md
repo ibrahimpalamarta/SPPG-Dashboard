@@ -52,34 +52,15 @@ curl -i localhost:3000/          # 404 — konfirmasi basePath aktif
 ```
 
 `HOSTNAME=0.0.0.0` di Dockerfile bukan hiasan: server standalone Next default-nya
-bind ke localhost, dan ALB tidak bisa menjangkaunya dari luar network namespace
-task.
+bind ke localhost, dan Cloud Run tidak bisa menjangkaunya dari luar container.
 
-## `basePath` ↔ listener rule ALB
+## `basePath: "/admin"`
 
-**Dua tempat ini harus diubah bersamaan.** `basePath: "/admin"` di
-`next.config.ts` berpasangan dengan `aws_lb_listener_rule.admin_http`
-(priority 20, `path_pattern = ["/admin", "/admin/*"]`) di
-`infra/modules/compute/main.tf`.
-
-Alasannya: satu ALB dipakai bertiga, dan selama belum ada domain/sertifikat ACM
-tidak ada hostname untuk dirouting — pembagiannya terpaksa lewat path.
-
-| Path | Tujuan | Priority |
-|---|---|---|
-| `/health` | backend | 5 |
-| `/api/*` | backend | 10 |
-| `/admin`, `/admin/*` | **frontend-admin** | 20 |
-| sisanya | frontend-public | default |
-
-`basePath` membuat Next memancarkan seluruh URL aset di bawah `/admin`
-(`/admin/_next/...`), sehingga aset ikut tertangkap rule yang sama. Tanpa itu
-aset akan jatuh ke default action dan 404 di frontend-public. Health check target
-group menembak `/admin` langsung ke container — health check ALB tidak lewat
-listener rule, jadi path-nya harus mengandung prefix.
-
-Begitu domain dan `acm_certificate_arn` tersedia, routing ini bisa pindah ke
-host-based (`admin-staging.<domain>`) dan `basePath` dilepas — keduanya sekaligus.
+Di Cloud Run app ini punya URL `*.run.app` sendiri, jadi `basePath` tidak lagi
+wajib untuk routing (dulu berpasangan dengan listener rule ALB). Ia dipertahankan
+supaya URL admin, cookie sesi (`NEXT_PUBLIC_BASE_PATH`), dan `ADMIN_BASE_URL` di
+backend (`…/admin`, lihat `infra/modules/app`) tidak berubah. Melepasnya berarti
+mengubah ketiganya sekaligus.
 
 ## Deploy
 

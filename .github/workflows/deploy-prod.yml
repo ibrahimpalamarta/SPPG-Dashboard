@@ -14,17 +14,20 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TF_DIR: infra/environments/production
+  TF_DIR: infra/production
+  TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+  TF_VAR_region: ${{ vars.GCP_REGION }}
+  TF_VAR_image_tag: ${{ github.sha }}
+  TF_VAR_smtp_url: ${{ secrets.SMTP_URL }}
+  TF_VAR_ai_api_key: ${{ secrets.AI_API_KEY }}
+  TF_VAR_public_db_url: ${{ secrets.DATABASE_URL_PUBLIC }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # `environment: production` is load-bearing three times over: it is what
-    # makes the required-reviewers protection rule (configured once, manually,
-    # in GitHub Settings -> Environments -> production) gate this job behind
-    # manual approval; every `vars.*` below is a GitHub Environment variable;
-    # and the OIDC sub claim the deploy role trusts is
-    # `repo:<org>/<repo>:environment:production`.
+    # `environment: production` gates this job behind the required-reviewers
+    # rule (Settings -> Environments -> production), scopes vars/secrets, and
+    # is the sub claim the Workload Identity binding trusts.
     environment: production
 
     steps:
@@ -45,122 +48,52 @@ jobs:
           npm run build
           npm test
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Authenticate to Google Cloud (Workload Identity)
+        uses: google-github-actions/auth@v2
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
 
       - name: Terraform Init
         working-directory: ${{ env.TF_DIR }}
-        run: |
-          terraform init \
-            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
-            -backend-config="key=production/terraform.tfstate" \
-            -backend-config="region=${{ vars.AWS_REGION }}" \
-            -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE }}"
+        run: terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
 
-      # Runs before the image is built, and does two jobs at once.
-      #
-      # It creates the ECR repository the next step pushes to: the repository
-      # is part of this stack, so on a fresh environment `docker push` would
-      # otherwise fail with "repository does not exist".
-      #
-      # And it registers the migration task definition against the new image
-      # tag WITHOUT rolling the service, so migrations land before the new code
-      # serves traffic. RegisterTaskDefinition doesn't check that the image
-      # exists, so registering it ahead of the push is safe — run-task below
-      # still happens after.
-      #
-      # The cluster is targeted explicitly because it is NOT a dependency of the
-      # migrate task definition: without it, a fresh environment reaches the
-      # migration step with no cluster and no ecs_cluster_name output to read.
-      # Everything else those two pull in as dependencies — VPC, subnets,
-      # security group, RDS, the secret, the log group, the task roles.
-      - name: Provision ECR and register migration task definition
+      - name: Provision Artifact Registry
         working-directory: ${{ env.TF_DIR }}
         run: |
           set -euo pipefail
-          terraform apply -auto-approve \
-            -target=module.compute.aws_ecs_cluster.this \
-            -target=module.compute.aws_ecs_task_definition.migrate \
-            -var="aws_region=${{ vars.AWS_REGION }}" \
-            -var="backend_image_tag=${{ github.sha }}"
-          echo "ECR_BACKEND_URL=$(terraform output -raw ecr_backend_repository_url)" >> "$GITHUB_ENV"
+          terraform apply -auto-approve -target=module.app.google_artifact_registry_repository.this
+          echo "REGISTRY=$(terraform output -raw registry)" >> "$GITHUB_ENV"
+          gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
 
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      # Frontend is deliberately absent from this workflow — frontend/ has no
-      # app yet, and its ECS service is pinned to desired_count 0 in Terraform
-      # for the same reason. Add a step here once frontend/ has a Dockerfile.
-      # frontend-admin and frontend-public are deliberately not built here yet.
-      # Terraform provisions their repositories, target groups, listener rules
-      # and services in production too, but at frontend_desired_count 0, so
-      # nothing runs and nothing is billed. Turning production on means adding
-      # the two build/push steps from deploy-staging.yml, passing
-      # frontend_image_tag to the apply below, and setting frontend_desired_count
-      # in infra/environments/production/main.tf.
+      # Frontends are deliberately not built here yet (enable_frontends = false
+      # in infra/production/main.tf). Turning them on = add them to this loop
+      # and flip that flag.
       - name: Build and push backend image
-        working-directory: backend
         run: |
-          docker build -t "$ECR_BACKEND_URL:${{ github.sha }}" .
-          docker push "$ECR_BACKEND_URL:${{ github.sha }}"
+          docker build -t "$REGISTRY/backend:${{ github.sha }}" backend
+          docker push "$REGISTRY/backend:${{ github.sha }}"
+
+      - name: Update migration job
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform apply -auto-approve -target=module.app.google_cloud_run_v2_job.migrate
 
       - name: Run database migrations
         working-directory: ${{ env.TF_DIR }}
-        run: |
-          set -euo pipefail
-          CLUSTER=$(terraform output -raw ecs_cluster_name)
-          FAMILY=$(terraform output -raw migrate_task_definition_family)
-          SUBNETS=$(terraform output -json private_subnet_ids | jq -r 'join(",")')
-          SG=$(terraform output -raw ecs_tasks_security_group_id)
-          LOG_GROUP=$(terraform output -raw backend_log_group_name)
-
-          TASK_ARN=$(aws ecs run-task \
-            --cluster "$CLUSTER" \
-            --launch-type FARGATE \
-            --task-definition "$FAMILY" \
-            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=DISABLED}" \
-            --query 'tasks[0].taskArn' --output text)
-          echo "Migration task: $TASK_ARN"
-
-          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN"
-
-          # Surface prisma's own output in this log, not just CloudWatch.
-          aws logs get-log-events \
-            --log-group-name "$LOG_GROUP" \
-            --log-stream-name "migrate/migrate/${TASK_ARN##*/}" \
-            --query 'events[].message' --output text || true
-
-          EXIT_CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" \
-            --query 'tasks[0].containers[0].exitCode' --output text)
-          if [ "$EXIT_CODE" != "0" ]; then
-            echo "::error::prisma migrate deploy exited with $EXIT_CODE"
-            exit 1
-          fi
+        run: gcloud run jobs execute "$(terraform output -raw migrate_job)" --region "${{ vars.GCP_REGION }}" --wait
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_DIR }}
-        run: |
-          terraform apply -auto-approve \
-            -var="aws_region=${{ vars.AWS_REGION }}" \
-            -var="backend_image_tag=${{ github.sha }}"
+        run: terraform apply -auto-approve
 
-      # terraform apply returns as soon as UpdateService is accepted, so
-      # without this the job goes green while the new tasks are still
-      # crash-looping. This is what turns "deployed" into "actually running".
-      - name: Wait for backend service to stabilise
+      - name: Show URLs
         working-directory: ${{ env.TF_DIR }}
-        run: |
-          set -euo pipefail
-          aws ecs wait services-stable \
-            --cluster "$(terraform output -raw ecs_cluster_name)" \
-            --services "$(terraform output -raw backend_service_name)"
-
-      - name: Show ALB URL
-        working-directory: ${{ env.TF_DIR }}
-        run: terraform output -raw alb_dns_name
+        run: terraform output urls

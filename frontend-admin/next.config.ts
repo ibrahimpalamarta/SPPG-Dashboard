@@ -1,10 +1,8 @@
 import type { NextConfig } from "next";
 
-// Load-bearing, and coupled to infra/modules/compute/main.tf: the ALB serves
-// frontend-public on the default action and forwards only /admin* here
-// (listener rule priority 20). Without basePath every asset request would
-// come back as /_next/... , miss that rule, and 404 against the public app.
-// Changing this means changing the listener rule's path_pattern too.
+// Coupled to ADMIN_BASE_URL (".../admin") in infra/modules/app/main.tf and to
+// the session cookie path. On Cloud Run this app has its own origin, so routing
+// no longer needs it; dropping it means changing those together.
 const basePath = "/admin";
 
 const nextConfig: NextConfig = {

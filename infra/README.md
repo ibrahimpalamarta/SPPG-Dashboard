@@ -1,123 +1,123 @@
-# Infrastruktur AWS — SPPG Dashboard
+# Infrastruktur GCP — SPPG Dashboard
 
-Terraform + GitHub Actions untuk 2 environment AWS yang berdiri sendiri (`staging`, `production`) — masing-masing punya VPC, ECS cluster, RDS, ECR, S3, state bucket, dan IAM role deploy sendiri, tanpa resource yang dipakai bersama kecuali OIDC provider (singleton per account). Didesain **migration-ready**: saat ini jalan di AWS account personal, dan pindah ke account kantor nanti hanya butuh ganti *value* (Account ID, region, role ARN) tanpa mengubah kode/struktur apa pun.
+Terraform + GitHub Actions untuk 2 environment (`staging`, `production`) di **satu project GCP**, region `asia-southeast2` (Jakarta). Pindahan dari AWS (ECS/RDS/S3/SES, lihat git history sebelum commit migrasi ini).
 
-Branch `develop` **bukan** environment: ia hanya branch transisi di GitHub (kena CI gate, tidak pernah di-deploy). Yang di-deploy dan bisa diakses hanya `staging` dan `production`.
+Branch `develop` **bukan** environment: hanya branch transisi (kena CI gate, tidak pernah di-deploy).
 
 ## Struktur
 
 ```
 infra/
-├── backend-bootstrap/   # one-time: state bucket + lock table + OIDC provider + IAM role deploy
-├── modules/             # network, ecr, database, storage, compute, iam-oidc
-├── environments/
-│   ├── staging/
-│   └── production/
-└── README.md
+├── bootstrap/        # one-time, manual: API, state bucket, Workload Identity, service account
+├── modules/app/      # semua resource satu environment
+├── staging/          # root module: module app + sizing staging
+└── production/       # root module: module app + sizing production
 ```
 
-Kedua environment memakai module yang sama persis (`main.tf`-nya nyaris identik); yang membedakan hanya `variables.tf` — `env`, blok CIDR VPC (`staging` 10.10.0.0/16, `production` 10.20.0.0/16, sengaja tidak overlap supaya VPC peering tetap mungkin nanti), dan sizing (staging: 1 task, `db.t4g.micro`, single-AZ; production: 2 task, `db.t4g.small`, multi-AZ).
+## Arsitektur per environment
 
-### Tiga service, satu ALB
+| Komponen | GCP | Catatan |
+|---|---|---|
+| backend, frontend-admin, frontend-public | Cloud Run (3 service) | HTTPS bawaan di `*.run.app`, scale ke 0 saat tidak dipakai |
+| Migrasi + seed | Cloud Run Job `…-migrate` | Image backend yang sama, dijalankan CI sebelum revisi baru melayani traffic |
+| Database | Cloud SQL Postgres 16 | Public IP **tanpa** authorized network: satu-satunya jalan masuk adalah Cloud SQL connector (`/cloudsql` socket) dengan IAM |
+| Upload | GCS bucket `<project>-sppg-dashboard-<env>-assets` | Uniform access, public access prevention |
+| Secret | Secret Manager | `DATABASE_URL`, `MFA_ENCRYPTION_KEY` (dibuat Terraform), `SMTP_URL`, `AI_API_KEY`, `DATABASE_URL_PUBLIC` (opsional, dari GitHub secret) |
+| Image | Artifact Registry `sppg-dashboard-<env>` | Simpan 10 terbaru, sisanya dihapus setelah 30 hari |
+| Off-hours (staging) | Cloud Scheduler → SQL Admin API | Cloud SQL stop 21:00, start 07:50 WIB Senin–Jumat |
+| AI | Gemini (Vertex AI express mode) | Kunci API, bukan IAM; dipanggil dari backend dan qa-audit |
+| Email | SMTP (nodemailer) | GCP tidak punya layanan email; pakai Gmail app password, Brevo, SendGrid, dll. |
 
-Stack ini menjalankan tiga ECS service: `backend`, `frontend-admin`, dan `frontend-public`. Ketiganya berbagi satu ALB, satu cluster, satu pasang task role, dan satu security group task (kedua frontend sama-sama listen di port 3000, jadi ingress rule yang ada sudah menutupi keduanya).
+**Tidak ada load balancer.** Tiap service punya URL sendiri: `https://sppg-dashboard-<env>-<service>-<project number>.asia-southeast2.run.app`. Ini aman karena frontend-admin memanggil API dari server-nya (`API_BASE_URL`), tidak pernah dari browser, jadi tidak butuh CORS. `basePath: "/admin"` di frontend-admin dipertahankan, jadi URL admin berakhiran `/admin`. Begitu ada domain, pasang [domain mapping Cloud Run](https://cloud.google.com/run/docs/mapping-custom-domains) atau HTTPS Load Balancer; module tidak perlu dirombak.
 
-Selama `acm_certificate_arn` masih kosong tidak ada domain — artinya tidak ada hostname untuk dirouting, dan pembagian traffic terpaksa lewat path:
+## Provisioning pertama kali
 
-```
-listener :80
- ├─ priority 5    /health            → be-tg    (backend)
- ├─ priority 10   /api/*             → be-tg    (backend)
- ├─ priority 20   /admin, /admin/*   → adm-tg   (frontend-admin)
- └─ default                          → pub-tg   (frontend-public)
-```
+Prasyarat: `gcloud` dan Terraform ≥ 1.6, akun dengan role **Owner** di project.
 
-Rule priority 20 **berpasangan** dengan `basePath: "/admin"` di `frontend-admin/next.config.ts`: basePath itu yang membuat Next memancarkan seluruh URL aset di bawah `/admin`, sehingga aset ikut tertangkap rule yang sama alih-alih jatuh ke frontend-public. Ubah satu tanpa yang lain dan app-nya rusak. Health check kedua target group juga mengikuti: `/` untuk public, `/admin` untuk admin — health check ALB menembak container langsung, tidak lewat listener rule, dan app admin memang 404 di `/`.
-
-Begitu domain tersedia, isi `acm_certificate_arn` lalu tukar `path_pattern` jadi `host_header` (`admin-staging.<domain>` / `staging.<domain>`) dan lepas `basePath`-nya. Struktur module tidak perlu berubah — listener HTTPS dan duplikat rule-nya sudah ada, tinggal aktif.
-
-Nama target group dibatasi 32 karakter, dan `sppg-dashboard-production` sendiri sudah 25 — karena itu namanya `-adm-tg`/`-pub-tg`, bukan `-frontend-admin-tg`. Memanjangkannya akan gagal di production lebih dulu, bukan di staging.
-
-Production ikut mendapat repository ECR, target group, listener rule, dan kedua service frontend, tapi `frontend_desired_count`-nya dibiarkan di default `0`: `deploy-prod.yml` belum membangun image frontend, jadi task yang jalan hanya akan crash-loop di ImagePullFailure. Tidak ada task = tidak ada biaya, dan menyalakannya nanti cuma satu baris di `environments/production/main.tf` plus dua step build di workflow.
-
-Kenapa OIDC provider dan kedua IAM role dibuat di `backend-bootstrap`, bukan di `environments/*`: OIDC provider adalah resource singleton per AWS account (gagal jika dibuat dua kali), dan GitHub Actions butuh role itu sudah ada sebelum bisa autentikasi — jadi harus diprovision manual, sekali, pakai credential admin lokal. `environments/*` sesudahnya hanya mengelola infrastruktur aplikasi (VPC, ECS, RDS, ECR, S3) dan tidak pernah menyentuh IAM/OIDC.
-
-## Provisioning Pertama Kali
-
-Prasyarat: AWS CLI ter-konfigurasi dengan **credential admin dari akun AWS personal** (`aws configure` atau SSO profile). Ini satu-satunya tempat di seluruh desain ini yang memakai credential jangka panjang/admin.
-
-1. **Bootstrap** (state bucket, lock table, OIDC provider, 2 IAM role):
+1. **Login dan bootstrap** (satu kali; state disimpan lokal di `infra/bootstrap/terraform.tfstate`, simpan file itu baik-baik):
    ```bash
-   cd infra/backend-bootstrap
-   cp terraform.tfvars.example terraform.tfvars
-   # isi account_id, github_org, github_repo di terraform.tfvars
+   gcloud auth application-default login
+   cd infra/bootstrap
+   cp terraform.tfvars.example terraform.tfvars   # isi project_id (ID string, bukan projects/<nomor>)
    terraform init
    terraform apply
-   terraform output   # catat staging_role_arn, production_role_arn, state_bucket_names, lock_table_names
+   terraform output
    ```
 
-2. **Environment `staging`** (masih pakai credential admin lokal untuk apply pertama):
-   ```bash
-   cd ../environments/staging
-   cp terraform.tfvars.example terraform.tfvars
-   cp backend-staging.hcl.example backend-staging.hcl
-   # isi kedua file dengan value dari output langkah 1
+2. **GitHub Environments** (`staging` dan `production`). Isi lewat Settings → Environments:
 
-   terraform init -backend-config=backend-staging.hcl
-   terraform apply
-   ```
-   Task definition ECS akan mereferensikan image `:latest` yang belum ada di ECR pada apply pertama ini — service ECS akan menunjukkan task gagal sampai image pertama di-push (baik manual maupun lewat CI run pertama). Ini normal/transient.
+   | Nama | Jenis | Nilai |
+   |---|---|---|
+   | `GCP_PROJECT_ID` | variable | ID project |
+   | `GCP_REGION` | variable | `asia-southeast2` |
+   | `GCP_WIF_PROVIDER` | variable | output `wif_provider` |
+   | `GCP_DEPLOY_SA` | variable | output `deploy_service_accounts[<env>]` |
+   | `TF_STATE_BUCKET` | variable | output `tf_state_bucket` |
+   | `AI_API_KEY` | secret | Kunci Gemini (`AQ.…`). Kosong = cek AI upload dilewati |
+   | `SMTP_URL` | secret | Gmail tim: `smtps://zerostuntingteam%40gmail.com:<APP_PASSWORD>@smtp.gmail.com:465`. App password dibuat di akun Google tersebut (butuh verifikasi 2 langkah aktif; Akun Google → Keamanan → Sandi aplikasi). Kosong = email tidak dikirim |
+   | `DATABASE_URL_PUBLIC` | secret | **production saja, wajib**: `postgresql://sppg_public:<pw>@localhost/sppg_dashboard?host=/cloudsql/<connection name>` (role dari `npm run grant:public-role`) |
 
-3. **Environment `production`**: ulangi langkah yang sama di folder `environments/production` (pakai `backend-production.hcl.example`).
+   Variable/secret AWS lama (`AWS_ROLE_ARN`, `AWS_REGION`, `TF_LOCK_TABLE`) boleh dihapus. Dua aturan manual, **bukan** Terraform:
+   - **Deployment branches**: `staging` → branch `staging`; `production` → `main` + tag `v*`. Workload Identity hanya mengunci repo + nama environment, jadi aturan branch ini yang menegakkannya.
+   - **Required reviewers** pada `production`: gate approval manual.
 
-4. **GitHub Environments** — di repo Settings → Environments, buat environment `staging` dan `production` (tidak ada environment `develop`). Isi Variables di masing-masing environment (lihat tabel di bawah) dengan value dari `terraform output` environment yang sesuai + output bootstrap. Dua konfigurasi manual satu kali lewat GitHub UI, **bukan** dikelola Terraform:
+3. **Deploy pertama**: push/merge ke `staging`. Workflow membuat Artifact Registry, push image, membuat Cloud SQL (pertama kali ±10 menit), menjalankan migrasi, lalu semua service. Jangan `terraform apply` penuh dari laptop sebelum image ada: Cloud Run menolak image yang belum di-push.
 
-   - **Deployment branches** (wajib, ini yang menegakkan pembatasan branch): `staging` → *Selected branches* → `staging`; `production` → `main` + tag `v*`. IAM tidak lagi mengunci branch, karena setiap job deploy memakai `environment:` sehingga GitHub mengirim sub claim `repo:<org>/<repo>:environment:<nama>` — bentuk `ref:refs/heads/<branch>` tidak pernah muncul.
-   - **Required reviewers** pada `production` (protection rule) — inilah gate approval manual sebelum deploy prod.
+4. **Super Admin pertama**: jalankan `seed:superadmin` sekali lewat job migrate dengan command override, atau lewat [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) dari laptop (`npm run seed:superadmin` dengan `DATABASE_URL` ke proxy).
 
-5. PR ke `develop`/`staging`/`main` → trigger `qa-pr.yml` (`qa-audit.yml`): satu check `qa-audit / audit` yang memuat build + test backend dan `terraform fmt`/`validate` ketiga root module. Gate saja: tanpa environment GitHub, tanpa credential AWS. Push langsung ke `develop` tidak lagi dicek (`ci.yml` dihapus).
+## Alur deploy (`deploy-staging.yml` / `deploy-prod.yml`)
 
-6. `develop` adalah branch transisi, tidak pernah di-deploy. Naik ke staging lewat PR `develop` → `staging`; merge-nya yang memicu `deploy-staging.yml` (environment `staging`): verifikasi OIDC auth, gate test/build backend, build+push ketiga image, migrasi DB, `terraform apply` dari CI, sampai ketiga ECS service healthy. Build Docker kedua frontend sengaja ditaruh **sebelum** step migrasi, supaya frontend yang gagal compile menggagalkan job selagi database belum tersentuh — itu juga alasan keduanya tidak di-build ulang di runner sebagai gate terpisah.
+1. Test + build backend (gate).
+2. Auth ke GCP lewat Workload Identity (tanpa kunci JSON).
+3. `terraform apply -target` Artifact Registry → build + push image (tag = commit SHA). Frontend di-build sebelum migrasi, jadi frontend yang gagal compile menggagalkan job sebelum database disentuh.
+4. `terraform apply -target` job migrate (menarik Cloud SQL, secret, bucket pada environment baru).
+5. Staging: bangunkan Cloud SQL bila sedang stop.
+6. `gcloud run jobs execute … --wait`: migrasi + seed.
+7. `terraform apply` penuh. Apply Cloud Run menunggu revisi baru siap, jadi container yang crash menggagalkan step ini.
 
-7. Push tag `v*` atau merge `staging` ke `main` → trigger `deploy-prod.yml`, approve manual gate di GitHub UI, verifikasi hal yang sama di production.
+Production belum membangun image frontend (`enable_frontends = false` di `production/main.tf`).
 
-### GitHub Environment Variables
+## Mematikan AWS lama
 
-Buat dengan key yang sama di environment `staging` dan `production`, isi value berbeda per environment:
+Kode Terraform AWS sudah dihapus dari branch ini, tapi state lokalnya masih ada di `infra/backend-bootstrap/` dan `infra/environments/*/` (untracked). Setelah GCP jalan:
 
-| Variable | Isi |
-|---|---|
-| `AWS_REGION` | `ap-southeast-3` — harus region tempat state bucket & VPC berada |
-| `AWS_ROLE_ARN` | ARN role OIDC (dari `backend-bootstrap` output) |
-| `TF_STATE_BUCKET`, `TF_LOCK_TABLE` | Dari `backend-bootstrap` output |
+```bash
+git worktree add ../sppg-aws 424b84c          # commit terakhir sebelum migrasi
+cp -r infra/environments/staging/{terraform.tfvars,backend-staging.hcl} ../sppg-aws/infra/environments/staging/
+cd ../sppg-aws/infra/environments/staging
+terraform init -backend-config=backend-staging.hcl && terraform destroy
+# ulangi untuk production, lalu backend-bootstrap (salin terraform.tfstate-nya)
+```
 
-Empat variable, itu saja. Yang sengaja **tidak** ada di sini:
+Hapus folder lama itu sesudahnya.
 
-- `ECR_BACKEND_URL` / `ECR_FRONTEND_ADMIN_URL` / `ECR_FRONTEND_PUBLIC_URL` — URL ketiga repository ECR sudah jadi `terraform output` di tiap environment, jadi workflow membacanya dari sana. Tiga nilai lebih sedikit yang bisa basi saat pindah akun.
-- `AWS_ACCOUNT_ID` — hanya dipakai `backend-bootstrap` (untuk menyusun ARN di policy IAM), bukan oleh environment stack.
-- `GITHUB_ORG` / `GITHUB_REPO_NAME` — sama, hanya dipakai `backend-bootstrap`. Lagi pula GitHub **menolak** nama variable/secret berawalan `GITHUB_`, jadi keduanya memang tidak akan pernah bisa dibuat.
+## Trade-off yang disengaja
 
-Tidak ada AWS secret jangka panjang yang perlu disimpan — OIDC menghilangkan kebutuhan itu sepenuhnya.
+- **Satu project untuk dua environment.** Role deployer berlaku se-project, jadi deployer staging secara teknis bisa menyentuh production. Untuk isolasi penuh, buat project kedua dan apply bootstrap di sana; module tidak berubah.
+- **Secret ada di Terraform state** (password DB, kunci MFA, dan secret dari GitHub). State bucket private + versioning; akses = akses ke project.
+- **`TRUST_PROXY_HOPS=2`**: client → Google Front End → frontend-admin → Google Front End → API. Bila limiter login per-IP terlihat menggabungkan semua user, cek header `X-Forwarded-For` di log backend.
+- **Cloud SQL staging `db-f1-micro`** (shared core, tanpa SLA) dan stop di luar jam kerja. Production `db-custom-1-3840` REGIONAL (HA) + point-in-time recovery.
 
-## Checklist Migrasi: Akun Personal → Akun Kantor
+## gcloud dari terminal
 
-1. **Akses akun kantor**: siapkan credential admin/SSO untuk akun AWS kantor, pastikan region `ap-southeast-3` sudah aktif di akun tsb — Jakarta adalah region *opt-in*, jadi harus di-enable manual lewat Console → Account → AWS Regions sebelum API call apa pun ke sana bisa jalan.
-2. **Re-run `backend-bootstrap`** dengan `account_id` baru di `terraform.tfvars`, jalankan `terraform init && apply` **memakai credential admin akun kantor**. Ini membuat state bucket/lock table/OIDC provider/IAM role baru yang sepenuhnya independen dari akun personal — tidak menyentuh resource lama.
-3. **Putuskan strategi data**: (a) fresh start — provision environment dari nol di akun baru (paling simpel, cocok jika belum ada data produksi nyata), atau (b) migrasi data — RDS snapshot export/import, sync S3, re-push image ke ECR akun baru. Pilih sesuai kondisi saat migrasi.
-4. **Re-run `terraform init -reconfigure` + `apply`** di tiap `environments/<env>` mengarah ke state bucket akun baru (dari output langkah 2). Ini provision VPC/ECS/RDS/ECR/S3 baru di akun kantor.
-5. **Update GitHub Environment variables** (staging & production): `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` (region biasanya tetap `ap-southeast-3`). **Tidak ada perubahan kode/workflow** — inilah inti dari desain ini.
-6. **Cutover DNS** (jika sudah ada domain kustom) mengarah ke ALB DNS name akun baru.
-7. **Verifikasi full deploy cycle** di akun kantor (PR `develop` → `staging`, lalu tag rilis prod) sebelum mematikan apa pun di akun personal.
-8. **Decommission akun personal**: `terraform destroy` tiap environment (staging dulu, baru production), lalu hapus resource `backend-bootstrap` (OIDC provider, IAM role, state bucket — setelah yakin tidak ada yang masih butuh histori state-nya; sebaiknya arsipkan dulu file `.tfstate` terakhir sebelum bucket dihapus).
-9. **Cabut/rotate** credential admin lokal akun personal yang dipakai untuk bootstrap.
+Terpasang lewat `winget install Google.CloudSDK`. Buka terminal baru supaya `gcloud` ada di PATH, lalu login sekali:
 
-## Catatan Desain / Trade-off yang Disengaja
+```bash
+gcloud auth login                              # untuk perintah gcloud
+gcloud auth application-default login          # untuk Terraform dan SDK lokal
+gcloud config set project <PROJECT_ID>
+gcloud config set run/region asia-southeast2
+```
 
-- **NAT gateway hanya di production**, 1 buah (bukan per-AZ) — single point of failure untuk egress private subnet; tingkatkan ke NAT per-AZ nanti kalau availability jadi prioritas. **Staging tidak punya NAT sama sekali** (`enable_nat_gateway = false`): dengan ~$45/bulan hanya untuk memberi egress ke satu task 0.25 vCPU, biayanya tidak sepadan. Staging menjalankan ECS task-nya di public subnet dengan public IP (`task_subnet_ids` + `task_assign_public_ip` di module `compute`). Ini bukan pelonggaran keamanan: security group `ecs-tasks` tetap hanya menerima ingress dari SG ALB, dan RDS tetap di private subnet yang — tanpa NAT — kini benar-benar tidak punya rute keluar sama sekali. Konsekuensinya, task migrasi di workflow staging harus jalan di subnet yang sama dengan `assignPublicIp=ENABLED`, kalau tidak ia tak bisa menarik image dari ECR.
-- **Staging dimatikan di luar jam kerja** (module `scheduler`, staging saja). EventBridge Scheduler memanggil `ecs:UpdateService` dan `rds:Stop/StartDBInstance` langsung lewat universal target — tanpa Lambda, tanpa kode. Default: nyala 07:00–21:00 WIB, Senin–Jumat (cron ditulis dalam `Asia/Jakarta`, jadi tidak perlu hitung UTC). Module-nya menerima **map** `ecs_services` dan membuat sepasang schedule per service (`for_each`), bukan satu service saja: service yang tertinggal dari map akan diam-diam menyala 24/7 dan membatalkan penghematannya — dua task Fargate frontend yang lupa dijadwalkan setara ~$15–20/bulan. Dua konsekuensi yang sudah ditangani: (1) ketiga `aws_ecs_service` memakai `ignore_changes = [desired_count]` supaya Terraform tidak berkelahi dengan scheduler — artinya `var.desired_count`/`var.frontend_desired_count` jadi nilai create-time di **semua** environment, dan perubahan setelahnya harus lewat `aws ecs update-service`; (2) workflow deploy staging punya step "Wake staging database" dan "Scale services up" (ketiganya), supaya deploy di luar jam kerja tidak gagal dengan connection timeout. Storage RDS tetap ditagih saat instance berhenti — yang hemat hanya jam compute-nya.
-- **HTTPS opsional**: listener 443/ACM di ALB dikontrol lewat variable `acm_certificate_arn` (default kosong = HTTP saja). Begitu ada domain, isi variable ini — tidak perlu ubah struktur module.
-- **CloudFront tidak dibuat** di first pass ini (ALB sudah cukup untuk awal, S3 assets bucket tetap private). Tambahkan CloudFront di depan ALB dan/atau S3 nanti kalau kebutuhan caching/TLS-edge/WAF/akses publik ke asset sudah jelas.
-- **`terraform apply` jalan di setiap deploy** (bukan pipeline terpisah untuk "infra" vs "update image"), dengan image tag (commit SHA) sebagai variable yang memicu perubahan task definition. Ini menghindari state drift dari dua jalur deploy yang terpisah; ketika hanya image yang berubah, apply hampir no-op karena cuma task definition + service yang berubah. Satu apply itu memegang **semua** image tag sekaligus — sebabnya tidak ada workflow deploy per-service meski path filter terlihat menggoda: apply kedua yang tidak ikut membawa tag service lain akan mengembalikannya ke default `latest`, dan dua apply paralel juga akan berebut state lock. Kedua frontend berbagi satu variable `frontend_image_tag` karena keduanya selalu dibangun dari commit yang sama di run yang sama.
-- **Migrasi DB lewat ECS one-off task**, bukan entrypoint container: RDS `publicly_accessible = false` dan security group-nya hanya menerima ingress dari SG ECS, jadi runner GitHub tidak bisa connect langsung. Workflow me-register task definition `<prefix>-migrate` (image sama, command `prisma migrate deploy`) lewat `terraform apply -target`, menjalankannya dengan `aws ecs run-task`, lalu menggagalkan job kalau exit code-nya bukan 0 — semuanya **sebelum** service di-update, sehingga skema selalu mendahului kode yang memakainya. Dipilih di atas entrypoint karena kegagalan migrasi jadi terlihat di log Actions, bukan cuma jadi crashloop diam di CloudWatch.
-- **IAM policy role deploy dipecah dua**: `deploy-app-policy` (ECR/ECS/PassRole, di-scope ketat by ARN) dan `deploy-infra-policy` (permission Terraform yang lebih luas untuk resource seperti EC2/RDS/ELB yang memang tidak mendukung resource-level IAM di banyak action-nya). Ini batas realistis "least privilege" untuk role yang juga menjalankan `terraform apply` dari CI.
-- Password database RDS di-generate otomatis (`random_password`) dan disimpan di Secrets Manager — tidak pernah muncul sebagai plaintext di tfvars, state Terraform (yang selalu berisiko), atau GitHub secret.
+Perintah yang sering dipakai (ganti `staging` dengan `production` bila perlu):
+
+```bash
+gcloud run services list                                          # status service
+gcloud run services logs read sppg-dashboard-staging-backend --limit 50
+gcloud run jobs execute sppg-dashboard-staging-migrate --wait     # migrasi + seed manual
+gcloud sql instances patch sppg-dashboard-staging --activation-policy=ALWAYS    # bangunkan DB
+gcloud sql instances patch sppg-dashboard-staging --activation-policy=NEVER      # matikan DB
+gcloud secrets versions add sppg-dashboard-staging-ai-api-key --data-file=-      # rotasi kunci AI (tempel, Ctrl+Z, Enter)
+```
+
+Deploy tetap lewat push ke `staging`/`main`; perintah di atas untuk inspeksi dan operasi manual, bukan pengganti pipeline.

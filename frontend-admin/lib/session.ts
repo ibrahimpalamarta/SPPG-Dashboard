@@ -12,9 +12,9 @@ export const SESSION_COOKIE = "sppg_session";
 const options = { httpOnly: true, sameSite: "lax", path: process.env.NEXT_PUBLIC_BASE_PATH } as const;
 
 /**
- * Secure only when the browser reached us over HTTPS (the ALB writes the last
+ * Secure only when the browser reached us over HTTPS (Cloud Run writes the last
  * X-Forwarded-Proto). A Secure cookie set over plain HTTP is dropped by the
- * browser, which logs everyone out on reload — staging has no certificate yet.
+ * browser, which logs everyone out on reload (e.g. plain-HTTP local runs).
  */
 async function secure() {
   const proto = (await headers()).get("x-forwarded-proto")?.split(",").at(-1)?.trim();

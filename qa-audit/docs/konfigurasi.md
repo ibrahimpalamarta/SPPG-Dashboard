@@ -18,8 +18,8 @@ Dibaca dari environment, atau `qa-audit/.env` (lihat [`.env.example`](../.env.ex
 | `ENFORCE` | `1` | `0` = laporan saja, exit 0 |
 | `QA_TRIGGER`, `QA_STARTED_AT`, `OUTCOME_*` | – | Diisi CI / `audit.ts` |
 | `AI_API_KEY` | – | Kunci Analisis AI (`npm run ai-review`, QD-30). Kosong = dilewati |
-| `AI_BASE_URL` | `https://openrouter.ai/api/v1` | Endpoint OpenAI-compatible |
-| `AI_MODEL` | – | Model, wajib bila `AI_API_KEY` diisi |
+| `AI_BASE_URL` | `https://aiplatform.googleapis.com/v1/publishers/google/models` | Endpoint Gemini `generateContent` (Vertex AI express, kunci `AQ.`). Kunci AI Studio: `https://generativelanguage.googleapis.com/v1beta/models` |
+| `AI_MODEL` | `gemini-3.8-flash` | Model Gemini |
 
 Port tetap: Postgres 15432, backend 18080, frontend-admin 13000, S3 tiruan 19000 (`scripts/lib.ts`), sengaja beda
 dari port dev (5432/8080/3000) supaya bisa jalan berdampingan dengan dev server.

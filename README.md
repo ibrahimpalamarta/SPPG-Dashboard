@@ -15,10 +15,10 @@ Tiap folder punya `package.json` dan lockfile sendiri, dan tiap job CI bekerja d
 
 | Folder | Isi | Stack | Dijalankan di |
 |---|---|---|---|
-| [`backend/`](backend/README.md) | REST API, auth internal, RBAC, pipeline unggah → publish → KPI | Express, TypeScript, Prisma, Postgres | ECS, `/api/*`, `/health` |
-| [`frontend-admin/`](frontend-admin/README.md) | Backoffice + Dashboard Internal (di belakang login) | Next.js 16 (App Router), Tailwind 4 | ECS, `/admin` |
-| [`frontend-public/`](frontend-public/README.md) | Dashboard transparansi publik | Next.js (App Router) | ECS, `/` |
-| [`infra/`](infra/README.md) | VPC, ECS, RDS, ECR, S3, ALB | Terraform, AWS `ap-southeast-3` | — |
+| [`backend/`](backend/README.md) | REST API, auth internal, RBAC, pipeline unggah → publish → KPI | Express, TypeScript, Prisma, Postgres | Cloud Run, `/api/*`, `/health` |
+| [`frontend-admin/`](frontend-admin/README.md) | Backoffice + Dashboard Internal (di belakang login) | Next.js 16 (App Router), Tailwind 4 | Cloud Run, `/admin` |
+| [`frontend-public/`](frontend-public/README.md) | Dashboard transparansi publik | Next.js (App Router) | Cloud Run, `/` |
+| [`infra/`](infra/README.md) | Cloud Run, Cloud SQL, Artifact Registry, GCS, Secret Manager | Terraform, GCP `asia-southeast2` | — |
 | [`qa-audit/`](qa-audit/README.md) | Satu verdict "aman di-merge atau tidak" per PR, plus bukti | Playwright, Vitest, Semgrep, gitleaks | CI atau laptop |
 | [`projects/jira/`](projects/jira/README.md) | Status tiket SCRUM dan decision log aplikasi | Markdown | — |
 
@@ -40,8 +40,8 @@ flowchart LR
   PB -->|"browser"| FP["frontend-public<br>Next.js"]
   FA -->|"Bearer token sesi"| BE["backend<br>Express /api"]
   FP -.->|"/api/public/*"| BE
-  BE --> PG[("Postgres RDS<br>data + akun + sesi")]
-  BE --> S3[("S3 assets<br>berkas unggahan")]
+  BE --> PG[("Postgres Cloud SQL<br>data + akun + sesi")]
+  BE --> S3[("GCS assets<br>berkas unggahan")]
   BE -.->|"opsional"| AI["LLM OpenAI-compatible<br>saran cek unggahan dan insight"]
 ```
 
@@ -78,7 +78,7 @@ menjaga agar angka salah tidak sampai ke dashboard.
 flowchart TD
   U[Data Operasional pilih jenis data + bulan + berkas<br>frontend-admin: Unggah Data] --> CHK[Cek otomatis tanpa menulis<br>POST /upload-batches?dryRun=true<br>profil terdeteksi? kolom beda? saran AI]
   CHK --> UP[Unggah<br>POST /upload-batches]
-  UP --> S3[(Berkas asli ke S3)]
+  UP --> S3[(Berkas asli ke GCS)]
   UP --> PARSE[Baca workbook xlsx/csv<br>deteksi baris header]
   PARSE --> DET{Profil mapping dikenali?<br>per dapur + jenis data}
   DET -- tidak --> NMU[NEEDS_MAPPING_UPDATE<br>layar perbedaan kolom<br>Ubah Mapping atau Unggah Ulang]
@@ -166,7 +166,7 @@ Bagaimana qa-audit terhubung ke tiap bagian:
 | `backend/` | Dibangun dengan `tsc -p`, dijalankan di `:18080` dengan `NODE_ENV=production`. Seed backend dipakai apa adanya, lalu `seed-qa.ts` menambah akun QA (`admin`, `data-operasional-skn`, `data-operasional-lwg`). Fungsi murni (`kpi.ts`, `values.ts`) diimpor langsung oleh tes Vitest. Fixture cashflow/menu Sukun diambil dari `backend/src/lib/ingest/fixtures/`. |
 | `frontend-admin/` | Dibangun dan dijalankan `next start` di `:13000/admin`. Playwright login lewat UI sekali per role, lalu memakai `storageState`. Hasil build juga dipakai ESLint, knip, dan axe. |
 | API langsung | `isolasi.spec.ts` memanggil `/api` dengan token sesi untuk membuktikan isolasi dapur (403 `forbidden_kitchen`), 401 tanpa token, dan tidak adanya NIK/telepon/alamat di respons. |
-| S3 / email | Dimock di environment QA (S3 tiruan menjawab 200; token reset dibuat seed), jadi izin IAM dan pengiriman email tidak teruji di sini. |
+| GCS / email | Dimock di environment QA (GCS tiruan lewat `STORAGE_EMULATOR_HOST`; token reset dibuat seed), jadi izin IAM dan pengiriman email tidak teruji di sini. |
 | Persyaratan produk | `requirements.json` memetakan acceptance criteria PRD ke test lewat ID di judul test (`[AC-PUB-01]`, `[SCRUM-151]`). `scorecard.html` menampilkan status tiap requirement. |
 | Keputusan merge | Hanya `merge-report` yang membaca `gate.json`. Blocker (tipe, secret, Semgrep keamanan, test smoke/rbac/pii, environment gagal) memerahkan check `qa-audit / audit`. |
 
@@ -176,20 +176,18 @@ pernah menyentuh production. Panduan lengkap, gate, dan cara menambah test ada d
 
 ## Routing
 
-Ketiga service berbagi satu ALB. Selama belum ada domain dan sertifikat ACM,
-pembagiannya lewat path, bukan hostname:
+Tiap service adalah Cloud Run service dengan URL `*.run.app` sendiri (HTTPS
+bawaan, tanpa load balancer):
 
 ```
-ALB :80
- ├─ priority 5    /health              → backend
- ├─ priority 10   /api/*               → backend
- ├─ priority 20   /admin, /admin/*     → frontend-admin   (basePath "/admin")
- └─ default                            → frontend-public
+https://sppg-dashboard-<env>-backend-<nomor project>.asia-southeast2.run.app          /api/*, /health
+https://sppg-dashboard-<env>-frontend-admin-<nomor project>.asia-southeast2.run.app   /admin (basePath)
+https://sppg-dashboard-<env>-frontend-public-<nomor project>.asia-southeast2.run.app  /
 ```
 
-Rule priority 20 berpasangan dengan `basePath: "/admin"` di
-`frontend-admin/next.config.ts`: ubah salah satu, ubah keduanya. Begitu domain
-tersedia, isi `acm_certificate_arn` dan routing bisa pindah ke host-based.
+frontend-admin memanggil API dari server-nya (`API_BASE_URL`), tidak pernah dari
+browser, jadi origin terpisah tidak butuh CORS. `terraform output urls` di
+`infra/<env>` menampilkan ketiganya.
 
 ## Branch, CI, dan deploy
 
@@ -206,8 +204,8 @@ satu fitur. Commit singkat dan present tense.
 
 | Pemicu | Workflow | Efek |
 |---|---|---|
-| PR ke `develop`/`staging`/`main` | `qa-pr.yml` → `qa-audit.yml` | Satu check `qa-audit / audit` (alur di atas). Tanpa kredensial AWS. Sekitar 2,5–4,5 menit. |
-| push ke `staging` | `deploy-staging.yml` | Build+push 3 image, migrasi DB, `terraform apply`, tunggu ketiga service stabil. |
+| PR ke `develop`/`staging`/`main` | `qa-pr.yml` → `qa-audit.yml` | Satu check `qa-audit / audit` (alur di atas). Tanpa kredensial GCP. Sekitar 2,5–4,5 menit. |
+| push ke `staging` | `deploy-staging.yml` | Build+push 3 image, migrasi DB (Cloud Run Job), `terraform apply` yang menunggu ketiga service siap. |
 | push ke `main` atau tag `v*` | `deploy-prod.yml` | Sama, di belakang approval manual. Frontend belum di-deploy ke production. |
 | Terjadwal 21:00 WIB, Senin–Jumat | `sync-staging.yml` | Merge `develop` ke `staging` setelah staging dimatikan malam hari, supaya commit sehari terdeploy sebelum jam kerja berikutnya. |
 
@@ -216,8 +214,8 @@ yang memegang semua image tag sekaligus. Itu sebabnya tidak ada workflow
 per-service: apply terpisah akan saling menimpa tag milik service lain kembali
 ke `latest`.
 
-Detail infrastruktur, IAM/OIDC, penghematan biaya staging, dan checklist migrasi
-akun AWS ada di [`infra/README.md`](infra/README.md).
+Detail infrastruktur GCP, Workload Identity, penghematan biaya staging, dan cara
+mematikan AWS lama ada di [`infra/README.md`](infra/README.md).
 
 ## Mulai dari nol
 
@@ -234,7 +232,7 @@ cd qa-audit && npm ci && npx playwright install chromium
 npm run audit                                   # enam tahap → reports/scorecard.html
 ```
 
-`backend/.env` wajib diisi (`DATABASE_URL`, `S3_BUCKET`, `MFA_ENCRYPTION_KEY`;
+`backend/.env` wajib diisi (`DATABASE_URL`, `GCS_BUCKET`, `MFA_ENCRYPTION_KEY`;
 lihat `backend/.env.example`). frontend-admin hanya membaca `API_BASE_URL`;
 frontend-public belum membaca environment variable apa pun.
 

@@ -25,7 +25,7 @@ backend/
 Prompt tugas meminta folder `migrations/`, `seed/`, dan `README.md` terpisah.
 Ketiganya diwujudkan di dalam struktur Prisma yang sudah ada, bukan sebagai
 folder baru di root, karena repo ini sudah menjalankan `prisma migrate deploy`
-lewat ECS migrate task di `.github/workflows/deploy-staging.yml` dan
+lewat Cloud Run Job migrate di `.github/workflows/deploy-staging.yml` dan
 `deploy-prod.yml`. Folder SQL terpisah berarti dua sistem migrasi menguasai satu
 database, dan `prisma migrate` akan menganggap tabel-tabel itu drift lalu
 menawarkan drop.

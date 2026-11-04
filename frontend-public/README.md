@@ -35,26 +35,14 @@ curl -i localhost:3000/          # 200
 ```
 
 `HOSTNAME=0.0.0.0` di Dockerfile bukan hiasan: server standalone Next default-nya
-bind ke localhost, dan ALB tidak bisa menjangkaunya dari luar network namespace
-task.
+bind ke localhost, dan Cloud Run tidak bisa menjangkaunya dari luar container.
 
-## Routing di staging
+## Routing
 
-Satu ALB dipakai bertiga. Selama belum ada domain/sertifikat ACM tidak ada
-hostname untuk dirouting, jadi pembagiannya lewat path — app ini duduk di
-**default action**, artinya semua yang tidak cocok rule lain sampai ke sini:
-
-| Path | Tujuan | Priority |
-|---|---|---|
-| `/health` | backend | 5 |
-| `/api/*` | backend | 10 |
-| `/admin`, `/admin/*` | frontend-admin | 20 |
-| sisanya | **frontend-public** | default |
-
-Konsekuensi yang perlu diingat saat menambah halaman: `/health` dan `/api/*`
-**tidak tersedia** untuk app ini — keduanya sudah dipesan backend. Health check
-target group menembak `/` langsung ke container (health check ALB tidak lewat
-listener rule), jadi halaman root harus selalu balas 200.
+App ini punya Cloud Run service dan URL `*.run.app` sendiri (lihat
+`terraform output urls` di `infra/<env>`), jadi semua path miliknya. Begitu
+dashboard publik mulai memanggil `/api/public/*`, panggil dari server
+(seperti frontend-admin) atau isi `CORS_ORIGINS` backend dengan URL app ini.
 
 ## Deploy
 

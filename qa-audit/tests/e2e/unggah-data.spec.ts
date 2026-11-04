@@ -46,7 +46,7 @@ test.describe('Unggah Data', () => {
   });
 });
 
-// Uploads need the S3 stub of the QA environment (scripts/env.ts). One test at a
+// Uploads need the GCS stub of the QA environment (scripts/env.ts). One test at a
 // time: every upload lands in the same database and the history is read back.
 test.describe.serial('Unggah Data: unggah file', () => {
   test.use({ storageState: storageState('data-operasional-skn') });

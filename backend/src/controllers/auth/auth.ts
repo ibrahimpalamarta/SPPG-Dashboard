@@ -206,7 +206,7 @@ export const forgotPassword = (db: Db = prisma, send: SendMail = sendMail): Requ
   const { email } = req.valid!.body as z.infer<typeof forgotPasswordBody>;
   const user = await db.user.findUnique({ where: { email } });
 
-  if (user?.status === 'ACTIVE' && user.passwordHash && user.email && env.EMAIL_FROM && env.ADMIN_BASE_URL) {
+  if (user?.status === 'ACTIVE' && user.passwordHash && user.email && env.EMAIL_FROM && env.SMTP_URL && env.ADMIN_BASE_URL) {
     const { token } = await issueResetToken(user.id, db);
     const link = `${env.ADMIN_BASE_URL.replace(/\/$/, '')}/reset-password/${token}`;
     const mail = renderMail({

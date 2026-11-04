@@ -1,6 +1,6 @@
 /**
  * Product events (PRD §11.1): one structured JSON line on stdout, which
- * CloudWatch already collects from the ECS task.
+ * Cloud Logging already collects from Cloud Run.
  *
  * ponytail: no analytics vendor yet. Swap the body of this function when one
  * is picked; call sites stay as they are. Never pass PII or file contents.
