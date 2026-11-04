@@ -97,3 +97,27 @@ Hapus folder lama itu sesudahnya.
 - **Secret ada di Terraform state** (password DB, kunci MFA, dan secret dari GitHub). State bucket private + versioning; akses = akses ke project.
 - **`TRUST_PROXY_HOPS=2`**: client → Google Front End → frontend-admin → Google Front End → API. Bila limiter login per-IP terlihat menggabungkan semua user, cek header `X-Forwarded-For` di log backend.
 - **Cloud SQL staging `db-f1-micro`** (shared core, tanpa SLA) dan stop di luar jam kerja. Production `db-custom-1-3840` REGIONAL (HA) + point-in-time recovery.
+
+## gcloud dari terminal
+
+Terpasang lewat `winget install Google.CloudSDK`. Buka terminal baru supaya `gcloud` ada di PATH, lalu login sekali:
+
+```bash
+gcloud auth login                              # untuk perintah gcloud
+gcloud auth application-default login          # untuk Terraform dan SDK lokal
+gcloud config set project <PROJECT_ID>
+gcloud config set run/region asia-southeast2
+```
+
+Perintah yang sering dipakai (ganti `staging` dengan `production` bila perlu):
+
+```bash
+gcloud run services list                                          # status service
+gcloud run services logs read sppg-dashboard-staging-backend --limit 50
+gcloud run jobs execute sppg-dashboard-staging-migrate --wait     # migrasi + seed manual
+gcloud sql instances patch sppg-dashboard-staging --activation-policy=ALWAYS    # bangunkan DB
+gcloud sql instances patch sppg-dashboard-staging --activation-policy=NEVER      # matikan DB
+gcloud secrets versions add sppg-dashboard-staging-ai-api-key --data-file=-      # rotasi kunci AI (tempel, Ctrl+Z, Enter)
+```
+
+Deploy tetap lewat push ke `staging`/`main`; perintah di atas untuk inspeksi dan operasi manual, bukan pengganti pipeline.
