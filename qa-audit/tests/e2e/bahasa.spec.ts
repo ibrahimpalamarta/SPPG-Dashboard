@@ -18,7 +18,7 @@ const PAGES: Record<RoleKey, { path: string; id: string; en: string }[]> = {
     { path: 'finance', id: 'Finance & Cost', en: 'Finance & Cost' },
     { path: 'kesehatan-data', id: 'Kelengkapan Data', en: 'Data Completeness' },
     { path: 'unggah-data', id: 'Unggah Data', en: 'Upload Data' },
-    { path: 'mapping-validasi', id: 'Upload History', en: 'Upload History' },
+    { path: 'mapping-validasi', id: 'Validasi Data', en: 'Data Validation' },
     { path: 'referensi-data', id: 'Data Reference', en: 'Data Reference' },
     { path: 'inbox', id: 'Inbox', en: 'Inbox' },
   ],
