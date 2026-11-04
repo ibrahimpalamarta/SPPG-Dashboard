@@ -12,11 +12,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { apiGet } from "@/lib/api";
 import { requirePage } from "@/lib/guard";
 import { getT } from "@/lib/lang-server";
+import { getMe } from "@/lib/me";
+import { historyLabel } from "@/lib/nav";
 import { batchFindings, tabs, type Batch, type BatchDetail } from "@/lib/mapping-validasi";
 import { DOMAINS, StatusBadge } from "@/lib/upload";
 
 export async function generateMetadata(): Promise<Metadata> {
-  return { title: `${(await getT())("Upload History")} · SPPG Internal` };
+  const [t, me] = await Promise.all([getT(), getMe()]);
+  return { title: `${t(historyLabel(me))} · SPPG Internal` };
 }
 
 const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.label ?? value;
@@ -31,7 +34,7 @@ export default async function Page({
   const [[me, t], { batch: batchId, listPage, recordsPage: recordsPageParam, ...filters }] = await Promise.all([Promise.all([requirePage("/mapping-validasi"), getT()]), searchParams]);
 
   if (!batchId) {
-    return <BatchList page={Number(listPage) || 1} canDelete={me.permissions.includes("batch:publish")} filters={filters} kitchens={me.kitchens} />;
+    return <BatchList page={Number(listPage) || 1} canDelete={me.permissions.includes("batch:publish")} title={historyLabel(me)} filters={filters} kitchens={me.kitchens} />;
   }
 
   const recordsPage = Number(recordsPageParam) || 1;

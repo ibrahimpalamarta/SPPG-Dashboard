@@ -6,6 +6,7 @@ export const EN: Record<string, string> = {
   "Kelengkapan Data": "Data Completeness",
   "Unggah Data": "Upload Data",
   "Upload History": "Upload History",
+  "Validasi Data": "Data Validation",
   "Data Reference": "Data Reference",
   "Inbox": "Inbox",
   "Anggota": "Members",

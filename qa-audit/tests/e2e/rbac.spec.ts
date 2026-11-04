@@ -3,11 +3,11 @@ import { storageState, type RoleKey } from './roles.js';
 
 // Dua role (SCRUM-152): Admin melihat semua dapur dan hanya melihat Upload History; Data Operasional
 // terikat satu dapur, mengunggah dan mem-publish sendiri lewat Upload History.
-const VIEW = ['Overview', 'Finance & Cost', 'Kelengkapan Data', 'Upload History', 'Data Reference', 'Inbox'];
+const VIEW = ['Overview', 'Finance & Cost', 'Kelengkapan Data', 'Data Reference', 'Inbox'];
 
 const CASES: { role: RoleKey; menu: string[]; hidden: string[] }[] = [
-  { role: 'admin', menu: [...VIEW, 'Anggota'], hidden: ['Unggah Data'] },
-  { role: 'data-operasional-skn', menu: [...VIEW, 'Unggah Data'], hidden: ['Anggota'] },
+  { role: 'admin', menu: [...VIEW, 'Upload History', 'Anggota'], hidden: ['Unggah Data', 'Validasi Data'] },
+  { role: 'data-operasional-skn', menu: [...VIEW, 'Unggah Data', 'Validasi Data'], hidden: ['Anggota', 'Upload History'] },
 ];
 
 for (const c of CASES) {
