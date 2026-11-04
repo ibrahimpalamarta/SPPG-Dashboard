@@ -120,3 +120,21 @@ describe('parseToStaging columnMap (Ubah Mapping)', () => {
     assert.equal(out.columns.find((c) => c.column === id.column)!.field, null);
   });
 });
+
+describe('parseToStaging rowEdits (Validasi Data grid)', () => {
+  test('edits a cell as typed text, empties one, removes a row and appends a new one', async () => {
+    const rowEdits = {
+      update: [{ sheet: 'RAB Oktober', row: 3, cells: { B: 'Beras merah', C: '' } }],
+      remove: [{ sheet: 'RAB Oktober', row: 5 }],
+      add: [{ sheet: 'RAB Oktober', cells: { A: '03/10/2026', B: 'Tahu' } }],
+    };
+    const out = await parseToStaging(await multiSheet(), { ...ctx, rowEdits }, new InMemoryStagingRepository());
+    assert.ok(out.ok);
+    assert.deepEqual(out.batch.rows.map((r) => r.sourceRowNumber), [3, 6], 'row 5 removed, the new row follows the last one');
+    const [edited, added] = out.batch.rows;
+    assert.deepEqual(edited.cells.B, { value: 'Beras merah', type: 'string' });
+    assert.deepEqual(edited.cells.C, { value: null, type: 'null' });
+    assert.equal(edited.cells.D.value, 'Rp12,000', 'untouched cells keep what was read');
+    assert.deepEqual(added.cells.A, { value: '03/10/2026', type: 'string' });
+  });
+});

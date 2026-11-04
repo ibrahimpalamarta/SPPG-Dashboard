@@ -218,8 +218,11 @@ export const deleteAllUploadBatches = (db: Db = prisma, remove: DeleteObject = d
   res.status(204).end();
 };
 
-/** Rows returned by a dry run. Enough to eyeball the mapping, not the file. */
-const PREVIEW_ROWS = 50;
+/**
+ * Rows a dry run returns for the "Validasi Data" grid.
+ * ponytail: rows past the cap cannot be edited in the grid; page the dry run if real files outgrow it.
+ */
+const PREVIEW_ROWS = 5_000;
 
 /**
  * The S3 key is built from the batch's public id, never from the original file
@@ -280,7 +283,8 @@ export const createUploadBatch =
     }
 
     const { buffer, originalname, size } = req.file!;
-    const fileHash = createHash('sha256').update(buffer).digest('hex');
+    // Edited rows are other data than the file: they must not count as a duplicate of it, nor share its record ids.
+    const fileHash = createHash('sha256').update(buffer).update(body.rowEdits ? JSON.stringify(body.rowEdits) : '').digest('hex');
 
     const context = (uploadBatchId: string, kitchenCode: string) => ({
       uploadBatchId,
@@ -291,6 +295,7 @@ export const createUploadBatch =
       fileHash,
       loadedAt: new Date(),
       columnMap: body.columnMap,
+      rowEdits: body.rowEdits,
     });
 
     // SCRUM-6 AC1 + SCRUM-150: read and check the file, write nothing. Same parser
@@ -314,7 +319,12 @@ export const createUploadBatch =
         fileHash,
         sheets: parsed.batch.sheets,
         rowCount: parsed.batch.rows.length,
-        rows: parsed.batch.rows.slice(0, PREVIEW_ROWS),
+        // The "Validasi Data" grid: the staged rows as read, and what the checks found on each.
+        rows: parsed.batch.rows.slice(0, PREVIEW_ROWS).map((r) => ({ id: r.sourceRecordId, sheet: r.sheetName, row: r.sourceRowNumber, cells: r.cells })),
+        flags: found.reduce<Record<string, { message: string; label: string }[]>>((acc, i) => {
+          if (i.sourceRecordId && i.action !== 'NORMALIZE') (acc[i.sourceRecordId] ??= []).push({ message: i.message, label: issueLabel(i) });
+          return acc;
+        }, {}),
         ready: parsed.detection.ok && !needsAttention(found),
         columnDiff,
         columns: parsed.columns,
@@ -423,7 +433,8 @@ export const createUploadBatch =
       if (!detection.ok) columnDiff = detection.diff;
       else mapping = parsed.mapping;
       // Read back by the Validasi Data page (B-MAPOUT).
-      const mappingResult = { sheets, columnDiff, mapping } as Prisma.InputJsonObject;
+      // `rowEdits` is kept with it: the stored file is the original, the data is the file plus these edits.
+      const mappingResult = { sheets, columnDiff, mapping, ...(body.rowEdits && { rowEdits: body.rowEdits }) } as Prisma.InputJsonObject;
       if (!detection.ok) {
         return finish({
           storageKey,

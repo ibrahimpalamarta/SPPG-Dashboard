@@ -21,6 +21,18 @@ export type FileColumn = { sheet: string; column: string; header: string; field:
 /** A canonical field of the SOP and the header its template writes it under. */
 export type SopField = { field: string; header: string };
 
+/** A cell exactly as the backend read it (dates as ISO). */
+export type RawCell = { value: string | number | boolean | null; type: string };
+
+/** One sheet of the file: column letter → header text. */
+export type FileSheet = { name: string; headers: Record<string, string>; headerRow: number | null; skipped?: string };
+
+/** One data row of the file, for the "Validasi Data" grid; `id` is the key `flags` uses. */
+export type FileRow = { id: string; sheet: string; row: number; cells: Record<string, RawCell> };
+
+/** What the checks found on one row. */
+export type RowFlag = { message: string; label: string };
+
 /** The "Siap diunggah" / "Perlu dicek" card, built before anything is stored. */
 export type CheckResult =
   | {
@@ -34,6 +46,9 @@ export type CheckResult =
       ai: UploadAdvice | null;
       /** Earliest and latest date inside the file (it can span several months); null when it has none. */
       dateRange: { from: string; to: string } | null;
+      sheets: FileSheet[];
+      rows: FileRow[];
+      flags: Record<string, RowFlag[]>;
     }
   | { ok: false; message: string };
 
@@ -93,7 +108,20 @@ export async function checkFile(form: FormData): Promise<CheckResult> {
   const res = await apiFetch("/upload-batches?dryRun=true", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return failure(t, res.status, body);
-  return { ok: true, ready: body.ready, issues: body.issues, columnDiff: body.columnDiff, rowCount: body.rowCount, columns: body.columns, fields: body.fields, ai: body.ai, dateRange: body.dateRange };
+  return {
+    ok: true,
+    ready: body.ready,
+    issues: body.issues,
+    columnDiff: body.columnDiff,
+    rowCount: body.rowCount,
+    columns: body.columns,
+    fields: body.fields,
+    ai: body.ai,
+    dateRange: body.dateRange,
+    sheets: body.sheets,
+    rows: body.rows,
+    flags: body.flags,
+  };
 }
 
 /**
@@ -107,17 +135,32 @@ export async function uploadFile(_prev: UploadResult | null, form: FormData): Pr
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: t("Pilih file .xlsx atau .csv terlebih dahulu.") };
   if (!form.get("period")) form.delete("period");
   if (!form.get("columnMap")) form.delete("columnMap");
+  if (!form.get("rowEdits")) form.delete("rowEdits");
+  // "Publish" on the Validasi Data grid: the uploader has checked every flagged row, so a file held for review goes live now.
+  const publish = form.get("publish") === "1";
+  form.delete("publish");
 
   const res = await apiFetch("/upload-batches", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return failure(t, res.status, body);
-  return {
-    ok: true,
+  const result = {
+    ok: true as const,
     batchId: body.publicId,
     status: body.status,
     errorCode: body.errorCode,
     errorSummary: body.errorSummary,
     autoPublished: body.autoPublished,
     warning: body.warning?.message,
+  };
+  if (!publish || body.status !== "NEEDS_REVIEW") return result;
+  const published = await apiSend(`/upload-batches/${encodeURIComponent(body.id)}/publish`, "POST");
+  revalidatePath("/mapping-validasi");
+  if (published.ok) return { ...result, status: "PUBLISHED" };
+  return {
+    ...result,
+    warning:
+      published.data.error === "batch_blocked"
+        ? t("File tersimpan, tapi masih ada temuan “Wajib diperbaiki”. Tandai sudah dicek di Validasi Data lalu Publish.")
+        : t("File tersimpan, tapi belum bisa dipublish. Publish dari Validasi Data."),
   };
 }

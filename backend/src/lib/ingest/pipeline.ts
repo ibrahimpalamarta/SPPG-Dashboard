@@ -1,6 +1,6 @@
 import type { UploadDomain } from '@prisma/client';
-import { WorkbookError, detectHeaderRow, readWorkbook, type RawSheet } from './workbook.js';
-import { loose, stageRows, type DomainParser, type ParseContext, type StagedBatch, type StagedSheet, type StagingRepository } from './staging.js';
+import { WorkbookError, detectHeaderRow, readWorkbook, type RawCell, type RawSheet } from './workbook.js';
+import { loose, stageRows, type DomainParser, type ParseContext, type RowEdits, type StagedBatch, type StagedSheet, type StagingRepository } from './staging.js';
 import { cashflowParser } from './cashflow.js';
 import { menuParser } from './menu.js';
 import { inputMakerParser } from './input-maker.js';
@@ -81,6 +81,26 @@ function applyColumnMap(sheets: RawSheet[], map: Record<string, string>, profile
   return originals;
 }
 
+/** An edited cell reads like a CSV cell: the text as typed, adapters do the parsing. */
+const typed = (text: string): RawCell => (text.trim() === '' ? { value: null, type: 'null' } : { value: text, type: 'string' });
+
+/** "Validasi Data" grid: applies the uploader's changes to the raw sheets; added rows go after the sheet's last row. */
+export function applyRowEdits(sheets: RawSheet[], edits: RowEdits): void {
+  for (const sheet of sheets) {
+    const removed = new Set(edits.remove.filter((r) => r.sheet === sheet.name).map((r) => r.row));
+    const byRow = new Map(sheet.rows.map((r) => [r.rowNumber, r]));
+    for (const u of edits.update) {
+      const row = u.sheet === sheet.name ? byRow.get(u.row) : undefined;
+      if (row) for (const [column, text] of Object.entries(u.cells)) row.cells[column] = typed(text);
+    }
+    let next = sheet.rows.reduce((max, r) => Math.max(max, r.rowNumber), 0);
+    for (const a of edits.add) {
+      if (a.sheet === sheet.name) sheet.rows.push({ rowNumber: ++next, cells: Object.fromEntries(Object.entries(a.cells).map(([c, t]) => [c, typed(t)])) });
+    }
+    sheet.rows = sheet.rows.filter((r) => !removed.has(r.rowNumber));
+  }
+}
+
 /**
  * read → parse → detect profile → stage → apply profile (SCRUM-39). Any failure leaves **no** staged rows for the batch
  * (step 5 of SCRUM-24); running it again for the same batch replaces what was
@@ -89,6 +109,7 @@ function applyColumnMap(sheets: RawSheet[], map: Record<string, string>, profile
 export async function parseToStaging(buffer: Buffer, ctx: ParseContext, staging: StagingRepository): Promise<PipelineResult> {
   try {
     const sheets = await readWorkbook(buffer, ctx.sourceFileName);
+    if (ctx.rowEdits) applyRowEdits(sheets, ctx.rowEdits);
     const candidate = profilesFor(ctx)[0];
     const originals = ctx.columnMap ? applyColumnMap(sheets, ctx.columnMap, candidate) : new Map<string, string>();
     const parsed = (parsers[ctx.domain] ?? rawParser)(sheets, ctx);

@@ -22,6 +22,31 @@ export const uploadBatchListQuery = refineDateRange(
  * `fileName`, `fileHash`, `fileSize` and `rowCount` are never accepted from the
  * client: the server has the bytes, so it takes those from the file itself.
  */
+const cells = z.record(z.string().regex(/^[A-Z]{1,3}$/, 'must be a column letter'), z.string().max(1000));
+const rowRef = { sheet: z.string().max(100), row: z.number().int().positive() };
+
+/** "Validasi Data" grid: cells the uploader changed, rows removed and rows added, applied to the file before it is parsed. */
+export const rowEditsSchema = z.object({
+  update: z.array(z.object({ ...rowRef, cells })).max(20_000).default([]),
+  remove: z.array(z.object(rowRef)).max(20_000).default([]),
+  add: z.array(z.object({ sheet: rowRef.sheet, cells })).max(2_000).default([]),
+});
+
+/** A multipart field holding JSON, checked against `schema`. */
+const jsonField = <S extends z.ZodTypeAny>(schema: S, message: string) =>
+  z
+    .string()
+    .optional()
+    .transform((v, ctx): z.infer<S> | undefined => {
+      if (!v) return undefined;
+      try {
+        return schema.parse(JSON.parse(v));
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+        return z.NEVER;
+      }
+    });
+
 export const uploadBatchCreate = z.object({
   kitchenId: z
     .string()
@@ -39,18 +64,9 @@ export const uploadBatchCreate = z.object({
   /** SCRUM-124: public id of the quarantined batch this file re-uploads; it ends "Diganti". */
   replaces: z.string().uuid().optional(),
   /** "Ubah Mapping": JSON object `sheet|column letter` → canonical field ("" = not used). */
-  columnMap: z
-    .string()
-    .optional()
-    .transform((v, ctx) => {
-      if (!v) return undefined;
-      try {
-        return z.record(z.string()).parse(JSON.parse(v));
-      } catch {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'must be a JSON object of strings' });
-        return z.NEVER;
-      }
-    }),
+  columnMap: jsonField(z.record(z.string()), 'must be a JSON object of strings'),
+  /** JSON `RowEdits`: what the uploader changed in the "Validasi Data" grid. */
+  rowEdits: jsonField(rowEditsSchema, 'must be a JSON object of row edits'),
 });
 
 /**

@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowRight, Building2, Check, CircleCheck, CircleX, Download, FileText, TriangleAlert, Upload } from "lucide-react";
+import { ArrowRight, Building2, Check, CircleCheck, CircleX, Download, FileText, Sparkles, TriangleAlert, Upload } from "lucide-react";
 import Link from "next/link";
 import { startTransition, useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { checkFile, uploadFile, type CheckResult, type FileColumn, type UploadResult } from "./actions";
+import { ValidasiGrid } from "./validasi-grid";
 import { useLang, useT } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -36,6 +37,7 @@ const LABEL_TONE: Record<string, string> = {
 /** PRD §9.1 wording for what became of the uploaded file. */
 function headline(t: T, r: Extract<UploadResult, { ok: true }>) {
   if (r.autoPublished) return t("Dipublish otomatis");
+  if (r.status === "PUBLISHED") return t("Dipublish");
   if (r.errorCode === "EMPTY_FILE") return t("Ditahan · file kosong");
   if (r.status === "NEEDS_REVIEW") return t("Perlu dicek");
   if (r.status === "NEEDS_MAPPING_UPDATE") return t("Format berbeda");
@@ -47,7 +49,7 @@ const RESULT_TONE = {
   review: { card: "border-amber-200 bg-amber-50/40", badge: "border-amber-200 bg-amber-50 text-amber-700" },
   fail: { card: "border-red-200 bg-red-50/40", badge: "border-red-200 bg-red-50 text-red-700" },
 };
-const resultTone = (r: Extract<UploadResult, { ok: true }>) => (r.autoPublished ? "ok" : r.status === "NEEDS_REVIEW" ? "review" : "fail");
+const resultTone = (r: Extract<UploadResult, { ok: true }>) => (r.status === "PUBLISHED" ? "ok" : r.status === "NEEDS_REVIEW" ? "review" : "fail");
 
 /** FR-AI-01: the verdict on the picked file, before anything is stored. */
 function CheckChips({ check }: { check: Extract<CheckResult, { ok: true }> }) {
@@ -169,49 +171,60 @@ type ColumnMap = Record<string, string>;
 const size = (bytes: number) => (bytes < 1_048_576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1_048_576).toFixed(1)} MB`);
 const mapKey = (c: FileColumn) => `${c.sheet}|${c.column}`;
 
-/** "Ubah Mapping": each header of the file next to the SOP field it is read as; every pick is re-checked by the backend. */
-function MappingEditor({
+/** Step 2 of "Validasi Data": each header of the file next to the SOP field it is read as; every pick is re-checked by the backend. */
+function MappingStep({
   check,
   map,
+  fileName,
+  domain,
   busy,
   onPick,
-  onDone,
+  onBack,
+  onSave,
 }: {
   check: Extract<CheckResult, { ok: true }>;
   map: ColumnMap;
+  fileName: string;
+  domain: string;
   busy: boolean;
   onPick: (column: FileColumn, field: string) => void;
-  onDone: () => void;
+  onBack: () => void;
+  onSave: () => void;
 }) {
   const t = useT();
   const sheets = new Set(check.columns.map((c) => c.sheet)).size;
+  const fieldOf = (c: FileColumn) => map[mapKey(c)] ?? c.field ?? "";
+  const matched = check.columns.filter((c) => fieldOf(c)).length;
+  // SCRUM-150: the AI's note on a header it could not place with certainty.
+  const notes = new Map(check.ai?.columns.map((c) => [c.header, c.reason]) ?? []);
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <CheckChips check={check} />
-        <div className="flex gap-3">
-          <button type="button" onClick={onDone} className={secondaryButton}>
-            {t("Selesai")}
-          </button>
-          <button type="submit" disabled={busy} className={primaryButton}>
-            <Upload className="size-4" aria-hidden="true" />
-            {t("Unggah")}
-          </button>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+        <p className="flex min-w-0 items-center gap-3 font-semibold text-slate-900">
+          <FileText className="size-5 shrink-0 text-slate-400" aria-hidden="true" />
+          <span className="truncate">{fileName}</span>
+        </p>
+        <Badge tone="slate">{t(DOMAIN_OPTIONS.find((o) => o.value === domain)?.label ?? domain)}</Badge>
       </div>
+      <p aria-live="polite" className="flex items-start gap-2 rounded-xl bg-slate-100 p-4 text-sm text-slate-800">
+        <Sparkles className="mt-0.5 size-4 shrink-0 text-sky-600" aria-hidden="true" />
+        {busy
+          ? t("AI mencocokkan kolom…")
+          : t("AI mencocokkan {matched} dari {total} kolom. {rest} kolom perlu dicek.", { matched, total: check.columns.length, rest: check.columns.length - matched })}
+      </p>
       <div className="rounded-xl border border-slate-200">
         <table className="w-full text-left text-sm">
           <thead className="text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">{t("Kolom di file")}</th>
-              <th className="px-4 py-3 font-medium">{t("Dibaca sebagai (kolom SOP)")}</th>
+              <th className="px-4 py-3 font-medium">{t("Dibaca sebagai")}</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {check.columns.map((c) => {
               const key = mapKey(c);
-              const changed = key in map;
+              const note = key in map ? undefined : notes.get(c.header);
               return (
                 <tr key={key}>
                   <td className="px-4 py-3">
@@ -221,20 +234,37 @@ function MappingEditor({
                   <td className="px-4 py-3">
                     <MorphSelect
                       label={t("Dibaca sebagai untuk kolom {header}", { header: c.header })}
-                      value={map[key] ?? c.field ?? ""}
+                      value={fieldOf(c)}
                       onChange={(v) => onPick(c, v)}
                       className="w-full max-w-xs"
-                      options={[{ value: "", label: t("Tidak dipakai") }, ...check.fields.map((f) => ({ value: f.field, label: f.header }))]}
+                      options={[{ value: "", label: t("Abaikan kolom ini") }, ...check.fields.map((f) => ({ value: f.field, label: f.header }))]}
                     />
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    {changed ? <Badge tone="amber">{t("Diubah")}</Badge> : c.field ? <Badge tone="green">{t("Yakin")}</Badge> : <Badge tone="slate">{t("Tidak dipakai")}</Badge>}
+                  <td className="px-4 py-3">
+                    {note ? (
+                      <span title={note} className="inline-flex h-6 items-center rounded-md border border-sky-200 bg-sky-50 px-2 text-xs font-medium text-sky-700">
+                        {t("Perlu dicek")}
+                      </span>
+                    ) : fieldOf(c) ? (
+                      <span className="text-slate-500">{t("Cocok")}</span>
+                    ) : (
+                      <Badge tone="slate">{t("Tidak dikenali")}</Badge>
+                    )}
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      </div>
+      <div className="flex flex-wrap justify-end gap-3">
+        <button type="button" onClick={onBack} className={secondaryButton}>
+          {t("Kembali")}
+        </button>
+        <button type="button" onClick={onSave} disabled={busy} className={primaryButton}>
+          <Sparkles className="size-4" aria-hidden="true" />
+          {t("Simpan & Cek dengan AI")}
+        </button>
       </div>
     </section>
   );
@@ -249,9 +279,12 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   const [checking, startChecking] = useTransition();
   // "Unggah ulang" goes back to the file pick without dropping kitchen/domain.
   const [retry, setRetry] = useState(false);
-  // "Ubah Mapping": the uploader's overrides of how the file's columns are read, per file.
+  // The uploader's overrides of how the file's columns are read, per file.
   const [columnMap, setColumnMap] = useState<ColumnMap>({});
-  const [editing, setEditing] = useState(false);
+  // "Validasi Data": pick the file → match its columns → check and edit its rows, then Publish.
+  const [step, setStep] = useState<"pick" | "mapping" | "grid">("pick");
+  // The grid stays mounted once opened, so going back to the mapping keeps its edits.
+  const [gridOpen, setGridOpen] = useState(false);
   const [file, setFile] = useState<{ name: string; size: number } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -260,7 +293,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   const found = check?.ok ? check.dateRange : null;
   const range = !found ? "" : found.from === found.to ? day(found.from) : `${day(found.from)} – ${day(found.to)}`;
   const showResult = result?.ok && !retry;
-  const mapping = check?.ok && editing ? check : null;
+  const validating = check?.ok && step !== "pick" ? check : null;
   // Progress and verdict take the place of the inputs.
   const overlay = pending || showResult;
 
@@ -280,7 +313,8 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
   // A new file, kitchen or domain has other columns and another SOP: overrides do not carry over.
   const resetMapping = () => {
     setColumnMap({});
-    setEditing(false);
+    setStep("pick");
+    setGridOpen(false);
   };
   const pick = (check: Extract<CheckResult, { ok: true }>, column: FileColumn, field: string) => {
     const next = { ...columnMap, [mapKey(column)]: field };
@@ -298,7 +332,6 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
       onSubmit={(e) => {
         e.preventDefault();
         setRetry(false);
-        setEditing(false);
         const data = new FormData(e.currentTarget);
         startTransition(() => action(data));
       }}
@@ -313,6 +346,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
       <Card className="space-y-5 p-6">
         {/* Hidden, not unmounted: the file input must keep its file if the upload fails. */}
         <div className={overlay ? "hidden" : "space-y-5"}>
+        <div className={validating ? "hidden" : "space-y-5"}>
         <div className="grid gap-4 sm:grid-cols-3">
           {kitchens.length > 1 ? (
             <div className="space-y-2 text-sm">
@@ -410,36 +444,50 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
           </a>
         )}
 
-        {mapping ? (
-          <MappingEditor check={mapping} map={columnMap} busy={pending || checking} onPick={(c, f) => pick(mapping, c, f)} onDone={() => setEditing(false)} />
-        ) : (
-          file && (
-            <div className="space-y-4 rounded-xl border border-slate-200 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {checking ? (
-                  <p className="text-sm text-slate-600">{t("Membaca dan mengecek file…")}</p>
-                ) : check?.ok && !showResult && !pending ? (
-                  <CheckChips check={check} />
-                ) : (
-                  <span />
-                )}
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setEditing(true)} disabled={pending || !check?.ok || !check.columns.length} className={secondaryButton}>
-                    {t("Ubah Mapping")}
-                  </button>
-                  <button type="submit" disabled={pending || checking || !check} className={primaryButton}>
-                    {pending ? t("Mengunggah…") : t("Unggah")}
-                  </button>
-                </div>
-              </div>
-              {!showResult && !pending && !checking && check && !check.ok && (
-                <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                  {check.message}
-                </p>
+        {file && (
+          <div className="space-y-4 rounded-xl border border-slate-200 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {checking ? (
+                <p className="text-sm text-slate-600">{t("Membaca dan mengecek file…")}</p>
+              ) : check?.ok && !showResult && !pending ? (
+                <CheckChips check={check} />
+              ) : (
+                <span />
               )}
-              {!showResult && !pending && !checking && check?.ok && <CheckDetails check={check} />}
+              <button type="button" onClick={() => setStep("mapping")} disabled={pending || checking || !check?.ok} className={primaryButton}>
+                {t("Validasi Data")}
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </button>
             </div>
-          )
+            {!showResult && !pending && !checking && check && !check.ok && (
+              <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                {check.message}
+              </p>
+            )}
+            {!showResult && !pending && !checking && check?.ok && <CheckDetails check={check} />}
+          </div>
+        )}
+        </div>
+
+        {validating && step === "mapping" && (
+          <MappingStep
+            check={validating}
+            map={columnMap}
+            fileName={file?.name ?? ""}
+            domain={domain}
+            busy={pending || checking}
+            onPick={(c, f) => pick(validating, c, f)}
+            onBack={() => setStep("pick")}
+            onSave={() => {
+              setStep("grid");
+              setGridOpen(true);
+            }}
+          />
+        )}
+        {validating && gridOpen && (
+          <div className={step === "grid" ? "" : "hidden"}>
+            <ValidasiGrid check={validating} fileName={file?.name ?? ""} busy={pending || checking} onBack={() => setStep("mapping")} />
+          </div>
         )}
         </div>
 
@@ -459,7 +507,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
                     {resultTone(result) === "ok" ? t("File berhasil dibaca") : resultTone(result) === "review" ? t("File sudah dibaca") : t("File belum bisa diproses")}
                   </p>
                   <span className={`inline-flex items-center gap-1 rounded-md border px-3 py-1 text-xs font-medium ${RESULT_TONE[resultTone(result)].badge}`}>
-                    {result.autoPublished && <Check className="size-3" aria-hidden="true" />}
+                    {result.status === "PUBLISHED" && <Check className="size-3" aria-hidden="true" />}
                     {headline(t, result)}
                   </span>
                 </div>
@@ -473,7 +521,7 @@ export function UploadForm({ kitchens, kitchenId }: { kitchens: Kitchen[]; kitch
                 {result.warning && <p className="rounded-md bg-amber-50 p-3 text-amber-800">{result.warning}</p>}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="flex items-center gap-1.5 text-slate-500">
-                    {result.autoPublished && (
+                    {result.status === "PUBLISHED" && (
                       <>
                         <Check className="size-4" aria-hidden="true" />
                         {t("Sudah dipublish.")}

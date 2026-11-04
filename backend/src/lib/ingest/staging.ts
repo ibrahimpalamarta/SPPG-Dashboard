@@ -58,6 +58,16 @@ export type ParseContext = {
   expenseCategories?: string[];
   /** "Ubah Mapping": `sheet|column letter` → canonical field the uploader says it holds; "" = not used. */
   columnMap?: Record<string, string>;
+  /** "Validasi Data" grid edits, applied to the raw sheets before anything reads them. */
+  rowEdits?: RowEdits;
+};
+
+/** Column letter → text the uploader typed ("" = emptied). */
+type CellEdits = Record<string, string>;
+export type RowEdits = {
+  update: { sheet: string; row: number; cells: CellEdits }[];
+  remove: { sheet: string; row: number }[];
+  add: { sheet: string; cells: CellEdits }[];
 };
 
 /** Turns the raw sheets into staged rows for one domain. */

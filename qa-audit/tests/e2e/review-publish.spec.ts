@@ -2,7 +2,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { shot } from './evidence.js';
 import { storageState, type RoleKey } from './roles.js';
-import { pilih } from './ui.js';
+import { pilih, validasiDanPublish } from './ui.js';
 
 // Alur sesudah unggah (skenario C-F dokumen pengujian manual): Data Operasional mem-publish sendiri
 // (Setujui & Publish, SCRUM-151), Admin hanya melihat, koreksi. Satu database dipakai bersama dan tiap langkah memakai hasil
@@ -42,9 +42,9 @@ async function unggah(page: Page, name: string, buffer: Buffer, jenis = CASHFLOW
       (el as HTMLInputElement).form?.append(input);
     }, replaces);
   }
-  await page.getByRole('button', { name: 'Unggah', exact: true }).click();
-  // Temuan menahan file (Perlu dicek); file tanpa temuan langsung Dipublish otomatis.
-  await expect(page.locator('section[aria-live=polite]').getByText(/Perlu dicek|Dipublish otomatis/)).toBeVisible();
+  await validasiDanPublish(page);
+  // Temuan "Wajib diperbaiki" menahan file (Perlu dicek); tanpa temuan itu Publish di tabel Validasi Data langsung mem-publish.
+  await expect(page.locator('section[aria-live=polite]').getByText(/Perlu dicek|Dipublish/)).toBeVisible();
 }
 
 async function bukaBatch(page: Page, name: string) {
@@ -72,8 +72,12 @@ async function unggahKirimPublish(browser: Browser, name: string, buffer: Buffer
   return sebagai(browser, 'data-operasional-skn', async (page) => {
     await unggah(page, name, buffer, jenis, replaces);
     await bukaBatch(page, name);
-    await tandaiTemuan(page);
-    await page.getByRole('button', { name: 'Setujui & Publish' }).click();
+    // Sudah live kalau Publish di tabel Validasi Data tidak tertahan temuan wajib.
+    const setujui = page.getByRole('button', { name: 'Setujui & Publish' });
+    if (await setujui.isVisible()) {
+      await tandaiTemuan(page);
+      await setujui.click();
+    }
     await expect(page.getByText('Dipublish')).toBeVisible();
     return batchId(page);
   });
